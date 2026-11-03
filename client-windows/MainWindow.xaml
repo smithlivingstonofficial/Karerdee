@@ -1,0 +1,626 @@
+<Window x:Class="SafeExamClient.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="KARE-SES — Standalone Secure Exam Environment"
+        Icon="app.ico"
+        WindowState="Maximized"
+        WindowStyle="None"
+        ResizeMode="NoResize"
+        Topmost="True"
+        Background="#F8FAFC"
+        Loaded="Window_Loaded"
+        Closing="Window_Closing"
+        PreviewKeyDown="Window_PreviewKeyDown"
+        Stylus.IsPressAndHoldEnabled="False"
+        Stylus.IsFlicksEnabled="False"
+        Stylus.IsTapFeedbackEnabled="False"
+        PreviewTouchDown="Window_PreviewTouchDown"
+        PreviewTouchMove="Window_PreviewTouchMove"
+        PreviewTouchUp="Window_PreviewTouchUp">
+
+    <Window.Resources>
+        <!-- Light Theme Academic Palette -->
+        <SolidColorBrush x:Key="CanvasBg" Color="#F8FAFC" />
+        <SolidColorBrush x:Key="CardBg" Color="#FFFFFF" />
+        <SolidColorBrush x:Key="BorderSubtle" Color="#E2E8F0" />
+        <SolidColorBrush x:Key="BorderMedium" Color="#CBD5E1" />
+        <SolidColorBrush x:Key="TextPrimary" Color="#0F172A" />
+        <SolidColorBrush x:Key="TextSecondary" Color="#475569" />
+        <SolidColorBrush x:Key="PrimaryBlue" Color="#1D4ED8" />
+        <SolidColorBrush x:Key="SuccessGreen" Color="#059669" />
+        <SolidColorBrush x:Key="WarningAmber" Color="#D97706" />
+        <SolidColorBrush x:Key="DangerRed" Color="#DC2626" />
+
+        <Style x:Key="RoundedButton" TargetType="Button">
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Padding" Value="14,8" />
+            <Setter Property="Background" Value="#FFFFFF" />
+            <Setter Property="BorderBrush" Value="#CBD5E1" />
+            <Setter Property="Foreground" Value="#0F172A" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="border" Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="6" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="border" Property="Opacity" Value="0.9" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="border" Property="Opacity" Value="0.5" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="PrimaryActionBtn" TargetType="Button" BasedOn="{StaticResource RoundedButton}">
+            <Setter Property="Background" Value="#1D4ED8" />
+            <Setter Property="BorderBrush" Value="#1D4ED8" />
+            <Setter Property="Foreground" Value="#FFFFFF" />
+            <Setter Property="FontWeight" Value="Bold" />
+        </Style>
+
+        <Style x:Key="DangerActionBtn" TargetType="Button" BasedOn="{StaticResource RoundedButton}">
+            <Setter Property="Background" Value="#FEF2F2" />
+            <Setter Property="BorderBrush" Value="#FCA5A5" />
+            <Setter Property="Foreground" Value="#B91C1C" />
+            <Setter Property="FontWeight" Value="Bold" />
+        </Style>
+    </Window.Resources>
+
+    <Grid>
+        <!-- ========================================================================= -->
+        <!-- LAYER 1: NATIVE AUTHENTICATION GATE (PRE-EXAM LOGIN)                      -->
+        <!-- ========================================================================= -->
+        <Grid x:Name="AuthGatePanel" Visibility="Visible">
+            <!-- Top Controls Bar -->
+            <Border VerticalAlignment="Top" HorizontalAlignment="Stretch" Background="#FFFFFF" BorderBrush="#E2E8F0" BorderThickness="0,0,0,1" Height="52" Padding="24,0">
+                <Grid VerticalAlignment="Center">
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
+                        <Image Source="KARE_Logo.png" Width="30" Height="30" Margin="0,0,10,0" VerticalAlignment="Center" RenderOptions.BitmapScalingMode="HighQuality" />
+                        <TextBlock Text="KARE-SES — Candidate Safe Exam Environment" FontWeight="Bold" FontSize="13" Foreground="#0F172A" VerticalAlignment="Center" />
+                    </StackPanel>
+
+                    <!-- Top-Right Exit Icon -->
+                    <Button HorizontalAlignment="Right" Height="32" Padding="12,0" Style="{StaticResource DangerActionBtn}" Click="BtnExitApp_Click" ToolTip="Exit Exam Software">
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <TextBlock Text="✕" FontWeight="Bold" FontSize="13" Margin="0,0,5,0" Foreground="#DC2626" />
+                            <TextBlock Text="Exit Software" Foreground="#B91C1C" FontWeight="SemiBold" />
+                        </StackPanel>
+                    </Button>
+                </Grid>
+            </Border>
+
+            <!-- Centered Entrance Card -->
+            <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Margin="0,52,0,0">
+                <Border Width="480" VerticalAlignment="Center" HorizontalAlignment="Center" Margin="0,30,0,30"
+                        Background="#FFFFFF" BorderBrush="#E2E8F0" BorderThickness="1"
+                        CornerRadius="12" Padding="32">
+                    <Border.Effect>
+                        <DropShadowEffect Color="#0F172A" Opacity="0.06" BlurRadius="20" ShadowDepth="4" />
+                    </Border.Effect>
+
+                    <StackPanel>
+                        <!-- Header -->
+                        <StackPanel HorizontalAlignment="Center" Margin="0,0,0,16">
+                            <Image Source="KARE_Logo.png" Width="68" Height="68" Margin="0,0,0,10" HorizontalAlignment="Center" RenderOptions.BitmapScalingMode="HighQuality" />
+                            <TextBlock Text="KARE-SES" FontWeight="Bold" FontSize="19" Foreground="#0F172A" HorizontalAlignment="Center" />
+                            <TextBlock Text="Kalasalingam Academy of Research and Education • Secure Sitting Engine" FontSize="11" Foreground="#475569" HorizontalAlignment="Center" Margin="0,2,0,0" />
+                        </StackPanel>
+
+                        <Separator Background="#E2E8F0" Margin="0,0,0,16" />
+
+                        <!-- Candidate Email Input -->
+                        <TextBlock Text="Candidate Registered / Institutional Email ID" FontSize="12" FontWeight="SemiBold" Foreground="#0F172A" Margin="0,0,0,5" />
+                        <TextBox x:Name="TxtEmail" Height="36" Padding="10,6" FontSize="13"
+                                 Background="#F8FAFC" BorderBrush="#CBD5E1" BorderThickness="1"
+                                 Text="" Margin="0,0,0,12" />
+
+                        <!-- Application ID as Password -->
+                        <Grid Margin="0,0,0,5">
+                            <TextBlock Text="Application ID (Password)" FontSize="12" FontWeight="SemiBold" Foreground="#0F172A" HorizontalAlignment="Left" />
+                            <TextBlock Text="Acts as Password" FontSize="11" FontWeight="SemiBold" Foreground="#1D4ED8" HorizontalAlignment="Right" />
+                        </Grid>
+                        <TextBox x:Name="TxtAppPassword" Height="36" Padding="10,6" FontSize="13" FontFamily="Consolas" FontWeight="SemiBold"
+                                 Background="#F8FAFC" BorderBrush="#CBD5E1" BorderThickness="1"
+                                 Text="" Margin="0,0,0,12" />
+
+                        <!-- Exam Passcode Input -->
+                        <TextBlock Text="Examination Security Passcode (Hall Ticket / Slip)" FontSize="12" FontWeight="SemiBold" Foreground="#0F172A" Margin="0,0,0,5" />
+                        <TextBox x:Name="TxtPasscode" Height="36" Padding="10,6" FontSize="13" FontFamily="Consolas" FontWeight="Bold"
+                                 Background="#F8FAFC" BorderBrush="#CBD5E1" BorderThickness="1"
+                                 Text="" Margin="0,0,0,14" />
+
+                        <!-- Backend API URL -->
+                        <TextBlock Text="Institution Server URL" FontSize="12" FontWeight="SemiBold" Foreground="#0F172A" Margin="0,0,0,5" />
+                        <TextBox x:Name="TxtServerUrl" Height="36" Padding="10,6" FontSize="13"
+                                 Background="#F8FAFC" BorderBrush="#CBD5E1" BorderThickness="1"
+                                 Text="http://localhost:3000" Margin="0,0,0,16" />
+
+                        <!-- Hardware Fingerprint Badge -->
+                        <Border Background="#F1F5F9" BorderBrush="#E2E8F0" BorderThickness="1" CornerRadius="6" Padding="10" Margin="0,0,0,16">
+                            <StackPanel>
+                                <TextBlock Text="Hardware Security Fingerprint" FontSize="11" FontWeight="SemiBold" Foreground="#475569" />
+                                <TextBlock x:Name="LblFingerprint" Text="Computing..." FontSize="11" FontFamily="Consolas" Foreground="#0F172A" TextWrapping="Wrap" Margin="0,4,0,0" />
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Status / Error Banner -->
+                        <TextBlock x:Name="LblStatus" Text="Environment verified. Ready to launch." FontSize="12" Foreground="#047857"
+                                   TextAlignment="Center" Margin="0,0,0,16" TextWrapping="Wrap" />
+
+                        <!-- Launch Button -->
+                        <Button x:Name="BtnLaunch" Content="Verify &amp; Enter Exam Session" Height="44"
+                                Style="{StaticResource PrimaryActionBtn}" Click="BtnLaunch_Click" Margin="0,0,0,8" />
+
+                        <!-- Exit Button -->
+                        <Button x:Name="BtnExitPreExam" Content="Exit Application" Height="36"
+                                Style="{StaticResource RoundedButton}" Click="BtnExitApp_Click" />
+                    </StackPanel>
+                </Border>
+            </ScrollViewer>
+        </Grid>
+
+        <!-- ========================================================================= -->
+        <!-- LAYER 2: NATIVE INSTRUCTIONS & VERIFICATION PANEL                         -->
+        <!-- ========================================================================= -->
+        <Grid x:Name="InstructionsPanel" Visibility="Collapsed">
+            <Border VerticalAlignment="Top" HorizontalAlignment="Stretch" Background="#FFFFFF" BorderBrush="#E2E8F0" BorderThickness="0,0,0,1" Height="52" Padding="24,0">
+                <Grid VerticalAlignment="Center">
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Center">
+                        <Image Source="KARE_Logo.png" Width="30" Height="30" Margin="0,0,10,0" VerticalAlignment="Center" RenderOptions.BitmapScalingMode="HighQuality" />
+                        <TextBlock Text="KARE-SES — Candidate Instructions &amp; Examination Agreement" FontWeight="Bold" FontSize="13" Foreground="#0F172A" VerticalAlignment="Center" />
+                    </StackPanel>
+                    <Button HorizontalAlignment="Right" Height="32" Padding="12,0" Style="{StaticResource DangerActionBtn}" Click="BtnExitApp_Click" ToolTip="Exit Exam Software">
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <TextBlock Text="✕" FontWeight="Bold" FontSize="13" Margin="0,0,5,0" Foreground="#DC2626" />
+                            <TextBlock Text="Exit Software" Foreground="#B91C1C" FontWeight="SemiBold" />
+                        </StackPanel>
+                    </Button>
+                </Grid>
+            </Border>
+
+            <ScrollViewer Margin="0,52,0,0" VerticalScrollBarVisibility="Auto">
+                <Border Width="680" Background="#FFFFFF" BorderBrush="#E2E8F0" BorderThickness="1" CornerRadius="12" Padding="32" Margin="0,24,0,24" HorizontalAlignment="Center">
+                    <StackPanel>
+                        <TextBlock x:Name="LblInstrExamTitle" Text="Ph.D Research Eligibility &amp; Entrance Test" FontWeight="Bold" FontSize="18" Foreground="#0F172A" Margin="0,0,0,16" />
+
+                        <!-- Candidate Profile Info Box -->
+                        <Border Background="#F8FAFC" BorderBrush="#E2E8F0" BorderThickness="1" CornerRadius="8" Padding="16" Margin="0,0,0,20">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
+
+                                <StackPanel Grid.Row="0" Grid.Column="0" Margin="0,0,0,10">
+                                    <TextBlock Text="Candidate Name" FontSize="11" Foreground="#64748B" FontWeight="SemiBold" />
+                                    <TextBlock x:Name="LblInstrCandName" Text="Candidate Scholar" FontSize="13" Foreground="#0F172A" FontWeight="Bold" />
+                                </StackPanel>
+
+                                <StackPanel Grid.Row="0" Grid.Column="1" Margin="0,0,0,10">
+                                    <TextBlock Text="Application Number" FontSize="11" Foreground="#64748B" FontWeight="SemiBold" />
+                                    <TextBlock x:Name="LblInstrAppNo" Text="KARE2026PHD" FontSize="13" Foreground="#0F172A" FontWeight="Bold" FontFamily="Consolas" />
+                                </StackPanel>
+
+                                <StackPanel Grid.Row="1" Grid.Column="0">
+                                    <TextBlock Text="Enrolled Department" FontSize="11" Foreground="#64748B" FontWeight="SemiBold" />
+                                    <TextBlock x:Name="LblInstrDept" Text="Computer Applications (MCA)" FontSize="13" Foreground="#1D4ED8" FontWeight="Bold" />
+                                </StackPanel>
+
+                                <StackPanel Grid.Row="1" Grid.Column="1">
+                                    <TextBlock Text="Allocated Duration" FontSize="11" Foreground="#64748B" FontWeight="SemiBold" />
+                                    <TextBlock x:Name="LblInstrDuration" Text="90 Minutes" FontSize="13" Foreground="#059669" FontWeight="Bold" />
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+
+                        <!-- Custom Paper Instructions & Marking Policy -->
+                        <Border x:Name="BorderPaperDetails" Background="#EFF6FF" BorderBrush="#BFDBFE" BorderThickness="1" CornerRadius="8" Padding="14" Margin="0,0,0,16">
+                            <StackPanel>
+                                <TextBlock Text="📋 Examination Paper Configuration:" FontWeight="Bold" FontSize="12" Foreground="#1E40AF" Margin="0,0,0,6" />
+                                <TextBlock x:Name="LblMarkingPolicy" Text="Marking: Standard (+1.0 / 0.0)" FontSize="12" Foreground="#1D4ED8" Margin="0,0,0,4" FontWeight="SemiBold" />
+                                <TextBlock x:Name="LblToolsAllowed" Text="Permitted Tools: Calculator (None) • Rough Space (Enabled) • Flagging (Enabled)" FontSize="12" Foreground="#1E3A8A" Margin="0,0,0,4" />
+                                <TextBlock x:Name="LblCustomInstructions" Text="" FontSize="11" Foreground="#334155" TextWrapping="Wrap" Margin="0,4,0,0" Visibility="Collapsed" />
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Examination Rules -->
+                        <TextBlock Text="Official Examination Standards &amp; Anti-Cheat Policies" FontWeight="Bold" FontSize="13" Foreground="#0F172A" Margin="0,0,0,8" />
+                        <Border Background="#FEF2F2" BorderBrush="#FECACA" BorderThickness="1" CornerRadius="8" Padding="14" Margin="0,0,0,16">
+                            <StackPanel>
+                                <TextBlock Text="⚠️ Strict Lockdown Rules in Effect:" FontWeight="Bold" FontSize="12" Foreground="#991B1B" Margin="0,0,0,6" />
+                                <TextBlock Text="1. Full Screen Kiosk: System shortcuts (Alt+Tab, WinKey, Ctrl+Esc, Alt+F4) are intercepted and dropped." FontSize="12" Foreground="#7F1D1D" Margin="0,0,0,4" />
+                                <TextBlock Text="2. Screen Recording &amp; Sharing: OBS, TeamViewer, AnyDesk, Discord, and Snipping Tool are automatically detected and terminated." FontSize="12" Foreground="#7F1D1D" Margin="0,0,0,4" />
+                                <TextBlock Text="3. Strike Policy: Intercepted system events register strikes (Max 3). Reaching the strike limit immediately locks your workstation." FontSize="12" Foreground="#7F1D1D" Margin="0,0,0,4" />
+                                <TextBlock Text="4. Continuous Answer Buffering: Your answers are saved locally in memory and synced securely to the server every few seconds." FontSize="12" Foreground="#7F1D1D" />
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Agreement Checkbox -->
+                        <CheckBox x:Name="ChkAgreeRules" Margin="0,0,0,24" VerticalContentAlignment="Center">
+                            <TextBlock Text="I confirm that I am the authorized candidate, and I agree to strictly abide by all examination security guidelines." FontSize="12" Foreground="#0F172A" FontWeight="SemiBold" TextWrapping="Wrap" />
+                        </CheckBox>
+
+                        <!-- Start Button -->
+                        <Button x:Name="BtnStartExam" Content="Start Examination Now" Height="44"
+                                Style="{StaticResource PrimaryActionBtn}" Click="BtnStartExam_Click" />
+                    </StackPanel>
+                </Border>
+            </ScrollViewer>
+        </Grid>
+
+        <!-- ========================================================================= -->
+        <!-- LAYER 3: NATIVE EXAMINATION ENGINE (ACTIVE EXAM SURFACE)                  -->
+        <!-- ========================================================================= -->
+        <Grid x:Name="ExamActivePanel" Visibility="Collapsed">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="56" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+
+            <!-- Top Exam Navigation Bar -->
+            <Border Grid.Row="0" Background="#FFFFFF" BorderBrush="#E2E8F0" BorderThickness="0,0,0,1" Padding="20,0">
+                <Grid VerticalAlignment="Center">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Left: Brand & Candidate Tag -->
+                    <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                        <Image Source="KARE_Logo.png" Width="34" Height="34" Margin="0,0,10,0" VerticalAlignment="Center" RenderOptions.BitmapScalingMode="HighQuality" />
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock x:Name="LblTopExamTitle" Text="Ph.D Research Entrance Test" FontWeight="Bold" FontSize="13" Foreground="#0F172A" />
+                            <TextBlock x:Name="LblTopCandTag" Text="Dr. Candidate Scholar (KARE2026PHD) • MCA" FontSize="11" Foreground="#475569" />
+                        </StackPanel>
+                    </StackPanel>
+
+                    <!-- Center: Countdown Timer -->
+                    <Border Grid.Column="1" HorizontalAlignment="Center" Background="#F8FAFC" BorderBrush="#E2E8F0" BorderThickness="1" CornerRadius="20" Padding="14,6">
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <TextBlock Text="⏱" FontSize="14" Foreground="#1D4ED8" Margin="0,0,6,0" VerticalAlignment="Center" />
+                            <TextBlock x:Name="LblCountdown" Text="01:29:59" FontSize="14" FontWeight="Bold" FontFamily="Consolas" Foreground="#0F172A" VerticalAlignment="Center" />
+                            <TextBlock Text=" Remaining" FontSize="12" Foreground="#64748B" Margin="4,0,0,0" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Right Controls: Strikes, Sync, Calculator, Submit, Exit -->
+                    <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                        <!-- Strikes Pill -->
+                        <Border x:Name="PillStrikes" Background="#FEF2F2" BorderBrush="#FCA5A5" BorderThickness="1" CornerRadius="6" Padding="8,4" Margin="0,0,10,0">
+                            <TextBlock x:Name="LblStrikesCount" Text="Strikes: 0 / 3" FontSize="11" FontWeight="Bold" Foreground="#B91C1C" />
+                        </Border>
+
+                        <!-- Live Sync Status -->
+                        <Border Background="#F0FDF4" BorderBrush="#BBF7D0" BorderThickness="1" CornerRadius="6" Padding="8,4" Margin="0,0,10,0">
+                            <TextBlock x:Name="LblSyncStatus" Text="☁ Synced" FontSize="11" FontWeight="Bold" Foreground="#15803D" />
+                        </Border>
+
+                        <!-- In-Exam Calculator (Strictly controlled by exam settings) -->
+                        <Button x:Name="BtnCalculatorToggle" Content="🧮 Calculator" Height="32" Padding="10,0" Margin="0,0,8,0"
+                                Style="{StaticResource RoundedButton}" Click="BtnToggleCalculator_Click" />
+
+                        <!-- In-Exam Rough Space / Scratchpad (Controlled by exam settings) -->
+                        <Button x:Name="BtnScratchpadToggle" Content="📝 Rough Space" Height="32" Padding="10,0" Margin="0,0,8,0"
+                                Style="{StaticResource RoundedButton}" Click="BtnToggleScratchpad_Click" />
+
+                        <!-- Submit Exam Button -->
+                        <Button Content="Submit Exam" Height="32" Padding="14,0" Margin="0,0,8,0"
+                                Style="{StaticResource PrimaryActionBtn}" Click="BtnSubmitExam_Click" />
+
+                        <!-- Top-Right Exit Button -->
+                        <Button Height="32" Padding="10,0" Style="{StaticResource DangerActionBtn}" Click="BtnExitApp_Click" ToolTip="Exit Exam Software">
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <TextBlock Text="✕" FontWeight="Bold" FontSize="13" Margin="0,0,4,0" Foreground="#DC2626" />
+                                <TextBlock Text="Exit" Foreground="#B91C1C" FontWeight="SemiBold" />
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <!-- Main Exam Layout Grid -->
+            <Grid Grid.Row="1">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="340" />
+                </Grid.ColumnDefinitions>
+
+                <!-- Left Column: Question Area -->
+                <Grid Grid.Column="0" Margin="24,16,16,16">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <!-- Section Selector Tabs -->
+                    <Border Grid.Row="0" Background="#FFFFFF" BorderBrush="#E2E8F0" BorderThickness="1" CornerRadius="8" Padding="8" Margin="0,0,0,16">
+                        <StackPanel x:Name="SectionTabsContainer" Orientation="Horizontal" />
+                    </Border>
+
+                    <!-- Question Card Container -->
+                    <Border Grid.Row="1" Background="#FFFFFF" BorderBrush="#E2E8F0" BorderThickness="1" CornerRadius="12" Padding="24">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                            <StackPanel>
+                                <!-- Question Meta Header -->
+                                <Grid Margin="0,0,0,12">
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                        <TextBlock x:Name="LblQuestionNumber" Text="Question 1 of 30" FontWeight="Bold" FontSize="14" Foreground="#0F172A" />
+                                        <Border x:Name="BadgeReview" Visibility="Collapsed" Background="#FEF3C7" BorderBrush="#FCD34D" BorderThickness="1" CornerRadius="4" Padding="6,2" Margin="10,0,0,0">
+                                            <TextBlock Text="Marked for Review" FontSize="11" FontWeight="Bold" Foreground="#92400E" />
+                                        </Border>
+                                        <Border x:Name="BadgeMultiSelect" Visibility="Collapsed" Background="#EFF6FF" BorderBrush="#BFDBFE" BorderThickness="1" CornerRadius="4" Padding="6,2" Margin="8,0,0,0">
+                                            <TextBlock Text="☑ Multi-Select (Choose all that apply)" FontSize="11" FontWeight="Bold" Foreground="#1E40AF" />
+                                        </Border>
+                                    </StackPanel>
+                                    <TextBlock x:Name="LblQuestionMarks" Text="+1.00 Marks / -0.00 Neg" FontSize="12" FontWeight="SemiBold" Foreground="#64748B" HorizontalAlignment="Right" VerticalAlignment="Center" />
+                                </Grid>
+
+                                <Separator Background="#F1F5F9" Margin="0,0,0,16" />
+
+                                <!-- Question Prompt Text -->
+                                <TextBlock x:Name="LblQuestionPrompt" Text="Question text will appear here."
+                                           FontSize="15" FontWeight="SemiBold" Foreground="#0F172A" TextWrapping="Wrap" LineHeight="24" Margin="0,0,0,16" />
+
+                                <!-- Code Snippet Box (if applicable) -->
+                                <Border x:Name="CodeSnippetBorder" Visibility="Collapsed" Background="#F8FAFC" BorderBrush="#CBD5E1" BorderThickness="1" CornerRadius="6" Padding="14" Margin="0,0,0,20">
+                                    <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+                                        <TextBlock x:Name="LblCodeSnippet" Text="" FontFamily="Consolas" FontSize="12" Foreground="#0F172A" />
+                                    </ScrollViewer>
+                                </Border>
+
+                                <!-- MCQ Options List -->
+                                <StackPanel x:Name="OptionsContainer" Margin="0,0,0,20" />
+                            </StackPanel>
+                        </ScrollViewer>
+                    </Border>
+
+                    <!-- Bottom Question Navigation Action Bar -->
+                    <Border Grid.Row="2" Background="#FFFFFF" BorderBrush="#E2E8F0" BorderThickness="1" CornerRadius="8" Padding="12,10" Margin="0,16,0,0">
+                        <Grid>
+                            <Button x:Name="BtnPrevQuestion" Content="← Previous" Height="36" Padding="16,0" HorizontalAlignment="Left"
+                                    Style="{StaticResource RoundedButton}" Click="BtnPrevQuestion_Click" />
+
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                <Button x:Name="BtnMarkReview" Content="⚑ Mark for Review" Height="36" Padding="14,0" Margin="0,0,10,0"
+                                        Style="{StaticResource RoundedButton}" Click="BtnMarkReview_Click" />
+                                <Button x:Name="BtnClearResponse" Content="Clear Selection" Height="36" Padding="14,0"
+                                        Style="{StaticResource RoundedButton}" Click="BtnClearResponse_Click" />
+                            </StackPanel>
+
+                            <Button x:Name="BtnNextQuestion" Content="Next →" Height="36" Padding="20,0" HorizontalAlignment="Right"
+                                    Style="{StaticResource PrimaryActionBtn}" Click="BtnNextQuestion_Click" />
+                        </Grid>
+                    </Border>
+                </Grid>
+
+                <!-- Right Column: Question Palette & Overview -->
+                <Border Grid.Column="1" Background="#FFFFFF" BorderBrush="#E2E8F0" BorderThickness="1,0,0,0" Padding="18">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+
+                        <!-- Overview Header -->
+                        <TextBlock Grid.Row="0" Text="Question Palette" FontWeight="Bold" FontSize="14" Foreground="#0F172A" Margin="0,0,0,12" />
+
+                        <!-- Legend & Counts Grid -->
+                        <Border Grid.Row="1" Background="#F8FAFC" BorderBrush="#E2E8F0" BorderThickness="1" CornerRadius="8" Padding="10" Margin="0,0,0,16">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+
+                                <StackPanel Grid.Row="0" Grid.Column="0" Orientation="Horizontal" Margin="0,0,0,8">
+                                    <Border Width="10" Height="10" Background="#059669" CornerRadius="5" Margin="0,0,6,0" VerticalAlignment="Center" />
+                                    <TextBlock x:Name="LblCountAnswered" Text="Answered: 0" FontSize="11" FontWeight="SemiBold" Foreground="#047857" />
+                                </StackPanel>
+
+                                <StackPanel Grid.Row="0" Grid.Column="1" Orientation="Horizontal" Margin="0,0,0,8">
+                                    <Border Width="10" Height="10" Background="#D97706" CornerRadius="5" Margin="0,0,6,0" VerticalAlignment="Center" />
+                                    <TextBlock x:Name="LblCountReview" Text="Review: 0" FontSize="11" FontWeight="SemiBold" Foreground="#B45309" />
+                                </StackPanel>
+
+                                <StackPanel Grid.Row="1" Grid.Column="0" Orientation="Horizontal">
+                                    <Border Width="10" Height="10" Background="#CBD5E1" CornerRadius="5" Margin="0,0,6,0" VerticalAlignment="Center" />
+                                    <TextBlock x:Name="LblCountUnanswered" Text="Unanswered: 30" FontSize="11" FontWeight="SemiBold" Foreground="#64748B" />
+                                </StackPanel>
+
+                                <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal">
+                                    <Border Width="10" Height="10" Background="#1D4ED8" CornerRadius="5" Margin="0,0,6,0" VerticalAlignment="Center" />
+                                    <TextBlock Text="Current" FontSize="11" FontWeight="SemiBold" Foreground="#1D4ED8" />
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+
+                        <!-- Question Numbers Palette -->
+                        <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
+                            <WrapPanel x:Name="QuestionPaletteContainer" Margin="0,0,0,10" />
+                        </ScrollViewer>
+
+                        <!-- Bottom Fast-Submit Button -->
+                        <Button Grid.Row="3" Content="Finish &amp; Submit Examination" Height="40"
+                                Style="{StaticResource PrimaryActionBtn}" Click="BtnSubmitExam_Click" />
+                    </Grid>
+                </Border>
+            </Grid>
+        </Grid>
+
+        <!-- ========================================================================= -->
+        <!-- LAYER 4: NATIVE SUBMISSION RECEIPT MODAL                                  -->
+        <!-- ========================================================================= -->
+        <Grid x:Name="SubmissionReceiptPanel" Visibility="Collapsed" Background="#B30F172A">
+            <Border Width="500" Background="#FFFFFF" BorderBrush="#E2E8F0" BorderThickness="1" CornerRadius="14" Padding="32" HorizontalAlignment="Center" VerticalAlignment="Center">
+                <StackPanel HorizontalAlignment="Center">
+                    <Image Source="KARE_Logo.png" Width="64" Height="64" Margin="0,0,0,12" HorizontalAlignment="Center" RenderOptions.BitmapScalingMode="HighQuality" />
+                    <TextBlock Text="Examination Successfully Submitted!" FontSize="18" FontWeight="Bold" Foreground="#0F172A" HorizontalAlignment="Center" Margin="0,0,0,8" />
+                    <TextBlock Text="Your responses have been securely stored in the academic examination records." FontSize="12" Foreground="#64748B" TextAlignment="Center" Margin="0,0,0,20" />
+
+                    <!-- Receipt Details Box -->
+                    <Border Background="#F8FAFC" BorderBrush="#E2E8F0" BorderThickness="1" CornerRadius="8" Padding="16" Margin="0,0,0,24">
+                        <StackPanel>
+                            <TextBlock Text="Official Submission Reference:" FontSize="11" FontWeight="SemiBold" Foreground="#64748B" />
+                            <TextBlock x:Name="LblReceiptCode" Text="KARE-SUB-XXXXXXXX" FontFamily="Consolas" FontSize="16" FontWeight="Bold" Foreground="#1D4ED8" Margin="0,2,0,10" />
+                            <TextBlock x:Name="LblReceiptCandidate" Text="Candidate: Dr. Candidate Scholar (KARE2026PHD)" FontSize="12" Foreground="#0F172A" Margin="0,0,0,4" />
+                            <TextBlock x:Name="LblReceiptSummary" Text="Total Answered: 30 Questions" FontSize="12" Foreground="#059669" FontWeight="SemiBold" />
+                        </StackPanel>
+                    </Border>
+
+                    <Button Content="Exit Examination Software" Height="42" Width="220"
+                            Style="{StaticResource PrimaryActionBtn}" Click="BtnReceiptExit_Click" />
+                </StackPanel>
+            </Border>
+        </Grid>
+
+        <!-- ========================================================================= -->
+        <!-- LAYER 5: IN-EXAM NATIVE SCIENTIFIC CALCULATOR POPUP                       -->
+        <!-- ========================================================================= -->
+        <Grid x:Name="CalculatorPanel" Visibility="Collapsed" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,64,24,0">
+            <Border Width="260" Background="#FFFFFF" BorderBrush="#CBD5E1" BorderThickness="1" CornerRadius="10" Padding="14">
+                <Border.Effect>
+                    <DropShadowEffect Color="#0F172A" Opacity="0.15" BlurRadius="16" ShadowDepth="4" />
+                </Border.Effect>
+                <StackPanel>
+                    <Grid Margin="0,0,0,10">
+                        <TextBlock Text="Exam Calculator" FontWeight="Bold" FontSize="13" Foreground="#0F172A" VerticalAlignment="Center" />
+                        <Button Content="✕" Width="24" Height="24" Background="Transparent" BorderThickness="0"
+                                Foreground="#64748B" FontWeight="Bold" HorizontalAlignment="Right" Click="BtnCloseCalculator_Click" Cursor="Hand" />
+                    </Grid>
+
+                    <!-- Calculator Screen -->
+                    <Border Background="#F8FAFC" BorderBrush="#CBD5E1" BorderThickness="1" CornerRadius="6" Padding="10,6" Margin="0,0,0,10">
+                        <TextBlock x:Name="LblCalcDisplay" Text="0" FontFamily="Consolas" FontSize="18" FontWeight="Bold"
+                                   Foreground="#0F172A" HorizontalAlignment="Right" />
+                    </Border>
+
+                    <!-- Calculator Button Grid -->
+                    <UniformGrid Columns="4" Rows="5">
+                        <Button Content="C" Height="32" Margin="2" Style="{StaticResource RoundedButton}" Click="BtnCalcClear_Click" Foreground="#DC2626" />
+                        <Button Content="(" Height="32" Margin="2" Style="{StaticResource RoundedButton}" Click="BtnCalcKey_Click" />
+                        <Button Content=")" Height="32" Margin="2" Style="{StaticResource RoundedButton}" Click="BtnCalcKey_Click" />
+                        <Button Content="/" Height="32" Margin="2" Style="{StaticResource RoundedButton}" Click="BtnCalcKey_Click" Foreground="#1D4ED8" />
+
+                        <Button Content="7" Height="32" Margin="2" Style="{StaticResource RoundedButton}" Click="BtnCalcKey_Click" />
+                        <Button Content="8" Height="32" Margin="2" Style="{StaticResource RoundedButton}" Click="BtnCalcKey_Click" />
+                        <Button Content="9" Height="32" Margin="2" Style="{StaticResource RoundedButton}" Click="BtnCalcKey_Click" />
+                        <Button Content="*" Height="32" Margin="2" Style="{StaticResource RoundedButton}" Click="BtnCalcKey_Click" Foreground="#1D4ED8" />
+
+                        <Button Content="4" Height="32" Margin="2" Style="{StaticResource RoundedButton}" Click="BtnCalcKey_Click" />
+                        <Button Content="5" Height="32" Margin="2" Style="{StaticResource RoundedButton}" Click="BtnCalcKey_Click" />
+                        <Button Content="6" Height="32" Margin="2" Style="{StaticResource RoundedButton}" Click="BtnCalcKey_Click" />
+                        <Button Content="-" Height="32" Margin="2" Style="{StaticResource RoundedButton}" Click="BtnCalcKey_Click" Foreground="#1D4ED8" />
+
+                        <Button Content="1" Height="32" Margin="2" Style="{StaticResource RoundedButton}" Click="BtnCalcKey_Click" />
+                        <Button Content="2" Height="32" Margin="2" Style="{StaticResource RoundedButton}" Click="BtnCalcKey_Click" />
+                        <Button Content="3" Height="32" Margin="2" Style="{StaticResource RoundedButton}" Click="BtnCalcKey_Click" />
+                        <Button Content="+" Height="32" Margin="2" Style="{StaticResource RoundedButton}" Click="BtnCalcKey_Click" Foreground="#1D4ED8" />
+
+                        <Button Content="0" Height="32" Margin="2" Style="{StaticResource RoundedButton}" Click="BtnCalcKey_Click" />
+                        <Button Content="." Height="32" Margin="2" Style="{StaticResource RoundedButton}" Click="BtnCalcKey_Click" />
+                        <Button Content="⌫" Height="32" Margin="2" Style="{StaticResource RoundedButton}" Click="BtnCalcBackspace_Click" />
+                        <Button Content="=" Height="32" Margin="2" Style="{StaticResource PrimaryActionBtn}" Click="BtnCalcEquals_Click" />
+                    </UniformGrid>
+                </StackPanel>
+            </Border>
+        </Grid>
+
+        <!-- ========================================================================= -->
+        <!-- LAYER 5b: IN-EXAM NATIVE ROUGH SPACE / SCRATCHPAD POPUP                   -->
+        <!-- ========================================================================= -->
+        <Grid x:Name="ScratchpadPanel" Visibility="Collapsed" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,64,24,0">
+            <Border Width="340" Background="#FFFFFF" BorderBrush="#CBD5E1" BorderThickness="1" CornerRadius="10" Padding="14">
+                <Border.Effect>
+                    <DropShadowEffect Color="#0F172A" Opacity="0.15" BlurRadius="16" ShadowDepth="4" />
+                </Border.Effect>
+                <StackPanel>
+                    <Grid Margin="0,0,0,8">
+                        <TextBlock Text="Digital Rough Space / Scratchpad" FontWeight="Bold" FontSize="13" Foreground="#0F172A" VerticalAlignment="Center" />
+                        <Button Content="✕" Width="24" Height="24" Background="Transparent" BorderThickness="0"
+                                Foreground="#64748B" FontWeight="Bold" HorizontalAlignment="Right" Click="BtnCloseScratchpad_Click" Cursor="Hand" />
+                    </Grid>
+                    <TextBox x:Name="TxtScratchpad" Height="220" TextWrapping="Wrap" AcceptsReturn="True"
+                             VerticalScrollBarVisibility="Auto" FontFamily="Consolas" FontSize="12"
+                             Background="#F8FAFC" BorderBrush="#CBD5E1" BorderThickness="1" Padding="8" Margin="0,0,0,8" />
+                    <Button Content="Clear Rough Space" Height="28" Padding="10,0" Style="{StaticResource RoundedButton}" Click="BtnClearScratchpad_Click" HorizontalAlignment="Right" />
+                </StackPanel>
+            </Border>
+        </Grid>
+
+        <!-- ========================================================================= -->
+        <!-- LAYER 6: LOCKOUT / DISQUALIFICATION MODAL OVERLAY                         -->
+        <!-- ========================================================================= -->
+        <Grid x:Name="LockoutOverlay" Visibility="Collapsed" Background="#CC0F172A">
+            <Border Width="500" Background="#FFFFFF" BorderBrush="#DC2626" BorderThickness="2"
+                    CornerRadius="12" Padding="32" VerticalAlignment="Center" HorizontalAlignment="Center">
+                <StackPanel HorizontalAlignment="Center">
+                    <TextBlock Text="⚠️ EXAM LOCKED" FontSize="20" FontWeight="Bold" Foreground="#B91C1C" HorizontalAlignment="Center" Margin="0,0,0,12" />
+                    <TextBlock Text="Security violations were registered on your machine or an invigilator locked your session."
+                               FontSize="13" Foreground="#475569" TextWrapping="Wrap" TextAlignment="Center" Margin="0,0,0,20" />
+                    <Border Background="#FEF2F2" BorderBrush="#FCA5A5" BorderThickness="1" CornerRadius="6" Padding="12" Margin="0,0,0,20">
+                        <TextBlock x:Name="LblLockoutReason" Text="Reason: System shortcut attempt (Alt+Tab)" FontSize="12" FontWeight="SemiBold" Foreground="#991B1B" TextAlignment="Center" />
+                    </Border>
+                    <TextBlock Text="Please notify your invigilator or administrator to request a remote unlock."
+                               FontSize="12" Foreground="#64748B" TextAlignment="Center" />
+                    <Button Content="Exit Software" Height="36" Padding="20,0" Margin="0,16,0,0"
+                            Style="{StaticResource DangerActionBtn}" Click="BtnExitApp_Click" />
+                </StackPanel>
+            </Border>
+        </Grid>
+
+        <!-- ========================================================================= -->
+        <!-- LAYER 7: IN-WINDOW EXIT CONFIRMATION MODAL OVERLAY                       -->
+        <!-- ========================================================================= -->
+        <Grid x:Name="ExitConfirmOverlay" Visibility="Collapsed" Background="#990F172A">
+            <Border Width="460" Background="#FFFFFF" BorderBrush="#CBD5E1" BorderThickness="1"
+                    CornerRadius="16" Padding="28" VerticalAlignment="Center" HorizontalAlignment="Center">
+                <Border.Effect>
+                    <DropShadowEffect Color="#0F172A" Opacity="0.18" BlurRadius="24" ShadowDepth="6" />
+                </Border.Effect>
+                <StackPanel HorizontalAlignment="Center">
+                    <Border Width="52" Height="52" CornerRadius="26" Background="#FEF2F2" BorderBrush="#FECACA" BorderThickness="1" Margin="0,0,0,16" HorizontalAlignment="Center">
+                        <TextBlock Text="⚠️" FontSize="22" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Border>
+                    <TextBlock Text="Exit Examination Client?" FontSize="18" FontWeight="Bold" Foreground="#0F172A" HorizontalAlignment="Center" Margin="0,0,0,10" />
+                    <TextBlock x:Name="LblExitConfirmMessage"
+                               Text="Are you sure you want to close and exit the software?"
+                               FontSize="13" Foreground="#475569" TextWrapping="Wrap" TextAlignment="Center" LineHeight="18" Margin="0,0,0,24" />
+                    <Grid Width="360">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="12" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Content="Cancel &amp; Continue" Height="40"
+                                Style="{StaticResource RoundedButton}" Click="BtnCancelExit_Click" />
+                        <Button Grid.Column="2" Content="Yes, Exit Software" Height="40"
+                                Style="{StaticResource DangerActionBtn}" Click="BtnConfirmExit_Click" />
+                    </Grid>
+                </StackPanel>
+            </Border>
+        </Grid>
+    </Grid>
+</Window>
