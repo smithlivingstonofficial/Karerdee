@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import { formatTime, formatDateTime } from "@/lib/date";
+import { supabaseClient } from "@/lib/supabase/client";
 import {
   Clock,
   CheckCircle2,
@@ -36,6 +37,13 @@ import {
   Camera,
   CameraOff,
   AlertOctagon,
+  Maximize2,
+  Minimize2,
+  Printer,
+  AlertTriangle,
+  MonitorCheck,
+  Globe,
+  RefreshCw,
 } from "lucide-react";
 
 interface OptionItem {
@@ -166,11 +174,21 @@ function CandidateSittingContent() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submissionReceipt, setSubmissionReceipt] = useState<any>(null);
 
-  // Instructions Agreement
+  // Instructions Agreement & Pre-Flight Diagnostics
   const [hasAgreedRules, setHasAgreedRules] = useState(false);
+
+  // Compensatory Extra Time Banner State
+  const prevExtraTimeRef = useRef<number>(0);
+  const [extraTimeNotice, setExtraTimeNotice] = useState<string | null>(null);
+
+  // Fullscreen Watchdog States
+  const [isFullscreenExited, setIsFullscreenExited] = useState(false);
+  const [fullscreenGraceCountdown, setFullscreenGraceCountdown] = useState(15);
+  const fullscreenTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Webcam & Security Watchdog States (Zero-Lag Background Camera + Watermark Engine)
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const instructionsVideoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const [isCameraActive, setIsCameraActive] = useState<boolean>(false);
@@ -181,7 +199,7 @@ function CandidateSittingContent() {
   const faceMissingTicksRef = useRef<number>(0);
   const lastViolationTimeRef = useRef<number>(0);
 
-  // Initialize Secure Background Webcam (Option B discreet mode)
+  // Initialize Secure Background Webcam (Pre-Exam Diagnostics & Active Exam)
   async function initializeSecureCamera() {
     if (typeof window === "undefined" || !navigator.mediaDevices?.getUserMedia) {
       console.warn("MediaDevices API not supported in this browser environment.");
@@ -220,18 +238,27 @@ function CandidateSittingContent() {
       });
 
       streamRef.current = stream;
+
+      // Attach stream to background capture element
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         await videoRef.current.play().catch(() => {});
       }
+
+      // Attach stream to instructions diagnostics preview element
+      if (instructionsVideoRef.current) {
+        instructionsVideoRef.current.srcObject = stream;
+        await instructionsVideoRef.current.play().catch(() => {});
+      }
+
       setIsCameraActive(true);
       setCameraError(null);
     } catch (err: any) {
       console.warn("Webcam access error:", err);
       setCameraError(
         err.name === "NotAllowedError"
-          ? "Camera permission denied"
-          : "Webcam initialization failed"
+          ? "Camera permission denied by browser. Please allow camera access in your URL bar."
+          : "Webcam initialization failed. Please verify your hardware connection."
       );
       setIsCameraActive(false);
     }
@@ -246,7 +273,60 @@ function CandidateSittingContent() {
     if (videoRef.current) {
       videoRef.current.srcObject = null;
     }
+    if (instructionsVideoRef.current) {
+      instructionsVideoRef.current.srcObject = null;
+    }
     setIsCameraActive(false);
+  }
+
+  // Pre-initialize camera during INSTRUCTIONS to avoid focus loss during ACTIVE_EXAM
+  useEffect(() => {
+    if (stage === "INSTRUCTIONS") {
+      initializeSecureCamera();
+    } else if (stage === "SUBMITTED") {
+      stopSecureCamera();
+    }
+    return () => {
+      if (stage === "SUBMITTED") {
+        stopSecureCamera();
+      }
+    };
+  }, [stage]);
+
+  // Keep instructions preview video wired when stream changes
+  useEffect(() => {
+    if (stage === "INSTRUCTIONS" && instructionsVideoRef.current && streamRef.current) {
+      instructionsVideoRef.current.srcObject = streamRef.current;
+      instructionsVideoRef.current.play().catch(() => {});
+    }
+  }, [stage, isCameraActive]);
+
+  // Fullscreen Entry Helper
+  async function enterFullscreen() {
+    try {
+      const docEl = document.documentElement as any;
+      if (docEl.requestFullscreen) {
+        await docEl.requestFullscreen();
+      } else if (docEl.webkitRequestFullscreen) {
+        await docEl.webkitRequestFullscreen();
+      } else if (docEl.msRequestFullscreen) {
+        await docEl.msRequestFullscreen();
+      }
+      setIsFullscreenExited(false);
+      setFullscreenGraceCountdown(15);
+      if (fullscreenTimerRef.current) {
+        clearInterval(fullscreenTimerRef.current);
+        fullscreenTimerRef.current = null;
+      }
+    } catch (err) {
+      console.warn("Fullscreen request error:", err);
+    }
+  }
+
+  // Transition from INSTRUCTIONS to ACTIVE_EXAM with mandatory Fullscreen
+  async function handleBeginExamination() {
+    await enterFullscreen();
+    setStage("ACTIVE_EXAM");
   }
 
   // Generate Evidentiary Watermarked JPEG Frame (Canvas 2D)
@@ -368,18 +448,6 @@ function CandidateSittingContent() {
     }
   }
 
-  // Camera Lifecycle Hook
-  useEffect(() => {
-    if (stage === "ACTIVE_EXAM") {
-      initializeSecureCamera();
-    } else if (stage === "SUBMITTED") {
-      stopSecureCamera();
-    }
-    return () => {
-      stopSecureCamera();
-    };
-  }, [stage]);
-
   // Option A: 10-Second Face Absence Grace Watchdog
   useEffect(() => {
     if (stage !== "ACTIVE_EXAM" || !isCameraActive) return;
@@ -440,7 +508,7 @@ function CandidateSittingContent() {
         );
       }
 
-      // Option A Grace Window Countdown Logic
+      // Grace Window Countdown Logic
       if (!faceDetected) {
         faceMissingTicksRef.current += 1;
         // Trigger 10-second warning banner after 2 consecutive missing ticks
@@ -468,7 +536,59 @@ function CandidateSittingContent() {
     return () => clearInterval(faceCheckInterval);
   }, [stage, isCameraActive, token, sessionId, strikes, exam, candidate]);
 
-  // Window Focus, Tab Switch & Keyboard Shortcut Interceptors
+  // Fullscreen Watchdog Event Listeners
+  useEffect(() => {
+    if (stage !== "ACTIVE_EXAM") return;
+
+    function handleFullscreenChange() {
+      const isCurrentlyFullscreen = !!(
+        document.fullscreenElement || (document as any).webkitFullscreenElement
+      );
+
+      if (!isCurrentlyFullscreen) {
+        setIsFullscreenExited(true);
+        setFullscreenGraceCountdown(15);
+
+        if (fullscreenTimerRef.current) clearInterval(fullscreenTimerRef.current);
+        fullscreenTimerRef.current = setInterval(() => {
+          setFullscreenGraceCountdown((prev) => {
+            if (prev <= 1) {
+              if (fullscreenTimerRef.current) {
+                clearInterval(fullscreenTimerRef.current);
+                fullscreenTimerRef.current = null;
+              }
+              reportSecurityViolation(
+                "FULLSCREEN_EXITED",
+                "Candidate exited fullscreen examination mode and did not return within 15 seconds"
+              );
+              return 0;
+            }
+            return prev - 1;
+          });
+        }, 1000);
+      } else {
+        setIsFullscreenExited(false);
+        if (fullscreenTimerRef.current) {
+          clearInterval(fullscreenTimerRef.current);
+          fullscreenTimerRef.current = null;
+        }
+      }
+    }
+
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+    document.addEventListener("webkitfullscreenchange", handleFullscreenChange);
+
+    return () => {
+      document.removeEventListener("fullscreenchange", handleFullscreenChange);
+      document.removeEventListener("webkitfullscreenchange", handleFullscreenChange);
+      if (fullscreenTimerRef.current) {
+        clearInterval(fullscreenTimerRef.current);
+        fullscreenTimerRef.current = null;
+      }
+    };
+  }, [stage, token, sessionId, strikes, exam, candidate]);
+
+  // Strict Browser Security & Interceptors (DevTools, Reload, Clipboard, Shortcuts, Focus)
   useEffect(() => {
     if (stage !== "ACTIVE_EXAM") return;
 
@@ -488,34 +608,151 @@ function CandidateSittingContent() {
       );
     }
 
+    function handleContextMenu(e: MouseEvent) {
+      e.preventDefault();
+    }
+
+    function handleClipboard(e: ClipboardEvent) {
+      e.preventDefault();
+      reportSecurityViolation(
+        "CLIPBOARD_ACCESS_ATTEMPT",
+        `Attempted unauthorized clipboard ${e.type} action`
+      );
+    }
+
+    function handleBeforeUnload(e: BeforeUnloadEvent) {
+      e.preventDefault();
+      e.returnValue = "";
+    }
+
+    function handleDragStart(e: DragEvent) {
+      e.preventDefault();
+    }
+
     function handleKeyDown(e: KeyboardEvent) {
-      if (
+      const isDevTools =
+        e.key === "F12" ||
+        ((e.ctrlKey || e.metaKey) &&
+          e.shiftKey &&
+          ["I", "i", "J", "j", "C", "c"].includes(e.key));
+
+      const isReload =
+        e.key === "F5" ||
+        ((e.ctrlKey || e.metaKey) && (e.key === "r" || e.key === "R"));
+
+      const isSavePrintSource =
+        (e.ctrlKey || e.metaKey) &&
+        ["u", "U", "p", "P", "s", "S"].includes(e.key);
+
+      const isClipboardKey =
+        (e.ctrlKey || e.metaKey) &&
+        ["c", "C", "v", "V", "x", "X", "a", "A"].includes(e.key);
+
+      const isSystemKey =
         e.key === "PrintScreen" ||
-        (e.altKey && (e.key === "Tab" || e.key === "Escape")) ||
         e.key === "Meta" ||
-        (e.ctrlKey && e.altKey && e.key === "Delete") ||
-        (e.ctrlKey &&
-          (e.key === "c" || e.key === "v" || e.key === "u" || e.key === "p" || e.key === "s")) ||
-        e.key === "F12"
-      ) {
+        (e.altKey && (e.key === "Tab" || e.key === "Escape"));
+
+      if (isDevTools || isReload || isSavePrintSource || isClipboardKey || isSystemKey) {
         e.preventDefault();
-        reportSecurityViolation(
-          "PROHIBITED_KEY_INPUT",
-          `Prohibited system keystroke intercepted: ${e.key}`
-        );
+        e.stopPropagation();
+        const reason = isDevTools
+          ? "Developer Inspection Tools shortcut intercepted"
+          : isReload
+          ? "Page reload command intercepted"
+          : isSavePrintSource
+          ? "Source/Print/Save command intercepted"
+          : isClipboardKey
+          ? "Clipboard shortcut intercepted"
+          : `System keystroke intercepted: ${e.key}`;
+        reportSecurityViolation("PROHIBITED_KEY_INPUT", reason);
       }
     }
 
     document.addEventListener("visibilitychange", handleVisibilityChange);
     window.addEventListener("blur", handleWindowBlur);
+    document.addEventListener("contextmenu", handleContextMenu);
+    document.addEventListener("copy", handleClipboard);
+    document.addEventListener("paste", handleClipboard);
+    document.addEventListener("cut", handleClipboard);
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    document.addEventListener("dragstart", handleDragStart);
     window.addEventListener("keydown", handleKeyDown);
 
     return () => {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       window.removeEventListener("blur", handleWindowBlur);
+      document.removeEventListener("contextmenu", handleContextMenu);
+      document.removeEventListener("copy", handleClipboard);
+      document.removeEventListener("paste", handleClipboard);
+      document.removeEventListener("cut", handleClipboard);
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+      document.removeEventListener("dragstart", handleDragStart);
       window.removeEventListener("keydown", handleKeyDown);
     };
   }, [stage, token, sessionId, strikes, exam, candidate]);
+
+  // Real-Time Invigilator Push Events via Supabase Realtime Channel
+  useEffect(() => {
+    if (stage !== "ACTIVE_EXAM" || !sessionId) return;
+
+    const channel = supabaseClient
+      .channel(`exam-session-${sessionId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "exam_sessions",
+          filter: `id=eq.${sessionId}`,
+        },
+        (payload: any) => {
+          const newRow = payload.new;
+          if (!newRow) return;
+
+          // 1. Remote Proctor Workstation Freeze / Unfreeze
+          if (newRow.status === "LOCKED") {
+            setIsWorkstationLocked(true);
+            setLockoutReason(
+              "Workstation Frozen by Invigilator in real time. Please raise your hand and await assistance."
+            );
+          } else if (newRow.status === "IN_PROGRESS") {
+            setIsWorkstationLocked(false);
+            setLockoutReason("");
+          }
+
+          // 2. Dynamic Compensatory Extra Time
+          if (
+            typeof newRow.extra_time_minutes === "number" &&
+            newRow.extra_time_minutes > prevExtraTimeRef.current
+          ) {
+            const addedMinutes = newRow.extra_time_minutes - prevExtraTimeRef.current;
+            prevExtraTimeRef.current = newRow.extra_time_minutes;
+            setSecondsRemaining((prev) => prev + addedMinutes * 60);
+            setExtraTimeNotice(
+              `⏱️ Compensatory Time Added: +${addedMinutes} minutes granted by invigilator.`
+            );
+            setTimeout(() => setExtraTimeNotice(null), 10000);
+          }
+
+          // 3. Live Strikes Sync
+          if (typeof newRow.strikes_count === "number") {
+            setStrikes(newRow.strikes_count);
+            if (exam && newRow.strikes_count >= (exam.maxStrikes || 3)) {
+              setIsWorkstationLocked(true);
+              setLockoutReason(
+                "Infraction Limit Reached. Workstation locked by Safe Exam Watchdog."
+              );
+            }
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabaseClient.removeChannel(channel);
+    };
+  }, [stage, sessionId, exam]);
 
   // Listen for WebView2 PostMessage from C# Windows Client
   useEffect(() => {
@@ -575,7 +812,11 @@ function CandidateSittingContent() {
         body: JSON.stringify({
           ticket: queryTicket,
           clientVersion: "1.0.0-web",
-          hardwareFingerprint: "WEB-CLIENT-" + (typeof window !== "undefined" && window.navigator?.userAgent ? window.navigator.userAgent.slice(0, 24) : "GENERIC"),
+          hardwareFingerprint:
+            "WEB-CLIENT-" +
+            (typeof window !== "undefined" && window.navigator?.userAgent
+              ? window.navigator.userAgent.slice(0, 24)
+              : "GENERIC"),
         }),
       })
         .then(async (res) => {
@@ -605,18 +846,28 @@ function CandidateSittingContent() {
       setIsAuthenticating(true);
       setAuthError(null);
 
-      fetch(`/api/exam/session?token=${encodeURIComponent(queryToken)}&sessionId=${encodeURIComponent(querySession || "")}`, {
-        headers: {
-          Authorization: `Bearer ${queryToken}`,
-        },
-      })
+      fetch(
+        `/api/exam/session?token=${encodeURIComponent(queryToken)}&sessionId=${encodeURIComponent(
+          querySession || ""
+        )}`,
+        {
+          headers: {
+            Authorization: `Bearer ${queryToken}`,
+          },
+        }
+      )
         .then(async (res) => {
           const data = await res.json();
           if (!res.ok) {
             throw new Error(data.error || "Failed to load examination session.");
           }
           if (data.candidate && data.exam) {
-            initializeSession(queryToken, data.sessionId || querySession || "", data.candidate, data.exam);
+            initializeSession(
+              queryToken,
+              data.sessionId || querySession || "",
+              data.candidate,
+              data.exam
+            );
           }
         })
         .catch((err: any) => {
@@ -629,7 +880,8 @@ function CandidateSittingContent() {
     }
 
     const queryEmail = searchParams.get("email");
-    const queryApp = searchParams.get("app") || searchParams.get("applicationId") || searchParams.get("appNo");
+    const queryApp =
+      searchParams.get("app") || searchParams.get("applicationId") || searchParams.get("appNo");
     const queryCode = searchParams.get("passcode") || searchParams.get("code");
     if (queryEmail) setLoginEmail(queryEmail);
     if (queryApp) setLoginPassword(queryApp);
@@ -720,7 +972,7 @@ function CandidateSittingContent() {
           password: loginPassword.trim(),
           applicationNumber: loginPassword.trim(),
           examPasscode: loginPasscode.trim(),
-          hardwareFingerprint: "BROWSER-SITTING-DEV-SIMULATOR",
+          hardwareFingerprint: "BROWSER-SITTING-WEB-CLIENT",
           clientVersion: "1.0.0-web",
         }),
       });
@@ -784,11 +1036,15 @@ function CandidateSittingContent() {
     return () => clearInterval(timer);
   }, [stage, examEndTime, clockSkewMs]);
 
-  // Periodic Background Heartbeat & Server Sync (Every 8 seconds)
+  // Periodic Unified Telemetry Heartbeat (Single 10-Second Interval)
   useEffect(() => {
     if (stage !== "ACTIVE_EXAM" || !token || !sessionId) return;
 
-    const hbInterval = setInterval(async () => {
+    let isHeartbeatRunning = false;
+
+    async function sendUnifiedHeartbeat() {
+      if (isHeartbeatRunning || !isOnline || !token || !sessionId) return;
+      isHeartbeatRunning = true;
       try {
         const res = await fetch("/api/telemetry/heartbeat", {
           method: "POST",
@@ -798,7 +1054,8 @@ function CandidateSittingContent() {
           },
           body: JSON.stringify({
             sessionId,
-            hardwareFingerprint: "BROWSER-SITTING-DEV-SIMULATOR",
+            hardwareFingerprint: "BROWSER-CLIENT-WEB",
+            questionsAnsweredCount: Object.keys(answers).length,
           }),
         });
 
@@ -813,23 +1070,49 @@ function CandidateSittingContent() {
           if (hbData.sessionStatus === "LOCKED") {
             setIsWorkstationLocked(true);
             setLockoutReason("Workstation locked by invigilator or security protocol.");
+          } else if (hbData.sessionStatus === "IN_PROGRESS" && isWorkstationLocked) {
+            setIsWorkstationLocked(false);
+          }
+          if (typeof hbData.strikesCount === "number") {
+            setStrikes(hbData.strikesCount);
+            if (exam && hbData.strikesCount >= (exam.maxStrikes || 3)) {
+              setIsWorkstationLocked(true);
+              setLockoutReason("Infraction Limit Reached. Workstation locked by Safe Exam Watchdog.");
+            }
+          }
+          if (
+            typeof hbData.extraTimeMinutes === "number" &&
+            hbData.extraTimeMinutes > prevExtraTimeRef.current
+          ) {
+            const addedMinutes = hbData.extraTimeMinutes - prevExtraTimeRef.current;
+            prevExtraTimeRef.current = hbData.extraTimeMinutes;
+            setSecondsRemaining((prev) => prev + addedMinutes * 60);
+            setExtraTimeNotice(
+              `⏱️ Compensatory Time Added: +${addedMinutes} minutes granted by invigilator.`
+            );
+            setTimeout(() => setExtraTimeNotice(null), 10000);
           }
         }
       } catch (hbErr) {
-        console.warn("Heartbeat notice:", hbErr);
+        console.warn("Unified heartbeat notice:", hbErr);
+      } finally {
+        isHeartbeatRunning = false;
       }
-    }, 8000);
+    }
+
+    sendUnifiedHeartbeat();
+    const hbInterval = setInterval(sendUnifiedHeartbeat, 10000);
 
     return () => clearInterval(hbInterval);
-  }, [stage, token, sessionId]);
+  }, [stage, token, sessionId, answers, isOnline, exam, isWorkstationLocked]);
 
-  // Periodic Background Answer Sync to /api/exam/sync
+  // Periodic Background Answer Sync to /api/exam/sync (Every 15 seconds)
   useEffect(() => {
     if (stage !== "ACTIVE_EXAM" || !token || !sessionId) return;
 
     const syncInterval = setInterval(() => {
       syncAnswersToServer();
-    }, 20000); // sync every 20 seconds
+    }, 15000);
 
     return () => clearInterval(syncInterval);
   }, [stage, token, sessionId, answers]);
@@ -868,67 +1151,7 @@ function CandidateSittingContent() {
     }
   }
 
-  // Periodic Telemetry Heartbeat to /api/telemetry/heartbeat (Syncs Proctored Lockout & Extra Time)
-  useEffect(() => {
-    if (stage !== "ACTIVE_EXAM" || !token || !sessionId) return;
-
-    let previousExtraMinutes = 0;
-
-    async function sendHeartbeat() {
-      if (!isOnline || !token || !sessionId) return;
-      try {
-        const res = await fetch("/api/telemetry/heartbeat", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            sessionId,
-            hardwareFingerprint: "BROWSER-SITTING-DEV-SIMULATOR",
-            questionsAnsweredCount: Object.keys(answers).length,
-          }),
-        });
-
-        if (res.ok) {
-          const data = await res.json();
-
-          // 1. Remote Proctor Workstation Freeze
-          if (data.sessionStatus === "LOCKED") {
-            setIsWorkstationLocked(true);
-            setLockoutReason("Workstation Frozen by Invigilator. Please contact your hall proctor.");
-          } else if (data.sessionStatus === "IN_PROGRESS" && isWorkstationLocked) {
-            setIsWorkstationLocked(false);
-          }
-
-          // 2. Dynamic Compensatory Extra Time
-          if (data.extraTimeMinutes > previousExtraMinutes) {
-            const addedMinutes = data.extraTimeMinutes - previousExtraMinutes;
-            previousExtraMinutes = data.extraTimeMinutes;
-            setSecondsRemaining((prev) => prev + addedMinutes * 60);
-          }
-
-          // 3. Live Strikes Sync
-          if (typeof data.strikesCount === "number") {
-            setStrikes(data.strikesCount);
-            if (exam && data.strikesCount >= (exam.maxStrikes || 3)) {
-              setIsWorkstationLocked(true);
-              setLockoutReason("Infraction Limit Reached. Workstation locked by Safe Exam Watchdog.");
-            }
-          }
-        }
-      } catch (err) {
-        console.warn("Heartbeat notice:", err);
-      }
-    }
-
-    sendHeartbeat();
-    const heartbeatInterval = setInterval(sendHeartbeat, 15000); // Heartbeat every 15s
-
-    return () => clearInterval(heartbeatInterval);
-  }, [stage, token, sessionId, answers, isOnline, exam, isWorkstationLocked]);
-
-  // Answer selection handler
+  // Answer selection handler (Synchronous LocalStorage Preservation)
   function handleSelectOption(questionId: string, optionId: string, isMultiple: boolean) {
     setAnswers((prev) => {
       let updated: string[];
@@ -942,7 +1165,7 @@ function CandidateSittingContent() {
       }
 
       const nextState = { ...prev, [questionId]: updated };
-      // Buffer locally in localStorage
+      // Buffer locally in localStorage immediately
       if (sessionId) {
         localStorage.setItem(`exam_answers_${sessionId}`, JSON.stringify(nextState));
       }
@@ -1018,6 +1241,11 @@ function CandidateSittingContent() {
       // Clean local cache
       localStorage.removeItem(`exam_answers_${sessionId}`);
 
+      // Exit fullscreen mode cleanly upon submission
+      if (document.fullscreenElement && document.exitFullscreen) {
+        document.exitFullscreen().catch(() => {});
+      }
+
       // Notify C# Host Client if running in WebView2
       if ((window as any).chrome?.webview) {
         (window as any).chrome.webview.postMessage({
@@ -1035,7 +1263,6 @@ function CandidateSittingContent() {
   // Calculator evaluation helper
   function evaluateCalc() {
     try {
-      // Safe arithmetic evaluator
       const sanitized = calcInput.replace(/[^0-9+\-*/().]/g, "");
       // eslint-disable-next-line no-eval
       const result = Function(`'use strict'; return (${sanitized})`)();
@@ -1070,8 +1297,7 @@ function CandidateSittingContent() {
   // STAGE 1: AUTHENTICATION GATE (CANDIDATE ENTRANCE)
   // =========================================================================
   if (stage === "AUTH_GATE") {
-    // If authenticated via C# Windows client or token, show loading without flashing login form
-    if (isAuthenticating && searchParams.get("token")) {
+    if (isAuthenticating && (searchParams.get("token") || searchParams.get("ticket"))) {
       return (
         <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
           <div className="w-full max-w-md bg-white border border-slate-200/90 rounded-2xl p-8 shadow-sm text-center space-y-4">
@@ -1082,7 +1308,7 @@ function CandidateSittingContent() {
               Loading Secure Examination Environment...
             </h1>
             <p className="text-xs text-slate-500">
-              Session verified. Preparing candidate questions and instructions...
+              Verifying candidate credentials and loading curriculum papers...
             </p>
             <div className="flex justify-center pt-2">
               <Loader2 className="w-6 h-6 animate-spin text-blue-700" />
@@ -1104,7 +1330,7 @@ function CandidateSittingContent() {
               KARE-SES Candidate Exam Portal
             </h1>
             <p className="text-xs text-slate-500">
-              Kalasalingam Academy of Research and Education • Secure Sitting Engine
+              Kalasalingam Academy of Research and Education • Online Examination Engine
             </p>
           </div>
 
@@ -1112,7 +1338,7 @@ function CandidateSittingContent() {
           <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-3 text-xs text-slate-600 flex items-start space-x-2.5">
             <ShieldCheck className="w-4 h-4 text-blue-700 shrink-0 mt-0.5" />
             <div className="text-[11px] leading-relaxed">
-              <span className="font-bold text-slate-800">Triple-Factor Candidate Entrance:</span> Enter your registered email ID, your official Application ID (as password), and the exam security passcode.
+              <span className="font-bold text-slate-800">Secure Candidate Entrance:</span> Enter your registered email ID, your official Application ID (as password), and the exam security passcode.
             </div>
           </div>
 
@@ -1199,7 +1425,7 @@ function CandidateSittingContent() {
                 </button>
               </div>
               <p className="text-[11px] text-slate-400 mt-1">
-                Your official Application Number acts as your password for this examination.
+                Your official Application Number acts as your secret password for this sitting.
               </p>
             </div>
 
@@ -1221,7 +1447,7 @@ function CandidateSittingContent() {
                 required
               />
               <p className="text-[11px] text-slate-400 mt-1">
-                6-8 character security code issued on your exam slip or invigilator announcement.
+                Security code issued on your exam slip or invigilator announcement.
               </p>
             </div>
 
@@ -1247,9 +1473,9 @@ function CandidateSittingContent() {
           <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400">
             <span className="flex items-center gap-1.5 text-emerald-700 font-medium">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-              Secure Lockdown Ready
+              Secure Web Lockdown Active
             </span>
-            <span>Win32 Hooks &amp; Display Affinity Protected</span>
+            <span>Continuous Telemetry &amp; Anti-Tamper Protected</span>
           </div>
         </div>
       </div>
@@ -1257,103 +1483,205 @@ function CandidateSittingContent() {
   }
 
   // =========================================================================
-  // STAGE 2: INSTRUCTIONS & VERIFICATION SCREEN
+  // STAGE 2: INSTRUCTIONS & PRE-FLIGHT SYSTEM DIAGNOSTICS SCREEN
   // =========================================================================
   if (stage === "INSTRUCTIONS") {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
-        <div className="w-full max-w-2xl bg-white border border-slate-200/90 rounded-2xl p-6 sm:p-8 shadow-sm space-y-6">
-          {/* Header */}
-          <div className="border-b border-slate-100 pb-4 flex items-center justify-between">
-            <div className="space-y-0.5">
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-3 sm:p-6 font-sans">
+        <div className="w-full max-w-5xl bg-white border border-slate-200/90 rounded-2xl p-6 sm:p-8 shadow-sm space-y-6">
+          {/* Institutional Top Header */}
+          <div className="border-b border-slate-100 pb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="space-y-1">
               <span className="text-[10px] font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200 uppercase tracking-wider">
-                CANDIDATE ADMISSION VERIFIED
+                CANDIDATE ADMISSION CONFIRMED
               </span>
-              <h1 className="text-lg font-bold text-slate-900 pt-1">
+              <h1 className="text-lg sm:text-xl font-bold text-slate-900 pt-0.5">
                 {exam?.title}
               </h1>
+              <p className="text-xs text-slate-500">
+                Duration: {exam?.durationMinutes} Minutes • Two-Part Department Examination
+              </p>
             </div>
-            <div className="text-right text-xs">
+            <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-right text-xs space-y-0.5">
               <span className="font-bold text-slate-900 block">{candidate?.fullName}</span>
-              <span className="text-slate-500 font-mono text-[11px] block">{candidate?.applicationNumber || candidate?.rollNumber} • {candidate?.department}</span>
-              {candidate?.email && <span className="text-slate-400 text-[10px] block">{candidate?.email}</span>}
+              <span className="text-slate-600 font-mono text-[11px] block">
+                {candidate?.applicationNumber || candidate?.rollNumber}
+              </span>
+              <span className="text-blue-700 font-semibold text-[10px] block">
+                Department: {candidate?.department}
+              </span>
             </div>
           </div>
 
-          {/* Guidelines Box */}
-          <div className="space-y-3 text-xs text-slate-700 leading-relaxed bg-slate-50 p-4 rounded-xl border border-slate-200/80">
-            <h3 className="font-bold text-slate-900 flex items-center">
-              <ShieldCheck className="w-4 h-4 mr-1.5 text-blue-700" />
-              Examination Sitting Rules &amp; Anti-Cheat Standards
-            </h3>
-            <ul className="space-y-2 list-disc pl-5 text-slate-600 text-[11px]">
-              <li>
-                <strong>Two-Part Architecture:</strong> This paper contains <strong>Part A (Common Core Aptitude)</strong> and <strong>Part B (Department Specialization)</strong>. You may navigate freely between questions.
-              </li>
-              <li>
-                <strong>Strict Lockdown Enforcement:</strong> System shortcuts (<code>Alt+Tab</code>, <code>WinKey</code>, <code>Ctrl+Esc</code>), screen capture utilities, and background processes are monitored. Excessive infractions trigger an automatic workstation lockout.
-              </li>
-              <li>
-                <strong>Offline Resilience:</strong> Your answers are saved locally in memory and continuously synced to the examination server. Even in the event of network disruption, your responses remain safe.
-              </li>
-              <li>
-                <strong>Marking Policy:</strong>{" "}
-                {exam?.enableNegativeMarking
-                  ? "Negative marking is ENABLED (negative marks deducted for incorrect responses)."
-                  : "Negative marking is DISABLED (0 penalty for incorrect responses)."}
-              </li>
-              <li>
-                <strong>Permitted Digital Tools:</strong>{" "}
-                Virtual Calculator:{" "}
-                <span className="font-bold">
-                  {exam?.calculatorMode && exam.calculatorMode !== "NONE"
-                    ? `Enabled (${exam.calculatorMode})`
-                    : "Disabled"}
-                </span>
-                {" • "}Digital Scratchpad:{" "}
-                <span className="font-bold">
-                  {exam?.enableScratchpad !== false ? "Enabled" : "Disabled"}
-                </span>
-                {" • "}Question Flagging:{" "}
-                <span className="font-bold">
-                  {exam?.enableQuestionFlagging !== false ? "Enabled" : "Disabled"}
-                </span>
-              </li>
-            </ul>
+          {/* Two-Column Layout: Left (Rules & Curriculum) + Right (Webcam Diagnostics) */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            {/* Left Column (7 cols): Exam Rules & Curriculum Guidelines */}
+            <div className="lg:col-span-7 space-y-4">
+              <div className="space-y-3 text-xs text-slate-700 leading-relaxed bg-slate-50 p-4 rounded-xl border border-slate-200/80">
+                <h3 className="font-bold text-slate-900 flex items-center">
+                  <ShieldCheck className="w-4 h-4 mr-1.5 text-blue-700" />
+                  Online Examination Integrity &amp; Sitting Rules
+                </h3>
+                <ul className="space-y-2 list-disc pl-5 text-slate-600 text-[11px]">
+                  <li>
+                    <strong>Part A &amp; Part B Structure:</strong> The question paper comprises <strong>Part A (Common Core Research Aptitude)</strong> and <strong>Part B (Department Core Specialization)</strong>. You may freely navigate between sections.
+                  </li>
+                  <li>
+                    <strong>Mandatory Fullscreen Mode:</strong> The examination runs strictly in Fullscreen. Exiting fullscreen, pressing <code>Alt+Tab</code>, switching browser tabs, or launching other windows immediately registers an official infraction strike.
+                  </li>
+                  <li>
+                    <strong>Continuous Webcam Proctoring:</strong> Your webcam stays active throughout the session. If your face leaves the camera viewport for more than 10 seconds, a security strike is recorded.
+                  </li>
+                  <li>
+                    <strong>Tamper-Proof Keystroke Shield:</strong> Developer Tools (<code>F12</code>), browser reload (<code>F5</code>), printing (<code>Ctrl+P</code>), and clipboard copy/paste shortcuts are strictly disabled.
+                  </li>
+                  <li>
+                    <strong>Real-Time Persistence:</strong> Every answer you select is immediately preserved locally and synchronized to the examination servers every 15 seconds.
+                  </li>
+                  <li>
+                    <strong>Marking Policy:</strong>{" "}
+                    {exam?.enableNegativeMarking
+                      ? "Negative marking is ENABLED for this examination."
+                      : "Negative marking is DISABLED (no deduction for incorrect attempts)."}
+                  </li>
+                  <li>
+                    <strong>Permitted Digital Tools:</strong> Virtual Calculator:{" "}
+                    <span className="font-bold">
+                      {exam?.calculatorMode && exam.calculatorMode !== "NONE"
+                        ? `Enabled (${exam.calculatorMode})`
+                        : "Disabled"}
+                    </span>
+                    {" • "}Scratchpad:{" "}
+                    <span className="font-bold">
+                      {exam?.enableScratchpad !== false ? "Enabled" : "Disabled"}
+                    </span>
+                    {" • "}Review Flagging:{" "}
+                    <span className="font-bold">
+                      {exam?.enableQuestionFlagging !== false ? "Enabled" : "Disabled"}
+                    </span>
+                  </li>
+                </ul>
 
-            {exam?.instructions && (
-              <div className="mt-3 pt-3 border-t border-slate-200/60">
-                <span className="font-bold text-slate-800 block mb-1">Paper-Specific Instructions:</span>
-                <p className="text-slate-600 whitespace-pre-line text-[11px] leading-relaxed">
-                  {exam.instructions}
-                </p>
+                {exam?.instructions && (
+                  <div className="mt-3 pt-3 border-t border-slate-200/60">
+                    <span className="font-bold text-slate-800 block mb-1">
+                      Paper-Specific Guidelines:
+                    </span>
+                    <p className="text-slate-600 whitespace-pre-line text-[11px] leading-relaxed">
+                      {exam.instructions}
+                    </p>
+                  </div>
+                )}
               </div>
-            )}
+            </div>
+
+            {/* Right Column (5 cols): Pre-Exam Live Webcam Diagnostics */}
+            <div className="lg:col-span-5 space-y-4">
+              <div className="bg-slate-50 border border-slate-200/90 rounded-xl p-4 space-y-3.5">
+                <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+                  <span className="text-xs font-bold text-slate-900 flex items-center">
+                    <Camera className="w-4 h-4 mr-1.5 text-blue-700" />
+                    Webcam &amp; Diagnostics Check
+                  </span>
+                  <span
+                    className={`text-[10px] font-bold px-2 py-0.5 rounded-full border flex items-center space-x-1 ${
+                      isCameraActive
+                        ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                        : "bg-amber-50 text-amber-800 border-amber-200"
+                    }`}
+                  >
+                    <span
+                      className={`w-1.5 h-1.5 rounded-full ${
+                        isCameraActive ? "bg-emerald-500 animate-pulse" : "bg-amber-500"
+                      }`}
+                    />
+                    <span>{isCameraActive ? "Camera Calibrated" : "Calibration Required"}</span>
+                  </span>
+                </div>
+
+                {/* Live Video Preview Box */}
+                <div className="relative rounded-xl overflow-hidden bg-slate-950 aspect-video border border-slate-200 shadow-inner flex items-center justify-center">
+                  <video
+                    ref={instructionsVideoRef}
+                    autoPlay
+                    playsInline
+                    muted
+                    className={`w-full h-full object-cover ${isCameraActive ? "block" : "hidden"}`}
+                  />
+                  {!isCameraActive && (
+                    <div className="p-4 text-center text-slate-400 text-xs space-y-2">
+                      <CameraOff className="w-7 h-7 mx-auto text-slate-500" />
+                      <p className="text-[11px] text-slate-400">
+                        {cameraError || "Requesting camera stream for proctoring verification..."}
+                      </p>
+                      <button
+                        type="button"
+                        onClick={initializeSecureCamera}
+                        className="px-3 py-1.5 bg-blue-700 text-white rounded-lg text-xs font-bold hover:bg-blue-800 transition-colors cursor-pointer inline-flex items-center space-x-1"
+                      >
+                        <RefreshCw className="w-3 h-3 mr-1" />
+                        <span>Grant Camera Permission</span>
+                      </button>
+                    </div>
+                  )}
+
+                  {isCameraActive && (
+                    <div className="absolute top-2 left-2 px-2 py-0.5 rounded-full bg-slate-900/80 text-emerald-300 border border-emerald-500/40 text-[9px] font-bold flex items-center space-x-1 backdrop-blur-xs">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                      <span>LIVE FEED • 640x480</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Pre-Flight Checklist */}
+                <div className="space-y-2 pt-1 text-[11px]">
+                  <div className="flex items-center justify-between p-2 rounded-lg bg-white border border-slate-200/80">
+                    <span className="text-slate-600 font-medium">Video Capture Device:</span>
+                    <span className="font-semibold text-slate-900 truncate max-w-[170px]">
+                      {cameraDeviceLabel}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between p-2 rounded-lg bg-white border border-slate-200/80">
+                    <span className="text-slate-600 font-medium">Fullscreen Security:</span>
+                    <span className="font-semibold text-blue-700">Enforced on Start</span>
+                  </div>
+
+                  <div className="flex items-center justify-between p-2 rounded-lg bg-white border border-slate-200/80">
+                    <span className="text-slate-600 font-medium">Network Connection:</span>
+                    <span className="font-semibold text-emerald-700 flex items-center">
+                      <Wifi className="w-3 h-3 mr-1 text-emerald-600" />
+                      Connected &amp; Synced
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
 
-          {/* Agreement Checkbox */}
-          <label className="flex items-start space-x-3 cursor-pointer select-none">
-            <input
-              type="checkbox"
-              checked={hasAgreedRules}
-              onChange={(e) => setHasAgreedRules(e.target.checked)}
-              className="mt-0.5 w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500"
-            />
-            <span className="text-xs text-slate-700 font-medium">
-              I certify that I am the registered candidate, have verified my institutional department, and agree to adhere strictly to the examination rules.
-            </span>
-          </label>
+          {/* Rules Agreement & Action Ribbon */}
+          <div className="pt-4 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <label className="flex items-start space-x-3 cursor-pointer select-none max-w-xl">
+              <input
+                type="checkbox"
+                checked={hasAgreedRules}
+                onChange={(e) => setHasAgreedRules(e.target.checked)}
+                className="mt-0.5 w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500 cursor-pointer"
+              />
+              <span className="text-xs text-slate-700 font-medium leading-relaxed">
+                I certify that I am <strong>{candidate?.fullName}</strong>, verify that I am sitting for the <strong>{candidate?.department}</strong> department examination, and agree to adhere strictly to all anti-cheat protocols.
+              </span>
+            </label>
 
-          {/* Action Buttons */}
-          <div className="pt-2 flex items-center justify-end space-x-3">
             <button
               type="button"
               disabled={!hasAgreedRules}
-              onClick={() => setStage("ACTIVE_EXAM")}
-              className="inline-flex items-center px-5 py-2.5 text-xs font-bold text-white bg-blue-700 hover:bg-blue-800 rounded-xl shadow-xs transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+              onClick={handleBeginExamination}
+              className="px-6 py-3 text-xs font-bold text-white bg-blue-700 hover:bg-blue-800 rounded-xl shadow-xs transition-all flex items-center justify-center space-x-2 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
             >
+              <Maximize2 className="w-4 h-4 mr-1" />
               <span>Begin Examination Now</span>
-              <ArrowRight className="w-4 h-4 ml-1.5" />
+              <ArrowRight className="w-4 h-4 ml-1" />
             </button>
           </div>
         </div>
@@ -1362,57 +1690,99 @@ function CandidateSittingContent() {
   }
 
   // =========================================================================
-  // STAGE 3: POST-SUBMISSION RECEIPT
+  // STAGE 3: POST-SUBMISSION VERIFIED RECEIPT SCREEN
   // =========================================================================
   if (stage === "SUBMITTED") {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
-        <div className="w-full max-w-lg bg-white border border-slate-200/90 rounded-2xl p-6 sm:p-8 shadow-sm text-center space-y-5">
-          <div className="w-14 h-14 rounded-full bg-emerald-50 text-emerald-700 flex items-center justify-center mx-auto border border-emerald-200 shadow-xs">
-            <CheckCircle2 className="w-8 h-8" />
-          </div>
-
-          <div className="space-y-1">
-            <h1 className="text-lg font-bold text-slate-900 tracking-tight">
+        <div className="w-full max-w-xl bg-white border border-slate-200/90 rounded-2xl p-6 sm:p-8 shadow-sm space-y-6 print:shadow-none print:border-none print:p-0">
+          {/* Institutional Top Crest in Receipt */}
+          <div className="text-center space-y-2 border-b border-slate-100 pb-5">
+            <div className="w-14 h-14 rounded-full bg-emerald-50 text-emerald-700 flex items-center justify-center mx-auto border border-emerald-200 shadow-xs">
+              <CheckCircle2 className="w-8 h-8" />
+            </div>
+            <h1 className="text-xl font-bold text-slate-900 tracking-tight">
               Examination Successfully Submitted
             </h1>
             <p className="text-xs text-slate-500">
-              Your responses have been securely archived and recorded in the institutional registry.
+              Kalasalingam Academy of Research and Education • Online Examination Services
             </p>
           </div>
 
-          {/* Receipt Card */}
-          <div className="bg-slate-50 border border-slate-200/90 rounded-xl p-4 text-left text-xs space-y-2.5">
-            <div className="flex justify-between border-b border-slate-200/80 pb-2">
+          {/* Official Verification Receipt Card */}
+          <div className="bg-slate-50 border border-slate-200/90 rounded-2xl p-5 text-left text-xs space-y-3 print:bg-white print:border-slate-300">
+            <div className="flex justify-between items-center border-b border-slate-200/80 pb-2.5">
               <span className="text-slate-500 font-medium">Submission Reference</span>
-              <span className="font-mono font-bold text-blue-800">
+              <span className="font-mono font-extrabold text-blue-800 text-sm">
                 {submissionReceipt?.referenceCode || `KARE-SUB-${sessionId.slice(0, 8).toUpperCase()}`}
               </span>
             </div>
-            <div className="flex justify-between border-b border-slate-200/80 pb-2">
+            <div className="flex justify-between items-center border-b border-slate-200/80 pb-2.5">
+              <span className="text-slate-500 font-medium">Examination Title</span>
+              <span className="font-bold text-slate-900 text-right max-w-[260px] truncate">
+                {exam?.title}
+              </span>
+            </div>
+            <div className="flex justify-between items-center border-b border-slate-200/80 pb-2.5">
               <span className="text-slate-500 font-medium">Candidate Name</span>
               <span className="font-bold text-slate-900">{candidate?.fullName}</span>
             </div>
-            <div className="flex justify-between border-b border-slate-200/80 pb-2">
-              <span className="text-slate-500 font-medium">Application ID</span>
-              <span className="font-mono font-bold text-slate-800">{candidate?.applicationNumber || candidate?.rollNumber}</span>
+            <div className="flex justify-between items-center border-b border-slate-200/80 pb-2.5">
+              <span className="text-slate-500 font-medium">Application Number</span>
+              <span className="font-mono font-bold text-slate-800">
+                {candidate?.applicationNumber || candidate?.rollNumber}
+              </span>
             </div>
-            <div className="flex justify-between border-b border-slate-200/80 pb-2">
-              <span className="text-slate-500 font-medium">Department</span>
+            {candidate?.email && (
+              <div className="flex justify-between items-center border-b border-slate-200/80 pb-2.5">
+                <span className="text-slate-500 font-medium">Registered Email</span>
+                <span className="text-slate-700 font-mono text-[11px]">{candidate.email}</span>
+              </div>
+            )}
+            <div className="flex justify-between items-center border-b border-slate-200/80 pb-2.5">
+              <span className="text-slate-500 font-medium">Department Specialization</span>
               <span className="font-bold text-slate-800">{candidate?.department}</span>
             </div>
-            <div className="flex justify-between pt-0.5">
-              <span className="text-slate-500 font-medium">Submission Timestamp</span>
-              <span className="font-medium text-slate-700" suppressHydrationWarning>
+            <div className="flex justify-between items-center border-b border-slate-200/80 pb-2.5">
+              <span className="text-slate-500 font-medium">Questions Attempted</span>
+              <span className="font-bold text-emerald-700">
+                {totalAnsweredCount} of {totalQuestionsCount} questions
+              </span>
+            </div>
+            <div className="flex justify-between items-center pt-0.5">
+              <span className="text-slate-500 font-medium">Final Submission Timestamp</span>
+              <span className="font-medium text-slate-800 font-mono" suppressHydrationWarning>
                 {submissionReceipt?.submittedAt
-                  ? formatTime(submissionReceipt.submittedAt, true)
-                  : formatTime(new Date(), true)}
+                  ? formatDateTime(submissionReceipt.submittedAt)
+                  : formatDateTime(new Date())}
               </span>
             </div>
           </div>
 
-          <div className="pt-2 text-xs text-slate-400">
-            You may now safely close your workstation client window.
+          {/* Forensic Integrity Seal */}
+          <div className="bg-blue-50/70 border border-blue-200/80 rounded-xl p-3 flex items-start space-x-2.5 text-[11px] text-blue-900">
+            <ShieldCheck className="w-4 h-4 text-blue-700 shrink-0 mt-0.5" />
+            <div>
+              <span className="font-bold">Cryptographically Sealed:</span> This candidate paper has been archived, scored against the departmental answer key, and permanently recorded in the institutional database.
+            </div>
+          </div>
+
+          {/* Action Buttons (Hidden when printing) */}
+          <div className="pt-2 flex flex-col sm:flex-row items-center justify-between gap-3 print:hidden">
+            <Link
+              href="/"
+              className="w-full sm:w-auto px-5 py-2.5 text-xs font-bold text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 rounded-xl transition-colors text-center"
+            >
+              Return to Home Page
+            </Link>
+            <button
+              type="button"
+              onClick={() => window.print()}
+              className="w-full sm:w-auto px-5 py-2.5 text-xs font-bold text-white bg-blue-700 hover:bg-blue-800 rounded-xl shadow-xs transition-colors flex items-center justify-center space-x-1.5 cursor-pointer"
+            >
+              <Printer className="w-3.5 h-3.5 mr-1" />
+              <span>Print Official Receipt</span>
+            </button>
           </div>
         </div>
       </div>
@@ -1424,7 +1794,15 @@ function CandidateSittingContent() {
   // =========================================================================
   return (
     <div className="min-h-screen bg-slate-100 flex flex-col font-sans select-none">
-      {/* Option A: 10-Second Face Absence Grace Countdown Warning Toast */}
+      {/* 1. Compensatory Extra Time Granted Banner */}
+      {extraTimeNotice && (
+        <div className="fixed top-14 left-1/2 -translate-x-1/2 z-40 bg-emerald-600 text-white px-5 py-2.5 rounded-full shadow-lg flex items-center space-x-2 text-xs font-bold border border-emerald-500 animate-in slide-in-from-top-4">
+          <Clock className="w-4 h-4 text-white animate-spin" />
+          <span>{extraTimeNotice}</span>
+        </div>
+      )}
+
+      {/* 2. Face Absence Grace Countdown Warning Toast */}
       {faceWarningCountdown !== null && (
         <div className="fixed top-0 left-0 right-0 z-50 bg-amber-500 text-white px-4 py-2.5 shadow-lg flex items-center justify-between border-b border-amber-600 animate-pulse">
           <div className="flex items-center space-x-2.5 text-xs font-bold">
@@ -1439,7 +1817,45 @@ function CandidateSittingContent() {
         </div>
       )}
 
-      {/* 1. High-Precision Exam Header Bar */}
+      {/* 3. Mandatory Fullscreen Exited Alert Overlay */}
+      {isFullscreenExited && (
+        <div className="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="w-full max-w-md bg-white border-2 border-red-500 rounded-3xl p-6 shadow-2xl text-center space-y-4">
+            <div className="w-16 h-16 rounded-full bg-red-100 text-red-600 flex items-center justify-center mx-auto border-2 border-red-300 animate-bounce">
+              <AlertTriangle className="w-8 h-8" />
+            </div>
+            <div className="space-y-1.5">
+              <h2 className="text-lg font-black text-slate-900 uppercase tracking-tight">
+                SECURITY ALERT: FULLSCREEN EXITED
+              </h2>
+              <p className="text-xs text-red-600 font-bold leading-relaxed">
+                You have exited the mandatory fullscreen examination environment.
+              </p>
+              <p className="text-xs text-slate-600 leading-relaxed">
+                The Safe Exam Watchdog requires fullscreen mode at all times. Return to fullscreen immediately to prevent an automatic infraction strike and workstation lock.
+              </p>
+            </div>
+
+            <div className="p-3 bg-red-50 border border-red-200 rounded-xl flex items-center justify-between text-xs font-bold text-red-900">
+              <span>Automatic Infraction Strike in:</span>
+              <span className="font-mono text-base font-extrabold text-red-700">
+                {fullscreenGraceCountdown}s
+              </span>
+            </div>
+
+            <button
+              type="button"
+              onClick={enterFullscreen}
+              className="w-full py-3 bg-red-600 hover:bg-red-700 text-white font-extrabold text-xs uppercase tracking-wider rounded-xl shadow-md transition-colors flex items-center justify-center space-x-2 cursor-pointer"
+            >
+              <Maximize2 className="w-4 h-4 mr-1" />
+              <span>Return to Fullscreen Now</span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* 4. High-Precision Exam Header Bar */}
       <header className="bg-white border-b border-slate-200 sticky top-0 z-30 px-4 py-2.5 shadow-2xs">
         <div className="max-w-7xl mx-auto flex items-center justify-between gap-3">
           {/* Left: Branding & Candidate Profile */}
@@ -1454,7 +1870,9 @@ function CandidateSittingContent() {
               <div className="flex items-center space-x-2 text-[11px] text-slate-500">
                 <span className="font-semibold text-slate-700">{candidate?.fullName}</span>
                 <span>•</span>
-                <span className="font-mono text-blue-800 font-semibold">{candidate?.applicationNumber || candidate?.rollNumber}</span>
+                <span className="font-mono text-blue-800 font-semibold">
+                  {candidate?.applicationNumber || candidate?.rollNumber}
+                </span>
                 <span>•</span>
                 <span className="bg-purple-50 text-purple-700 px-1.5 py-0.2 rounded font-bold text-[10px] border border-purple-200">
                   {candidate?.department}
@@ -1486,7 +1904,7 @@ function CandidateSittingContent() {
               )}
             </div>
 
-            {/* Option B: Discreet Proctor Camera Status */}
+            {/* Proctor Camera Status */}
             <button
               type="button"
               onClick={() => setIsCameraPreviewOpen(true)}
@@ -1520,7 +1938,7 @@ function CandidateSittingContent() {
               <span>{timerDisplay}</span>
             </div>
 
-            {/* Digital Aids Quick Toggles (Strictly conditioned on exam options) */}
+            {/* Digital Aids Quick Toggles */}
             {exam?.calculatorMode && exam.calculatorMode !== "NONE" && (
               <button
                 type="button"
@@ -1537,7 +1955,7 @@ function CandidateSittingContent() {
                 type="button"
                 onClick={() => setIsScratchpadOpen(true)}
                 className="p-1.5 text-slate-600 hover:text-blue-700 hover:bg-slate-100 rounded-lg border border-slate-200 transition-colors cursor-pointer"
-                title="Open Digital Scratchpad (Rough Space)"
+                title="Open Digital Scratchpad (Rough Working Space)"
               >
                 <FileEdit className="w-4 h-4" />
               </button>
@@ -1555,7 +1973,7 @@ function CandidateSittingContent() {
         </div>
       </header>
 
-      {/* 2. Main Sitting Workspace */}
+      {/* 5. Main Sitting Workspace */}
       <div className="flex-1 max-w-7xl w-full mx-auto p-3 sm:p-4 grid grid-cols-1 lg:grid-cols-12 gap-4">
         {/* Left Column (8 cols): Active Question Surface */}
         <main className="lg:col-span-8 flex flex-col space-y-3">
@@ -2042,7 +2460,7 @@ function CandidateSittingContent() {
       )}
 
       {/* =====================================================================
-          MODAL 5: OPTION B CANDIDATE CAMERA ANGLE VERIFICATION
+          MODAL 5: CANDIDATE CAMERA ANGLE VERIFICATION
          ===================================================================== */}
       {isCameraPreviewOpen && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
@@ -2120,4 +2538,3 @@ function CandidateSittingContent() {
     </div>
   );
 }
-
