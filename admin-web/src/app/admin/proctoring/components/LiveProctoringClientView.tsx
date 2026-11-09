@@ -11,6 +11,7 @@ import {
   resetCandidateWorkstationBindingAction,
   grantLateEntryAction,
   denyLateEntryAction,
+  sendProctorWarningAction,
 } from "../actions";
 import { formatTime, formatDate, formatDateTime } from "@/lib/date";
 import {
@@ -36,6 +37,8 @@ import {
   FileText,
   Camera,
   X,
+  Globe,
+  Bell,
 } from "lucide-react";
 
 export interface ProctoringSession {
@@ -108,6 +111,8 @@ export function LiveProctoringClientView({
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [notice, setNotice] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [selectedEvidence, setSelectedEvidence] = useState<ViolationFeedItem | null>(null);
+  const [warningTarget, setWarningTarget] = useState<{ sessionId: string; candidateName: string } | null>(null);
+  const [warningPresetText, setWarningPresetText] = useState("Please look directly at your examination screen.");
 
   // Sync state when fresh server props arrive
   useEffect(() => {
@@ -335,6 +340,26 @@ export function LiveProctoringClientView({
       }
     } catch (err: any) {
       setNotice({ type: "error", text: err.message || "Failed to deny late entry." });
+    } finally {
+      setActionLoadingId(null);
+    }
+  }
+
+  async function handleSendWarning() {
+    if (!warningTarget) return;
+    setActionLoadingId(warningTarget.sessionId);
+    setNotice(null);
+    try {
+      const res = await sendProctorWarningAction(warningTarget.sessionId, warningPresetText);
+      if (res.error) {
+        setNotice({ type: "error", text: res.error });
+      } else {
+        setNotice({ type: "success", text: `Warning dispatched to ${warningTarget.candidateName} in real time.` });
+        setWarningTarget(null);
+        router.refresh();
+      }
+    } catch (err: any) {
+      setNotice({ type: "error", text: err.message || "Failed to dispatch warning." });
     } finally {
       setActionLoadingId(null);
     }
@@ -612,8 +637,21 @@ export function LiveProctoringClientView({
                         >
                           <td className="py-3 px-3">
                             <div className="font-bold text-slate-900">{s.candidateName}</div>
-                            <div className="font-mono text-[10px] text-blue-700 font-semibold mt-0.5">
-                              {s.applicationNumber}
+                            <div className="flex items-center space-x-1.5 mt-0.5">
+                              <span className="font-mono text-[10px] text-blue-700 font-semibold">
+                                {s.applicationNumber}
+                              </span>
+                              {s.hardwareFingerprint?.startsWith("WEB-") || s.hardwareFingerprint?.startsWith("BROWSER-") ? (
+                                <span className="text-[9px] font-bold bg-blue-50 text-blue-700 px-1.5 py-0.2 rounded border border-blue-200 inline-flex items-center">
+                                  <Globe className="w-2.5 h-2.5 mr-0.5" />
+                                  Web
+                                </span>
+                              ) : (
+                                <span className="text-[9px] font-bold bg-slate-100 text-slate-700 px-1.5 py-0.2 rounded border border-slate-200 inline-flex items-center">
+                                  <Monitor className="w-2.5 h-2.5 mr-0.5" />
+                                  Desktop
+                                </span>
+                              )}
                             </div>
                             <div className="text-[10px] text-slate-400 truncate max-w-xs">{s.email}</div>
                           </td>
@@ -734,6 +772,17 @@ export function LiveProctoringClientView({
                                     <Lock className="w-3.5 h-3.5" />
                                   </button>
                                 )}
+
+                                {/* Issue Warning to Candidate Screen */}
+                                <button
+                                  type="button"
+                                  disabled={isLoading}
+                                  onClick={() => setWarningTarget({ sessionId: s.id, candidateName: s.candidateName })}
+                                  className="p-1.5 rounded-lg bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200 transition-colors cursor-pointer"
+                                  title="Dispatch Warning to Candidate Screen"
+                                >
+                                  <Bell className="w-3.5 h-3.5" />
+                                </button>
 
                                 {/* Add Compensatory Time Dropdown / Button */}
                                 <button
@@ -997,6 +1046,99 @@ export function LiveProctoringClientView({
                 className="px-4 py-1.5 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors cursor-pointer"
               >
                 Close Inspector
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Warning Dispatch Modal */}
+      {warningTarget && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="w-full max-w-md bg-white border border-slate-200 rounded-2xl p-6 shadow-xl space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center space-x-2">
+                <AlertTriangle className="w-4 h-4 text-amber-600" />
+                <h3 className="text-sm font-bold text-slate-900">
+                  Issue Warning to Candidate
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setWarningTarget(null)}
+                className="p-1 text-slate-400 hover:text-slate-600 rounded-lg cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="text-xs text-slate-600 space-y-1">
+              <div>
+                Candidate: <span className="font-bold text-slate-900">{warningTarget.candidateName}</span>
+              </div>
+              <div className="text-[11px] text-slate-400">
+                This warning will be delivered immediately to the candidate's active sitting window in real time.
+              </div>
+            </div>
+
+            {/* Quick Presets */}
+            <div className="space-y-1.5">
+              <label className="text-[11px] font-bold text-slate-700 block">
+                Quick Preset Messages:
+              </label>
+              <div className="grid grid-cols-1 gap-1.5">
+                {[
+                  "Please look directly at your examination screen.",
+                  "Secondary person or excessive noise detected in your room.",
+                  "Do not attempt to exit fullscreen or switch windows.",
+                  "Please adjust your webcam so your face is clearly visible.",
+                ].map((preset) => (
+                  <button
+                    key={preset}
+                    type="button"
+                    onClick={() => setWarningPresetText(preset)}
+                    className={`text-left p-2 rounded-lg text-xs font-medium border transition-colors cursor-pointer ${
+                      warningPresetText === preset
+                        ? "bg-amber-50 text-amber-900 border-amber-300 font-semibold"
+                        : "bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100"
+                    }`}
+                  >
+                    {preset}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Custom Input */}
+            <div className="space-y-1">
+              <label className="text-[11px] font-bold text-slate-700 block">
+                Warning Message:
+              </label>
+              <textarea
+                value={warningPresetText}
+                onChange={(e) => setWarningPresetText(e.target.value)}
+                rows={3}
+                className="w-full p-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-1 focus:ring-amber-500 font-medium text-slate-900"
+                placeholder="Type custom warning..."
+              />
+            </div>
+
+            <div className="flex items-center justify-end space-x-2 pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setWarningTarget(null)}
+                className="px-3 py-1.5 text-xs font-semibold text-slate-600 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={!warningPresetText.trim() || actionLoadingId === warningTarget.sessionId}
+                onClick={handleSendWarning}
+                className="px-4 py-1.5 text-xs font-bold text-white bg-amber-600 hover:bg-amber-700 rounded-lg shadow-2xs transition-colors cursor-pointer disabled:opacity-50 flex items-center space-x-1.5"
+              >
+                <Bell className="w-3.5 h-3.5 mr-1" />
+                <span>Send Warning Now</span>
               </button>
             </div>
           </div>

@@ -181,6 +181,10 @@ function CandidateSittingContent() {
   const prevExtraTimeRef = useRef<number>(0);
   const [extraTimeNotice, setExtraTimeNotice] = useState<string | null>(null);
 
+  // Proctor Live Warning & Announcement Overlays
+  const [proctorWarningMessage, setProctorWarningMessage] = useState<string | null>(null);
+  const [proctorAnnouncement, setProctorAnnouncement] = useState<string | null>(null);
+
   // Fullscreen Watchdog States
   const [isFullscreenExited, setIsFullscreenExited] = useState(false);
   const [fullscreenGraceCountdown, setFullscreenGraceCountdown] = useState(15);
@@ -747,6 +751,33 @@ function CandidateSittingContent() {
           }
         }
       )
+      .on(
+        "broadcast",
+        { event: "proctor_command" },
+        (eventPayload: any) => {
+          const payload = eventPayload?.payload || eventPayload;
+          const cmd = payload?.command;
+          const msg = payload?.message;
+
+          if (cmd === "CMD_WARN") {
+            setProctorWarningMessage(
+              msg || "Official Warning from Invigilator: Please adhere strictly to examination integrity rules."
+            );
+          } else if (cmd === "CMD_ANNOUNCE") {
+            setProctorAnnouncement(msg || "Announcement from Invigilation Desk.");
+            setTimeout(() => setProctorAnnouncement(null), 12000);
+          } else if (cmd === "CMD_TERMINATE") {
+            setIsWorkstationLocked(true);
+            setLockoutReason(
+              "Examination terminated by invigilator: " + (msg || "Integrity protocol enforcement.")
+            );
+          } else if (cmd === "CMD_RESUME") {
+            setIsWorkstationLocked(false);
+            setLockoutReason("");
+            setProctorWarningMessage(null);
+          }
+        }
+      )
       .subscribe();
 
     return () => {
@@ -933,13 +964,31 @@ function CandidateSittingContent() {
       setActiveSectionId(examData.sections[0].id);
     }
 
-    // Load any locally buffered answers
+    // 1. Load any locally buffered answers
     const cached = localStorage.getItem(`exam_answers_${sessId}`);
     if (cached) {
       try {
         setAnswers(JSON.parse(cached));
       } catch {}
     }
+
+    // 2. Fetch server-persisted submissions from DB to ensure complete answer restoration across devices/refresh
+    fetch(`/api/exam/answers/restore?sessionId=${encodeURIComponent(sessId)}`, {
+      headers: { Authorization: `Bearer ${jwtToken}` },
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success && data.answers && Object.keys(data.answers).length > 0) {
+          setAnswers((prev) => {
+            const merged = { ...data.answers, ...prev };
+            if (typeof window !== "undefined") {
+              localStorage.setItem(`exam_answers_${sessId}`, JSON.stringify(merged));
+            }
+            return merged;
+          });
+        }
+      })
+      .catch((err) => console.warn("Answer restore fetch notice:", err));
 
     setStage("INSTRUCTIONS");
   }
@@ -1799,6 +1848,43 @@ function CandidateSittingContent() {
         <div className="fixed top-14 left-1/2 -translate-x-1/2 z-40 bg-emerald-600 text-white px-5 py-2.5 rounded-full shadow-lg flex items-center space-x-2 text-xs font-bold border border-emerald-500 animate-in slide-in-from-top-4">
           <Clock className="w-4 h-4 text-white animate-spin" />
           <span>{extraTimeNotice}</span>
+        </div>
+      )}
+
+      {/* Realtime Proctor Announcement Toast */}
+      {proctorAnnouncement && (
+        <div className="fixed top-14 left-1/2 -translate-x-1/2 z-40 bg-blue-700 text-white px-5 py-2.5 rounded-full shadow-lg flex items-center space-x-2 text-xs font-bold border border-blue-600 animate-in slide-in-from-top-4">
+          <BookOpen className="w-4 h-4 text-white" />
+          <span>📢 {proctorAnnouncement}</span>
+        </div>
+      )}
+
+      {/* Official Invigilator Direct Warning Modal */}
+      {proctorWarningMessage && (
+        <div className="fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="w-full max-w-md bg-white border-2 border-amber-500 rounded-2xl p-6 shadow-2xl text-center space-y-4 animate-in zoom-in-95">
+            <div className="w-14 h-14 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center mx-auto border border-amber-300 animate-bounce">
+              <AlertTriangle className="w-7 h-7" />
+            </div>
+            <div className="space-y-1.5">
+              <h2 className="text-base font-black text-slate-900 uppercase tracking-tight">
+                Official Invigilator Warning
+              </h2>
+              <p className="text-xs text-amber-900 bg-amber-50 border border-amber-200 rounded-xl p-3 font-semibold leading-relaxed">
+                {proctorWarningMessage}
+              </p>
+              <p className="text-[11px] text-slate-500 pt-1">
+                Please heed this warning immediately. Continued infractions will result in an automated strike and workstation freeze.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setProctorWarningMessage(null)}
+              className="w-full py-2.5 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs uppercase tracking-wider rounded-xl shadow-xs transition-colors cursor-pointer"
+            >
+              I Understand &amp; Acknowledge
+            </button>
+          </div>
         </div>
       )}
 

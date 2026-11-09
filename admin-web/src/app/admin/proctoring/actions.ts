@@ -221,4 +221,104 @@ export async function denyLateEntryAction(sessionId: string) {
   }
 }
 
+export async function sendProctorWarningAction(sessionId: string, message: string) {
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { error: "Unauthorized access" };
+
+    const warningText = (message || "Candidate Warning: Please look at the examination screen and maintain exam integrity.").trim();
+
+    // Log the formal warning in violation_logs for the candidate
+    await supabaseAdmin.from("violation_logs").insert({
+      session_id: sessionId,
+      violation_type: "PROCTOR_WARNING",
+      strike_number: 0,
+      metadata: {
+        action: "PROCTOR_DIRECT_WARNING",
+        message: warningText,
+        issuedBy: user.email,
+        timestamp: new Date().toISOString(),
+      },
+    });
+
+    // Broadcast in real-time to candidate sitting page
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    if (supabaseUrl && serviceKey) {
+      await fetch(`${supabaseUrl}/realtime/v1/api/broadcast`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${serviceKey}`,
+          apikey: serviceKey,
+        },
+        body: JSON.stringify({
+          messages: [
+            {
+              topic: `exam-session-${sessionId}`,
+              event: "proctor_command",
+              payload: {
+                command: "CMD_WARN",
+                message: warningText,
+                proctorEmail: user.email,
+                timestamp: new Date().toISOString(),
+              },
+            },
+          ],
+        }),
+      }).catch((err) => console.warn("Broadcast warning fetch error:", err));
+    }
+
+    revalidatePath("/proctoring");
+    return { success: true, message: warningText };
+  } catch (err: any) {
+    return { error: err.message || "Failed to issue proctor warning." };
+  }
+}
+
+export async function sendProctorAnnouncementAction(sessionId: string, message: string) {
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { error: "Unauthorized access" };
+
+    const announceText = (message || "Examination Hall Notice: Please check your screen.").trim();
+
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    if (supabaseUrl && serviceKey) {
+      await fetch(`${supabaseUrl}/realtime/v1/api/broadcast`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${serviceKey}`,
+          apikey: serviceKey,
+        },
+        body: JSON.stringify({
+          messages: [
+            {
+              topic: `exam-session-${sessionId}`,
+              event: "proctor_command",
+              payload: {
+                command: "CMD_ANNOUNCE",
+                message: announceText,
+                proctorEmail: user.email,
+                timestamp: new Date().toISOString(),
+              },
+            },
+          ],
+        }),
+      }).catch((err) => console.warn("Broadcast announcement fetch error:", err));
+    }
+
+    return { success: true, message: announceText };
+  } catch (err: any) {
+    return { error: err.message || "Failed to dispatch announcement." };
+  }
+}
+
+
 
