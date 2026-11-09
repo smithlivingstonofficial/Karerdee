@@ -35,6 +35,7 @@ import {
   ExternalLink,
   ShieldAlert,
   Calculator,
+  BarChart2,
 } from "lucide-react";
 
 export default function ExamDetailsPage() {
@@ -270,6 +271,15 @@ export default function ExamDetailsPage() {
 
         {/* Action Controls */}
         <div className="flex items-center space-x-2 flex-wrap gap-y-2 flex-shrink-0">
+          <Link
+            href={`/admin/exams/${exam.id}/results`}
+            className="inline-flex items-center px-3.5 py-2 text-xs font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-xl shadow-2xs transition-all cursor-pointer"
+            title="View Candidate Scores, Roster Gradebook & Item Accuracy"
+          >
+            <BarChart2 className="w-3.5 h-3.5 mr-1.5 text-emerald-700" />
+            <span>Gradebook &amp; Analytics</span>
+          </Link>
+
           <button
             type="button"
             onClick={() => setIsPrintModalOpen(true)}

@@ -36,6 +36,7 @@ import {
   ChevronRight,
   Shield,
   Printer,
+  BarChart2,
 } from "lucide-react";
 
 type FilterStatus = "ALL" | "SCHEDULED" | "ACTIVE" | "DRAFT" | "COMPLETED";
@@ -513,6 +514,14 @@ export default function ExaminationsDirectoryPage() {
                   {isActive && (
                     <>
                       <Link
+                        href={`/admin/exams/${exam.id}/results`}
+                        className="inline-flex items-center px-3 py-1.5 text-xs font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-lg shadow-2xs transition-all cursor-pointer"
+                        title="Live Submissions & Gradebook"
+                      >
+                        <BarChart2 className="w-3.5 h-3.5 mr-1 text-emerald-600" />
+                        <span>Results</span>
+                      </Link>
+                      <Link
                         href={`/admin/exams/${exam.id}`}
                         className="inline-flex items-center px-3 py-1.5 text-xs font-bold text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg shadow-2xs transition-all cursor-pointer"
                       >
@@ -536,6 +545,14 @@ export default function ExaminationsDirectoryPage() {
                   {/* COMPLETED Actions */}
                   {isCompleted && (
                     <>
+                      <Link
+                        href={`/admin/exams/${exam.id}/results`}
+                        className="inline-flex items-center px-3.5 py-1.5 text-xs font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-lg shadow-2xs transition-all cursor-pointer"
+                        title="View Gradebook & Candidate Submissions"
+                      >
+                        <BarChart2 className="w-3.5 h-3.5 mr-1 text-emerald-600" />
+                        <span>Gradebook &amp; Results</span>
+                      </Link>
                       <Link
                         href={`/admin/exams/${exam.id}`}
                         className="inline-flex items-center px-3 py-1.5 text-xs font-bold text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg shadow-2xs transition-all cursor-pointer"
