@@ -143,8 +143,14 @@ export function AdminDashboardClientView({
         {/* Top Header Row */}
         <div className="px-4 py-3 sm:px-5 sm:py-3.5 flex flex-col md:flex-row md:items-center justify-between gap-3 bg-gradient-to-r from-white via-slate-50/30 to-blue-50/20">
           <div className="flex items-center space-x-3 min-w-0">
-            <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-700 flex items-center justify-center font-black text-xs border border-blue-200/80 flex-shrink-0 select-none shadow-2xs">
-              KARE
+            {/* Official Square KARE Logo */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <div className="w-9 h-9 rounded-xl bg-white border border-slate-200/90 p-0.5 flex items-center justify-center flex-shrink-0 shadow-2xs overflow-hidden">
+              <img
+                src="/kare-square-logo.png"
+                alt="KARE Logo"
+                className="w-full h-full object-contain rounded-lg"
+              />
             </div>
 
             <div className="min-w-0">
