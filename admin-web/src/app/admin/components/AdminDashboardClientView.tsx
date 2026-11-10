@@ -138,49 +138,31 @@ export function AdminDashboardClientView({
 
   return (
     <div className="space-y-4 max-w-7xl mx-auto pb-8">
-      {/* 1. Combined Master Executive Command Center & KPI Cockpit */}
+      {/* 1. Combined Executive Command Center & KPI Cockpit */}
       <div className="bg-white border border-slate-200/90 rounded-2xl shadow-xs overflow-hidden">
-        {/* Top Header Segment */}
-        <div className="p-4 sm:px-5 sm:py-4 flex flex-col md:flex-row md:items-center justify-between gap-3.5 bg-gradient-to-r from-white via-slate-50/40 to-blue-50/20">
-          {/* Left: Brand Monogram + Compact Greeting & Live Metadata */}
-          <div className="flex items-center space-x-3.5 min-w-0">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-700 to-indigo-800 text-white flex items-center justify-center font-black text-xs shadow-xs border border-blue-600/30 flex-shrink-0 select-none">
+        {/* Top Header Row */}
+        <div className="px-4 py-3 sm:px-5 sm:py-3.5 flex flex-col md:flex-row md:items-center justify-between gap-3 bg-gradient-to-r from-white via-slate-50/30 to-blue-50/20">
+          <div className="flex items-center space-x-3 min-w-0">
+            <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-700 flex items-center justify-center font-black text-xs border border-blue-200/80 flex-shrink-0 select-none shadow-2xs">
               KARE
             </div>
 
-            <div className="min-w-0 space-y-0.5">
+            <div className="min-w-0">
               <div className="flex items-center space-x-2 flex-wrap">
-                <h1 className="text-sm sm:text-base font-bold text-slate-900 tracking-tight truncate">
+                <h1 className="text-sm sm:text-base font-bold text-slate-900 tracking-tight">
                   {greeting}, {capitalizedName}
                 </h1>
-
-                <span className="inline-flex items-center px-1.5 py-0.2 rounded-full text-[10px] font-extrabold bg-blue-50 text-blue-700 border border-blue-200 flex-shrink-0">
-                  Command Center
-                </span>
-
-                {stats.activeExamsCount > 0 && (
-                  <span className="inline-flex items-center px-1.5 py-0.2 rounded-full text-[10px] font-extrabold bg-emerald-50 text-emerald-700 border border-emerald-200 animate-pulse flex-shrink-0">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 mr-1" />
-                    {stats.activeExamsCount} Active
-                  </span>
-                )}
-
                 {currentDateTime && (
-                  <span className="text-[11px] text-slate-400 font-medium hidden sm:inline-flex items-center space-x-1 flex-shrink-0">
-                    <span>•</span>
-                    <span>{currentDateTime}</span>
+                  <span className="text-xs text-slate-400 font-medium">
+                    • {currentDateTime}
                   </span>
                 )}
               </div>
-
-              <p className="text-[11px] text-slate-500 truncate">
-                Kalasalingam Academy of Research and Education • Examination Controller &amp; Biometrics Cockpit
-              </p>
             </div>
           </div>
 
-          {/* Right: High-Precision Action Buttons */}
-          <div className="flex items-center space-x-2 flex-shrink-0 self-start md:self-center">
+          {/* Right Action Buttons */}
+          <div className="flex items-center space-x-2 flex-shrink-0">
             <Link
               href="/admin/proctoring"
               className="inline-flex items-center px-3 py-1.5 text-xs font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300/80 rounded-lg shadow-2xs transition-all cursor-pointer group"
@@ -209,30 +191,16 @@ export function AdminDashboardClientView({
           </div>
         </div>
 
-        {/* Integrated 4-Column KPI Metric Cells (Seamlessly Bordered Inside Same Card) */}
-        <div className="border-t border-slate-200/80 grid grid-cols-2 lg:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-slate-200/80 bg-slate-50/30">
-          {/* Metric 1: Active In-Session Exams */}
+        {/* 4 Clean Metric Cells (Zero Unwanted Text, Streamlined Padding) */}
+        <div className="border-t border-slate-200/80 grid grid-cols-2 lg:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-slate-200/80">
+          {/* Metric 1 */}
           <Link
             href="/admin/exams"
-            className="p-3.5 sm:p-4 hover:bg-white transition-all flex flex-col justify-between group"
+            className="px-4 py-3 sm:px-5 sm:py-3.5 hover:bg-slate-50/80 transition-colors flex flex-col justify-between group"
           >
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider group-hover:text-blue-700 transition-colors">
                 Active Exams
-              </span>
-              <div className="w-7 h-7 rounded-lg bg-blue-50 text-blue-700 flex items-center justify-center border border-blue-100">
-                <Activity className="w-3.5 h-3.5" />
-              </div>
-            </div>
-            <div className="mt-2 flex items-baseline space-x-1.5">
-              <span className="text-2xl font-black text-slate-900 tracking-tight">
-                {stats.activeExamsCount}
-              </span>
-              <span className="text-[11px] text-slate-400">in-session</span>
-            </div>
-            <div className="mt-2.5 pt-2 border-t border-slate-100/80 flex items-center justify-between text-[10px]">
-              <span className="text-slate-500 font-medium truncate">
-                {stats.scheduledExamsCount} upcoming
               </span>
               <span
                 className={`font-bold px-1.5 py-0.2 rounded-full border text-[9px] ${
@@ -244,29 +212,28 @@ export function AdminDashboardClientView({
                 {stats.activeExamsCount > 0 ? "Running" : "Idle"}
               </span>
             </div>
+            <div className="mt-2 flex items-baseline space-x-1.5">
+              <span className="text-2xl font-black text-slate-900 tracking-tight">
+                {stats.activeExamsCount}
+              </span>
+              <span className="text-xs text-slate-400">in-session</span>
+              {stats.scheduledExamsCount > 0 && (
+                <span className="text-[11px] text-slate-400 ml-auto font-medium">
+                  {stats.scheduledExamsCount} upcoming
+                </span>
+              )}
+            </div>
           </Link>
 
-          {/* Metric 2: Candidates Online */}
+          {/* Metric 2 */}
           <Link
             href="/admin/proctoring"
-            className="p-3.5 sm:p-4 hover:bg-white transition-all flex flex-col justify-between group"
+            className="px-4 py-3 sm:px-5 sm:py-3.5 hover:bg-slate-50/80 transition-colors flex flex-col justify-between group"
           >
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider group-hover:text-emerald-700 transition-colors">
                 Candidates Online
               </span>
-              <div className="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center border border-emerald-100">
-                <Users className="w-3.5 h-3.5" />
-              </div>
-            </div>
-            <div className="mt-2 flex items-baseline space-x-1.5">
-              <span className="text-2xl font-black text-slate-900 tracking-tight">
-                {stats.onlineCandidatesCount}
-              </span>
-              <span className="text-[11px] text-slate-400">examinees</span>
-            </div>
-            <div className="mt-2.5 pt-2 border-t border-slate-100/80 flex items-center justify-between text-[10px]">
-              <span className="text-slate-500 font-medium truncate">Live telemetry</span>
               <span
                 className={`font-bold px-1.5 py-0.2 rounded-full border text-[9px] flex items-center space-x-1 ${
                   stats.onlineCandidatesCount > 0
@@ -275,34 +242,28 @@ export function AdminDashboardClientView({
                 }`}
               >
                 {stats.onlineCandidatesCount > 0 && (
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-ping inline-block mr-0.5" />
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-ping mr-0.5" />
                 )}
                 <span>{stats.onlineCandidatesCount > 0 ? "Active" : "Standby"}</span>
               </span>
             </div>
+            <div className="mt-2 flex items-baseline space-x-1.5">
+              <span className="text-2xl font-black text-slate-900 tracking-tight">
+                {stats.onlineCandidatesCount}
+              </span>
+              <span className="text-xs text-slate-400">examinees</span>
+            </div>
           </Link>
 
-          {/* Metric 3: Integrity Violations & Strikes */}
+          {/* Metric 3 */}
           <Link
             href="/admin/violations"
-            className="p-3.5 sm:p-4 hover:bg-white transition-all flex flex-col justify-between group"
+            className="px-4 py-3 sm:px-5 sm:py-3.5 hover:bg-slate-50/80 transition-colors flex flex-col justify-between group"
           >
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider group-hover:text-amber-700 transition-colors">
                 Integrity Strikes
               </span>
-              <div className="w-7 h-7 rounded-lg bg-amber-50 text-amber-700 flex items-center justify-center border border-amber-100">
-                <ShieldAlert className="w-3.5 h-3.5" />
-              </div>
-            </div>
-            <div className="mt-2 flex items-baseline space-x-1.5">
-              <span className="text-2xl font-black text-slate-900 tracking-tight">
-                {stats.activeViolationsCount}
-              </span>
-              <span className="text-[11px] text-slate-400">infractions</span>
-            </div>
-            <div className="mt-2.5 pt-2 border-t border-slate-100/80 flex items-center justify-between text-[10px]">
-              <span className="text-slate-500 font-medium truncate">Lockdown guard</span>
               <span
                 className={`font-bold px-1.5 py-0.2 rounded-full border text-[9px] ${
                   stats.activeViolationsCount > 0
@@ -313,34 +274,32 @@ export function AdminDashboardClientView({
                 {stats.activeViolationsCount > 0 ? "Needs Review" : "Clean"}
               </span>
             </div>
+            <div className="mt-2 flex items-baseline space-x-1.5">
+              <span className="text-2xl font-black text-slate-900 tracking-tight">
+                {stats.activeViolationsCount}
+              </span>
+              <span className="text-xs text-slate-400">infractions</span>
+            </div>
           </Link>
 
-          {/* Metric 4: Question Repository & Curricula */}
+          {/* Metric 4 */}
           <Link
             href="/admin/questions"
-            className="p-3.5 sm:p-4 hover:bg-white transition-all flex flex-col justify-between group"
+            className="px-4 py-3 sm:px-5 sm:py-3.5 hover:bg-slate-50/80 transition-colors flex flex-col justify-between group"
           >
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider group-hover:text-purple-700 transition-colors">
                 Question Bank
               </span>
-              <div className="w-7 h-7 rounded-lg bg-purple-50 text-purple-700 flex items-center justify-center border border-purple-100">
-                <BookOpen className="w-3.5 h-3.5" />
-              </div>
+              <span className="font-bold px-1.5 py-0.2 rounded-full border text-[9px] bg-purple-50 text-purple-700 border-purple-200">
+                {stats.totalDepartmentsCount} Depts
+              </span>
             </div>
             <div className="mt-2 flex items-baseline space-x-1.5">
               <span className="text-2xl font-black text-slate-900 tracking-tight">
                 {stats.totalQuestionsCount}
               </span>
-              <span className="text-[11px] text-slate-400">items</span>
-            </div>
-            <div className="mt-2.5 pt-2 border-t border-slate-100/80 flex items-center justify-between text-[10px]">
-              <span className="text-slate-500 font-medium truncate">
-                {stats.totalDepartmentsCount} Dept Tracks
-              </span>
-              <span className="font-bold px-1.5 py-0.2 rounded-full border text-[9px] bg-purple-50 text-purple-700 border-purple-200">
-                Synced
-              </span>
+              <span className="text-xs text-slate-400">items</span>
             </div>
           </Link>
         </div>
