@@ -387,37 +387,42 @@ export function AdminDashboardClientView({
         {/* Left Column (8 cols): Primary Examination Data Matrix */}
         <div className="lg:col-span-8 space-y-4">
           <div className="bg-white border border-slate-200/90 rounded-2xl overflow-hidden shadow-xs">
-            {/* Header: Title, Action & Filter Tabs (Zero Unwanted Text) */}
-            <div className="p-3.5 sm:p-4 border-b border-slate-200 space-y-2.5">
-              <div className="flex items-center justify-between gap-2">
-                <div className="flex items-center space-x-2">
-                  <h2 className="text-sm sm:text-base font-bold text-slate-900 tracking-tight">
-                    Institutional Examination Papers
-                  </h2>
-                  <span className="text-[11px] font-bold px-2 py-0.2 rounded-full bg-slate-100 text-slate-700 border border-slate-200">
-                    {exams.length} Total
-                  </span>
+            {/* Header: Title, Primary CTA & Segmented Filter Toolbar */}
+            <div className="p-4 sm:p-4.5 border-b border-slate-200/90 space-y-3">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center space-x-2.5">
+                  <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-700 flex items-center justify-center border border-blue-100 flex-shrink-0">
+                    <FileText className="w-4 h-4" />
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <h2 className="text-sm sm:text-base font-bold text-slate-900 tracking-tight">
+                      Institutional Examination Papers
+                    </h2>
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
+                      {exams.length} Total
+                    </span>
+                  </div>
                 </div>
 
                 <Link
                   href="/admin/exams/new"
-                  className="inline-flex items-center text-xs font-bold text-blue-700 hover:text-blue-800 transition-colors"
+                  className="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 active:scale-[0.98] shadow-xs hover:shadow transition-all"
                 >
-                  <PlusCircle className="w-3.5 h-3.5 mr-1" />
-                  <span>+ Author New</span>
+                  <PlusCircle className="w-3.5 h-3.5" />
+                  <span>Author Paper</span>
                 </Link>
               </div>
 
-              {/* Filter Tabs & Search Bar */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-1">
-                <div className="inline-flex p-0.5 bg-slate-100/90 rounded-lg border border-slate-200/70 text-xs font-bold text-slate-600">
+              {/* Segmented Filter Tabs & Quick Search */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pt-0.5">
+                <div className="inline-flex p-1 bg-slate-100/90 rounded-xl border border-slate-200/70 text-xs font-semibold text-slate-600">
                   <button
                     type="button"
                     onClick={() => setExamTab("ALL")}
-                    className={`px-2.5 py-1 rounded-md transition-all cursor-pointer text-[11px] ${
+                    className={`px-3 py-1 rounded-lg transition-all cursor-pointer text-xs ${
                       examTab === "ALL"
-                        ? "bg-white text-blue-700 shadow-2xs font-extrabold"
-                        : "hover:text-slate-900"
+                        ? "bg-white text-blue-700 shadow-xs font-bold border border-slate-200/60"
+                        : "hover:text-slate-900 hover:bg-white/40"
                     }`}
                   >
                     All ({exams.length})
@@ -425,10 +430,10 @@ export function AdminDashboardClientView({
                   <button
                     type="button"
                     onClick={() => setExamTab("ACTIVE")}
-                    className={`px-2.5 py-1 rounded-md transition-all cursor-pointer text-[11px] ${
+                    className={`px-3 py-1 rounded-lg transition-all cursor-pointer text-xs ${
                       examTab === "ACTIVE"
-                        ? "bg-white text-blue-700 shadow-2xs font-extrabold"
-                        : "hover:text-slate-900"
+                        ? "bg-white text-blue-700 shadow-xs font-bold border border-slate-200/60"
+                        : "hover:text-slate-900 hover:bg-white/40"
                     }`}
                   >
                     In Session ({stats.activeExamsCount})
@@ -436,10 +441,10 @@ export function AdminDashboardClientView({
                   <button
                     type="button"
                     onClick={() => setExamTab("SCHEDULED")}
-                    className={`px-2.5 py-1 rounded-md transition-all cursor-pointer text-[11px] ${
+                    className={`px-3 py-1 rounded-lg transition-all cursor-pointer text-xs ${
                       examTab === "SCHEDULED"
-                        ? "bg-white text-blue-700 shadow-2xs font-extrabold"
-                        : "hover:text-slate-900"
+                        ? "bg-white text-blue-700 shadow-xs font-bold border border-slate-200/60"
+                        : "hover:text-slate-900 hover:bg-white/40"
                     }`}
                   >
                     Scheduled ({stats.scheduledExamsCount})
@@ -447,26 +452,35 @@ export function AdminDashboardClientView({
                   <button
                     type="button"
                     onClick={() => setExamTab("COMPLETED")}
-                    className={`px-2.5 py-1 rounded-md transition-all cursor-pointer text-[11px] ${
+                    className={`px-3 py-1 rounded-lg transition-all cursor-pointer text-xs ${
                       examTab === "COMPLETED"
-                        ? "bg-white text-blue-700 shadow-2xs font-extrabold"
-                        : "hover:text-slate-900"
+                        ? "bg-white text-blue-700 shadow-xs font-bold border border-slate-200/60"
+                        : "hover:text-slate-900 hover:bg-white/40"
                     }`}
                   >
                     Concluded ({stats.completedExamsCount})
                   </button>
                 </div>
 
-                {/* Quick Search inside Table */}
-                <div className="relative w-full sm:w-48">
-                  <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                {/* Quick Search with standard padding & clear action */}
+                <div className="relative w-full sm:w-56">
+                  <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
                   <input
                     type="text"
                     value={examSearch}
                     onChange={(e) => setExamSearch(e.target.value)}
                     placeholder="Filter papers..."
-                    className="w-full pl-7 pr-2.5 py-1 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-700 focus:bg-white transition-all"
+                    className="w-full pl-9 pr-7 py-1.5 text-xs bg-slate-50 hover:bg-white border border-slate-200 rounded-xl text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 focus:bg-white transition-all shadow-2xs"
                   />
+                  {examSearch && (
+                    <button
+                      type="button"
+                      onClick={() => setExamSearch("")}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 hover:text-slate-700 px-1 font-bold"
+                    >
+                      ✕
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
@@ -474,14 +488,14 @@ export function AdminDashboardClientView({
             {/* Examination Data Table */}
             {filteredExams.length > 0 ? (
               <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-slate-100 text-left text-xs">
-                  <thead className="bg-slate-50/75 text-slate-600 font-semibold uppercase tracking-wider text-[10px]">
+                <table className="min-w-full divide-y divide-slate-200/80 text-left text-xs">
+                  <thead className="bg-slate-50/80 text-slate-500 font-bold uppercase tracking-wider text-[10px] border-b border-slate-200/80">
                     <tr>
-                      <th className="px-4 py-2.5">Paper Details</th>
-                      <th className="px-4 py-2.5">Passcode</th>
-                      <th className="px-4 py-2.5">Duration</th>
-                      <th className="px-4 py-2.5">Status</th>
-                      <th className="px-4 py-2.5 text-right">Actions</th>
+                      <th className="px-5 py-3">Paper Details</th>
+                      <th className="px-4 py-3">Passcode</th>
+                      <th className="px-4 py-3">Duration</th>
+                      <th className="px-4 py-3">Status</th>
+                      <th className="px-5 py-3 text-right">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 text-slate-800">
@@ -495,26 +509,31 @@ export function AdminDashboardClientView({
                       return (
                         <tr
                           key={exam.id}
-                          className="hover:bg-slate-50/70 transition-colors group"
+                          className="hover:bg-blue-50/20 transition-colors group"
                         >
                           {/* Paper Details */}
-                          <td className="px-4 py-3">
-                            <div className="space-y-0.5">
-                              <div className="font-bold text-slate-900 text-xs sm:text-sm group-hover:text-blue-700 transition-colors">
+                          <td className="px-5 py-3.5">
+                            <div className="space-y-1">
+                              <Link
+                                href={`/admin/exams/${exam.id}`}
+                                className="font-bold text-slate-900 text-xs sm:text-sm group-hover:text-blue-600 transition-colors block line-clamp-1"
+                              >
                                 {exam.title}
-                              </div>
-                              <div className="flex items-center space-x-1.5 text-[11px] text-slate-400 flex-wrap">
-                                <span className="font-mono font-bold bg-slate-100 text-slate-700 px-1 py-0.2 rounded border border-slate-200 text-[10px]">
+                              </Link>
+                              <div className="flex items-center space-x-1.5 text-xs text-slate-500 flex-wrap">
+                                <span className="font-mono font-bold bg-slate-100 text-slate-700 px-2 py-0.5 rounded-md border border-slate-200/80 text-[10px]">
                                   {exam.course_code || "GEN-CORE"}
                                 </span>
-                                <span>•</span>
-                                <span>Strikes: {exam.max_strikes}</span>
+                                <span className="text-slate-300">•</span>
+                                <span className="text-[11px] font-medium text-slate-500">
+                                  {exam.max_strikes} Strikes Max
+                                </span>
                                 {exam.activeSessions !== undefined && exam.activeSessions > 0 && (
                                   <>
-                                    <span>•</span>
-                                    <span className="text-emerald-700 font-bold flex items-center">
+                                    <span className="text-slate-300">•</span>
+                                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/80">
                                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 mr-1 animate-pulse" />
-                                      {exam.activeSessions} online
+                                      {exam.activeSessions} Online
                                     </span>
                                   </>
                                 )}
@@ -523,51 +542,65 @@ export function AdminDashboardClientView({
                           </td>
 
                           {/* Access Passcode with One-Click Copy */}
-                          <td className="px-4 py-3 whitespace-nowrap">
-                            <button
-                              type="button"
-                              onClick={() => handleCopyPasscode(exam.id, exam.passcode)}
-                              className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-md bg-slate-50 hover:bg-slate-100 border border-slate-200/90 font-mono font-bold text-slate-800 text-xs transition-colors cursor-pointer group/btn"
-                              title="Click to copy passcode"
-                            >
-                              <span>{exam.passcode}</span>
-                              {isCopied ? (
-                                <CheckCircle2 className="w-3 h-3 text-emerald-600 animate-in fade-in" />
-                              ) : (
-                                <Copy className="w-3 h-3 text-slate-400 group-hover/btn:text-blue-700 transition-colors" />
+                          <td className="px-4 py-3.5 whitespace-nowrap">
+                            <div className="inline-flex flex-col items-start">
+                              <button
+                                type="button"
+                                onClick={() => handleCopyPasscode(exam.id, exam.passcode)}
+                                className={`inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-lg border font-mono font-bold text-xs transition-all cursor-pointer shadow-2xs group/btn ${
+                                  isCopied
+                                    ? "bg-emerald-50 text-emerald-700 border-emerald-300 ring-1 ring-emerald-200"
+                                    : "bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-800 hover:border-slate-300"
+                                }`}
+                                title="Click to copy passcode"
+                              >
+                                <span>{exam.passcode}</span>
+                                {isCopied ? (
+                                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 animate-in fade-in" />
+                                ) : (
+                                  <Copy className="w-3 h-3 text-slate-400 group-hover/btn:text-blue-600 transition-colors" />
+                                )}
+                              </button>
+                              {isCopied && (
+                                <span className="text-[9px] text-emerald-600 font-bold mt-0.5 animate-in fade-in">
+                                  Copied
+                                </span>
                               )}
-                            </button>
-                            {isCopied && (
-                              <div className="text-[9px] text-emerald-600 font-semibold animate-in fade-in">
-                                Copied!
-                              </div>
-                            )}
+                            </div>
                           </td>
 
                           {/* Duration */}
-                          <td className="px-4 py-3 whitespace-nowrap">
-                            <div className="flex items-center space-x-1 text-slate-600 font-medium text-[11px]">
-                              <Clock className="w-3 h-3 text-slate-400" />
+                          <td className="px-4 py-3.5 whitespace-nowrap">
+                            <div className="inline-flex items-center space-x-1.5 text-slate-700 font-medium text-xs bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-200/70">
+                              <Clock className="w-3.5 h-3.5 text-slate-400" />
                               <span>{exam.duration_minutes} Mins</span>
                             </div>
                           </td>
 
                           {/* Status Badge */}
-                          <td className="px-4 py-3 whitespace-nowrap">
+                          <td className="px-4 py-3.5 whitespace-nowrap">
                             <span
-                              className={`inline-flex items-center px-2 py-0.2 rounded-full text-[9px] font-extrabold border ${
+                              className={`inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-extrabold tracking-wide border shadow-2xs ${
                                 isActive
-                                  ? "bg-emerald-50 text-emerald-700 border-emerald-200 animate-pulse"
+                                  ? "bg-emerald-50 text-emerald-700 border-emerald-200/90"
                                   : isScheduled
-                                  ? "bg-blue-50 text-blue-700 border-blue-200"
+                                  ? "bg-blue-50 text-blue-700 border-blue-200/90"
                                   : isDraft
-                                  ? "bg-amber-50 text-amber-800 border-amber-200"
+                                  ? "bg-amber-50 text-amber-800 border-amber-200/90"
                                   : "bg-slate-100 text-slate-700 border-slate-200"
                               }`}
                             >
-                              {isActive && (
-                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 mr-1 animate-ping" />
-                              )}
+                              <span
+                                className={`w-1.5 h-1.5 rounded-full mr-1.5 ${
+                                  isActive
+                                    ? "bg-emerald-600 animate-pulse"
+                                    : isScheduled
+                                    ? "bg-blue-600"
+                                    : isDraft
+                                    ? "bg-amber-600"
+                                    : "bg-slate-400"
+                                }`}
+                              />
                               {isActive
                                 ? "IN SESSION"
                                 : isScheduled
@@ -579,26 +612,26 @@ export function AdminDashboardClientView({
                           </td>
 
                           {/* Action Buttons */}
-                          <td className="px-4 py-3 whitespace-nowrap text-right">
-                            <div className="flex items-center justify-end space-x-1">
+                          <td className="px-5 py-3.5 whitespace-nowrap text-right">
+                            <div className="flex items-center justify-end space-x-1.5">
                               {isActive && (
                                 <Link
                                   href="/admin/proctoring"
-                                  className="inline-flex items-center px-2 py-1 text-[10px] font-bold text-white bg-emerald-700 hover:bg-emerald-800 rounded-md shadow-2xs transition-colors"
+                                  className="inline-flex items-center space-x-1 px-2.5 py-1.5 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 active:scale-[0.98] rounded-lg shadow-2xs transition-all"
                                   title="Enter Live Proctoring Stream"
                                 >
-                                  <Radio className="w-2.5 h-2.5 mr-1 fill-current animate-pulse" />
-                                  <span>Live</span>
+                                  <Radio className="w-3 h-3 fill-current animate-pulse" />
+                                  <span>Invigilate</span>
                                 </Link>
                               )}
 
                               {isCompleted && (
                                 <Link
                                   href={`/admin/exams/${exam.id}/results`}
-                                  className="inline-flex items-center px-2 py-1 text-[10px] font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-md shadow-2xs transition-colors"
+                                  className="inline-flex items-center space-x-1 px-2.5 py-1.5 text-xs font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 active:scale-[0.98] border border-emerald-200/90 rounded-lg shadow-2xs transition-all"
                                   title="Inspect Gradebook & Scores"
                                 >
-                                  <BarChart2 className="w-2.5 h-2.5 mr-1 text-emerald-600" />
+                                  <BarChart2 className="w-3 h-3 text-emerald-600" />
                                   <span>Results</span>
                                 </Link>
                               )}
@@ -606,19 +639,19 @@ export function AdminDashboardClientView({
                               {isDraft && (
                                 <Link
                                   href={`/admin/exams/new?id=${exam.id}`}
-                                  className="inline-flex items-center px-2 py-1 text-[10px] font-bold text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-md shadow-2xs transition-colors"
+                                  className="inline-flex items-center space-x-1 px-2.5 py-1.5 text-xs font-bold text-amber-800 bg-amber-50 hover:bg-amber-100 active:scale-[0.98] border border-amber-200/90 rounded-lg shadow-2xs transition-all"
                                 >
                                   <span>Resume</span>
-                                  <ArrowRight className="w-2.5 h-2.5 ml-0.5" />
+                                  <ArrowRight className="w-3 h-3 text-amber-600" />
                                 </Link>
                               )}
 
                               <Link
                                 href={`/admin/exams/${exam.id}`}
-                                className="inline-flex items-center px-2 py-1 text-[10px] font-bold text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 rounded-md shadow-2xs transition-colors"
+                                className="inline-flex items-center space-x-1 px-2.5 py-1.5 text-xs font-bold text-slate-700 bg-white hover:bg-slate-50 hover:text-slate-900 border border-slate-200 hover:border-slate-300 rounded-lg shadow-2xs transition-all"
                               >
                                 <span>Details</span>
-                                <ChevronRight className="w-2.5 h-2.5 text-slate-400" />
+                                <ChevronRight className="w-3 h-3 text-slate-400" />
                               </Link>
                             </div>
                           </td>
@@ -629,30 +662,40 @@ export function AdminDashboardClientView({
                 </table>
               </div>
             ) : (
-              <div className="p-8 text-center space-y-2">
-                <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-700 flex items-center justify-center mx-auto shadow-xs border border-blue-100">
-                  <FileText className="w-5 h-5" />
+              <div className="p-10 text-center space-y-3">
+                <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center mx-auto shadow-xs border border-blue-100">
+                  <FileText className="w-6 h-6" />
                 </div>
-                <div className="space-y-0.5">
-                  <h3 className="text-xs font-bold text-slate-900">No Examinations Found</h3>
-                  <p className="text-[11px] text-slate-500 max-w-sm mx-auto">
-                    No examination records match the selected filter or search term.
+                <div className="space-y-1">
+                  <h3 className="text-sm font-bold text-slate-900">No Examinations Found</h3>
+                  <p className="text-xs text-slate-500 max-w-sm mx-auto">
+                    No examination records match the selected status filter or search query.
                   </p>
                 </div>
+                {examSearch && (
+                  <button
+                    type="button"
+                    onClick={() => setExamSearch("")}
+                    className="inline-flex items-center px-3 py-1.5 text-xs font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors cursor-pointer"
+                  >
+                    Clear Filter
+                  </button>
+                )}
               </div>
             )}
 
             {/* Footer Directory Link */}
-            <div className="p-2.5 px-4 border-t border-slate-100 bg-slate-50/50 flex items-center justify-between text-[11px] text-slate-500">
-              <span>
-                Showing {filteredExams.length} of {exams.length} papers
+            <div className="p-3 px-5 border-t border-slate-200/80 bg-slate-50/60 flex items-center justify-between text-xs text-slate-500">
+              <span className="font-medium">
+                Showing <strong className="text-slate-700">{filteredExams.length}</strong> of{" "}
+                <strong className="text-slate-700">{exams.length}</strong> examination papers
               </span>
               <Link
                 href="/admin/exams"
-                className="font-bold text-blue-700 hover:text-blue-800 inline-flex items-center space-x-1"
+                className="font-bold text-blue-700 hover:text-blue-800 inline-flex items-center space-x-1 group"
               >
                 <span>Complete Directory</span>
-                <ArrowRight className="w-3 h-3" />
+                <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
               </Link>
             </div>
           </div>
