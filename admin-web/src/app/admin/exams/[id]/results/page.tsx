@@ -41,6 +41,8 @@ import {
   HelpCircle,
   Monitor,
   Globe,
+  Radio,
+  BookOpen,
 } from "lucide-react";
 
 export default function ExamResultsGradebookPage() {
@@ -60,7 +62,7 @@ export default function ExamResultsGradebookPage() {
   const [sortBy, setSortBy] = useState<"SCORE_DESC" | "SCORE_ASC" | "NAME_ASC" | "APP_ASC">("SCORE_DESC");
 
   // Active View Tab
-  const [activeTab, setActiveTab] = useState<"GRADEBOOK" | "QUESTION_ANALYSIS">("GRADEBOOK");
+  const [activeTab, setActiveTab] = useState<"GRADEBOOK" | "QUESTION_ANALYSIS" | "DEPARTMENTS">("GRADEBOOK");
 
   // Candidate Answer Sheet Inspector Modal State
   const [inspectCandidate, setInspectCandidate] = useState<CandidateGradebookItem | null>(null);
@@ -207,6 +209,16 @@ export default function ExamResultsGradebookPage() {
     return inspectCandidate.questionBreakdown;
   }, [inspectCandidate, inspectFilter]);
 
+  function getInitials(name: string) {
+    return name
+      .split(" ")
+      .map((n) => n[0])
+      .filter(Boolean)
+      .slice(0, 2)
+      .join("")
+      .toUpperCase();
+  }
+
   if (isLoading) {
     return (
       <div className="min-h-[70vh] flex flex-col items-center justify-center p-6 text-center space-y-3 font-sans">
@@ -215,7 +227,7 @@ export default function ExamResultsGradebookPage() {
           Compiling Examination Gradebook &amp; Analytics...
         </h2>
         <p className="text-xs text-slate-500">
-          Calculating candidate scores, pass rates, and item accuracy statistics.
+          Aggregating all examination questions, candidate scores, and departmental benchmarks.
         </p>
       </div>
     );
@@ -253,367 +265,296 @@ export default function ExamResultsGradebookPage() {
   const { exam, metrics, departmentBreakdown, questionAnalytics } = data;
 
   return (
-    <div className="space-y-6 font-sans select-none pb-12">
-      {/* 1. Header with Breadcrumb & Action Ribbon */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white border border-slate-200/90 rounded-2xl p-6 shadow-xs print:shadow-none print:border-none print:p-0">
-        <div className="space-y-1">
-          <div className="flex items-center space-x-2 text-xs font-semibold text-slate-500">
-            <Link
-              href="/admin/exams"
-              className="hover:text-blue-700 transition-colors flex items-center"
-            >
-              <ArrowLeft className="w-3.5 h-3.5 mr-1" />
-              <span>Examinations</span>
-            </Link>
-            <span>/</span>
-            <Link
-              href={`/admin/exams/${examId}`}
-              className="hover:text-blue-700 transition-colors truncate max-w-xs"
-            >
-              {exam.title}
-            </Link>
-            <span>/</span>
-            <span className="text-blue-700 font-bold">Gradebook &amp; Analytics</span>
-          </div>
-
-          <div className="flex items-center space-x-3 pt-1">
-            <h1 className="text-lg sm:text-xl font-bold text-slate-900 tracking-tight">
-              {exam.title}
-            </h1>
-            <span
-              className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border ${
-                exam.status === "COMPLETED"
-                  ? "bg-emerald-50 text-emerald-800 border-emerald-200"
-                  : exam.status === "ACTIVE"
-                  ? "bg-blue-50 text-blue-800 border-blue-200 animate-pulse"
-                  : "bg-slate-100 text-slate-700 border-slate-200"
-              }`}
-            >
-              {exam.status}
-            </span>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500 pt-0.5">
-            {exam.courseCode && (
-              <span className="font-mono font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200 text-[10px]">
-                {exam.courseCode}
-              </span>
-            )}
-            <span>
-              Passing Score: <strong className="text-slate-800">{exam.passingScorePercentage}%</strong>
-            </span>
-            <span>•</span>
-            <span>
-              Total Marks: <strong className="text-slate-800">{exam.totalPossiblePoints} pts</strong>
-            </span>
-            <span>•</span>
-            <span>
-              Negative Marking:{" "}
-              <strong className={exam.enableNegativeMarking ? "text-red-600" : "text-slate-700"}>
-                {exam.enableNegativeMarking ? "Enabled" : "Disabled"}
-              </strong>
-            </span>
-          </div>
-        </div>
-
-        {/* Action Buttons */}
-        <div className="flex items-center space-x-2.5 shrink-0 print:hidden">
-          <button
-            type="button"
-            onClick={() => window.print()}
-            className="inline-flex items-center px-3.5 py-2 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 rounded-xl transition-all shadow-2xs cursor-pointer"
-            title="Print Official Gradebook Summary"
-          >
-            <Printer className="w-3.5 h-3.5 mr-1.5 text-slate-500" />
-            <span>Print Report</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={handleExportCsv}
-            className="inline-flex items-center px-4 py-2 text-xs font-bold text-white bg-blue-700 hover:bg-blue-800 rounded-xl transition-all shadow-2xs cursor-pointer"
-            title="Export candidate marks and responses to CSV"
-          >
-            <Download className="w-3.5 h-3.5 mr-1.5" />
-            <span>Export CSV</span>
-          </button>
-        </div>
-      </div>
-
-      {/* 2. Executive KPI Metrics Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 print:grid-cols-4">
-        {/* Metric 1: Attendance & Submissions */}
-        <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-xs space-y-2">
-          <div className="flex items-center justify-between text-xs font-semibold text-slate-500">
-            <span>Candidates Appeared</span>
-            <div className="p-1.5 rounded-lg bg-blue-50 text-blue-700">
-              <Users className="w-4 h-4" />
+    <div className="space-y-4 max-w-7xl mx-auto pb-12 w-full font-sans">
+      {/* 1. Master Executive Command Cockpit Header */}
+      <div className="bg-white border border-slate-200/90 rounded-2xl shadow-xs overflow-hidden print:border-none print:shadow-none">
+        {/* Top Header Row */}
+        <div className="px-4 py-3 sm:px-5 sm:py-3.5 flex flex-col md:flex-row md:items-center justify-between gap-3 bg-gradient-to-r from-white via-slate-50/30 to-blue-50/20">
+          <div className="flex items-center space-x-3 min-w-0">
+            {/* Official Square KARE Logo */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <div className="w-9 h-9 rounded-xl bg-white border border-slate-200/90 p-0.5 flex items-center justify-center flex-shrink-0 shadow-2xs overflow-hidden">
+              <img
+                src="/kare-square-logo.png"
+                alt="KARE Logo"
+                className="w-full h-full object-contain rounded-lg"
+              />
             </div>
-          </div>
-          <div className="flex items-baseline space-x-2">
-            <span className="text-2xl font-black text-slate-900">{metrics.totalSubmitted}</span>
-            <span className="text-xs text-slate-500 font-semibold">
-              of {metrics.totalEnrolled} enrolled
-            </span>
-          </div>
-          <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
-            <div
-              className="bg-blue-600 h-1.5 rounded-full"
-              style={{
-                width: `${
-                  metrics.totalEnrolled > 0
-                    ? Math.round((metrics.totalSubmitted / metrics.totalEnrolled) * 100)
-                    : 0
-                }%`,
-              }}
-            />
-          </div>
-          <div className="flex justify-between text-[10px] text-slate-400 font-medium pt-0.5">
-            <span>
-              {metrics.totalAppeared - metrics.totalSubmitted} sitting in-progress
-            </span>
-            <span>
-              {metrics.totalEnrolled - metrics.totalAppeared} absent
-            </span>
-          </div>
-        </div>
 
-        {/* Metric 2: Overall Pass Rate */}
-        <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-xs space-y-2">
-          <div className="flex items-center justify-between text-xs font-semibold text-slate-500">
-            <span>Pass Rate ({exam.passingScorePercentage}% threshold)</span>
-            <div className="p-1.5 rounded-lg bg-emerald-50 text-emerald-700">
-              <Award className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="flex items-baseline space-x-2">
-            <span className="text-2xl font-black text-emerald-700">{metrics.overallPassRate}%</span>
-            <span className="text-xs text-slate-500 font-semibold">
-              ({metrics.passCount} passed)
-            </span>
-          </div>
-          <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
-            <div
-              className="bg-emerald-600 h-1.5 rounded-full"
-              style={{ width: `${metrics.overallPassRate}%` }}
-            />
-          </div>
-          <div className="flex justify-between text-[10px] text-slate-400 font-medium pt-0.5">
-            <span>{metrics.failCount} below passing score</span>
-            <span className="text-emerald-700 font-bold">{metrics.passCount} cleared</span>
-          </div>
-        </div>
-
-        {/* Metric 3: Score Averages */}
-        <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-xs space-y-2">
-          <div className="flex items-center justify-between text-xs font-semibold text-slate-500">
-            <span>Average Score</span>
-            <div className="p-1.5 rounded-lg bg-indigo-50 text-indigo-700">
-              <TrendingUp className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="flex items-baseline space-x-2">
-            <span className="text-2xl font-black text-slate-900">{metrics.averageScore}</span>
-            <span className="text-xs text-slate-500 font-semibold">
-              / {exam.totalPossiblePoints} pts ({metrics.averagePercentage}%)
-            </span>
-          </div>
-          <div className="flex items-center space-x-2 pt-1 text-[10px]">
-            <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-800 font-bold border border-emerald-200">
-              High: {metrics.highestScore} pt
-            </span>
-            <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-amber-50 text-amber-800 font-bold border border-amber-200">
-              Median: {metrics.medianScore} pt
-            </span>
-            <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-red-50 text-red-800 font-bold border border-red-200">
-              Low: {metrics.lowestScore} pt
-            </span>
-          </div>
-        </div>
-
-        {/* Metric 4: Security Integrity & Infractions */}
-        <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-xs space-y-2">
-          <div className="flex items-center justify-between text-xs font-semibold text-slate-500">
-            <span>Integrity Violations</span>
-            <div className="p-1.5 rounded-lg bg-red-50 text-red-700">
-              <ShieldAlert className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="flex items-baseline space-x-2">
-            <span className="text-2xl font-black text-red-700">
-              {metrics.totalViolationsRecorded}
-            </span>
-            <span className="text-xs text-slate-500 font-semibold">strikes recorded</span>
-          </div>
-          <p className="text-[10px] text-slate-500 leading-snug pt-1">
-            Fullscreen exits, tab switches, and unauthorized background keystrokes flagged by the watchdog.
-          </p>
-        </div>
-      </div>
-
-      {/* 3. Department Breakdown Cards */}
-      {departmentBreakdown.length > 0 && (
-        <div className="bg-white border border-slate-200/90 rounded-2xl p-5 shadow-xs space-y-3">
-          <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
-            <div className="flex items-center space-x-2">
-              <Building2 className="w-4 h-4 text-blue-700" />
-              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800">
-                Department Performance Breakdown ({departmentBreakdown.length} Tracks)
-              </h3>
-            </div>
-            <span className="text-[11px] text-slate-400">
-              Comparative cohort averages
-            </span>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-1">
-            {departmentBreakdown.map((dept) => (
-              <div
-                key={dept.departmentCode}
-                className="p-3.5 rounded-xl border border-slate-200/80 bg-slate-50/60 space-y-2.5"
-              >
-                <div className="flex items-center justify-between">
-                  <span className="font-mono font-bold text-xs bg-white text-blue-700 px-2 py-0.5 rounded border border-blue-200 shadow-2xs">
-                    {dept.departmentCode}
-                  </span>
-                  <span className="text-[10px] text-slate-500 font-semibold">
-                    {dept.submittedCount}/{dept.enrolledCount} Submitted
-                  </span>
-                </div>
-
-                <div className="font-bold text-xs text-slate-900 truncate">
-                  {dept.departmentName}
-                </div>
-
-                <div className="grid grid-cols-2 gap-2 text-[11px] pt-1 border-t border-slate-200/60">
-                  <div>
-                    <span className="text-slate-400 block text-[10px]">Avg Score</span>
-                    <span className="font-bold text-slate-800">
-                      {dept.averageScore} pt ({dept.averagePercentage}%)
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-slate-400 block text-[10px]">Pass Rate</span>
-                    <span
-                      className={`font-bold ${
-                        dept.passRate >= 60 ? "text-emerald-700" : "text-amber-700"
-                      }`}
-                    >
-                      {dept.passRate}% ({dept.passCount} passed)
-                    </span>
-                  </div>
-                </div>
+            <div className="min-w-0">
+              <div className="flex items-center space-x-2 flex-wrap">
+                <Link
+                  href="/admin/exams"
+                  className="text-xs text-slate-400 hover:text-blue-700 transition-colors flex items-center"
+                >
+                  <ArrowLeft className="w-3.5 h-3.5 mr-1" />
+                  <span>Exams</span>
+                </Link>
+                <span className="text-slate-300">/</span>
+                <h1 className="text-sm sm:text-base font-bold text-slate-900 tracking-tight truncate max-w-md">
+                  {exam.title}
+                </h1>
+                <span
+                  className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border ${
+                    exam.status === "COMPLETED"
+                      ? "bg-emerald-50 text-emerald-800 border-emerald-200"
+                      : exam.status === "ACTIVE"
+                      ? "bg-blue-50 text-blue-800 border-blue-200 animate-pulse"
+                      : "bg-slate-100 text-slate-700 border-slate-200"
+                  }`}
+                >
+                  {exam.status}
+                </span>
               </div>
-            ))}
+              <div className="flex items-center space-x-2 text-[11px] text-slate-500 mt-0.5">
+                <span>Passing: {exam.passingScorePercentage}%</span>
+                <span>•</span>
+                <span>Total Marks: {exam.totalPossiblePoints} pts ({questionAnalytics.length} Questions)</span>
+                <span>•</span>
+                <span>
+                  Negative Marking:{" "}
+                  <strong className={exam.enableNegativeMarking ? "text-red-600" : "text-slate-600"}>
+                    {exam.enableNegativeMarking ? "Active" : "None"}
+                  </strong>
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Right Action Buttons */}
+          <div className="flex items-center space-x-2 flex-wrap gap-y-1.5 flex-shrink-0 print:hidden">
+            <button
+              type="button"
+              onClick={() => window.print()}
+              className="inline-flex items-center space-x-1.5 px-3 py-1.5 text-xs font-bold text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 hover:border-slate-300 rounded-lg shadow-2xs transition-all cursor-pointer"
+              title="Print official institutional summary report"
+            >
+              <Printer className="w-3.5 h-3.5 text-slate-500" />
+              <span>Print Report</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleExportCsv}
+              className="inline-flex items-center space-x-1.5 px-3 py-1.5 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 active:scale-[0.98] rounded-lg shadow-xs hover:shadow transition-all cursor-pointer"
+              title="Export complete marks roster to CSV"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span>Export CSV</span>
+            </button>
           </div>
         </div>
-      )}
 
-      {/* 4. Tab Navigation Ribbon (Gradebook vs Item Analysis) */}
-      <div className="flex items-center justify-between border-b border-slate-200 pt-2 print:hidden">
-        <div className="flex items-center space-x-1">
-          <button
-            type="button"
-            onClick={() => setActiveTab("GRADEBOOK")}
-            className={`px-4 py-2.5 text-xs font-bold transition-all border-b-2 flex items-center space-x-2 cursor-pointer ${
-              activeTab === "GRADEBOOK"
-                ? "border-blue-700 text-blue-700"
-                : "border-transparent text-slate-500 hover:text-slate-800"
-            }`}
-          >
-            <Users className="w-4 h-4" />
-            <span>Candidate Gradebook Roster ({filteredCandidates.length})</span>
-          </button>
+        {/* 4 Clean Metric Cells */}
+        <div className="border-t border-slate-200/80 grid grid-cols-2 lg:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-slate-200/80">
+          {/* Metric 1: Candidates Appeared */}
+          <div className="px-4 py-3 sm:px-5 sm:py-3.5 hover:bg-slate-50/80 transition-colors flex flex-col justify-between group">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider group-hover:text-blue-700 transition-colors">
+                Candidates Appeared
+              </span>
+              <span className="font-bold px-1.5 py-0.2 rounded-full border text-[9px] bg-blue-50 text-blue-700 border-blue-200">
+                {metrics.totalSubmitted} Finalized
+              </span>
+            </div>
+            <div className="mt-2 flex items-baseline space-x-1.5">
+              <span className="text-2xl font-black text-slate-900 tracking-tight">
+                {metrics.totalAppeared}
+              </span>
+              <span className="text-xs text-slate-400">of {metrics.totalEnrolled} enrolled</span>
+            </div>
+          </div>
 
-          <button
-            type="button"
-            onClick={() => setActiveTab("QUESTION_ANALYSIS")}
-            className={`px-4 py-2.5 text-xs font-bold transition-all border-b-2 flex items-center space-x-2 cursor-pointer ${
-              activeTab === "QUESTION_ANALYSIS"
-                ? "border-blue-700 text-blue-700"
-                : "border-transparent text-slate-500 hover:text-slate-800"
-            }`}
-          >
-            <BarChart3 className="w-4 h-4" />
-            <span>Question Item Accuracy &amp; Difficulty ({questionAnalytics.length})</span>
-          </button>
+          {/* Metric 2: Overall Pass Rate */}
+          <div className="px-4 py-3 sm:px-5 sm:py-3.5 hover:bg-slate-50/80 transition-colors flex flex-col justify-between group">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider group-hover:text-emerald-700 transition-colors">
+                Overall Pass Rate
+              </span>
+              <span className="font-bold px-1.5 py-0.2 rounded-full border text-[9px] bg-emerald-50 text-emerald-700 border-emerald-200">
+                {metrics.passCount} Cleared
+              </span>
+            </div>
+            <div className="mt-2 flex items-baseline space-x-1.5">
+              <span className="text-2xl font-black text-emerald-700 tracking-tight">
+                {metrics.overallPassRate}%
+              </span>
+              <span className="text-xs text-slate-400">≥ {exam.passingScorePercentage}% threshold</span>
+            </div>
+          </div>
+
+          {/* Metric 3: Average Marks */}
+          <div className="px-4 py-3 sm:px-5 sm:py-3.5 hover:bg-slate-50/80 transition-colors flex flex-col justify-between group">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider group-hover:text-indigo-700 transition-colors">
+                Class Mean Score
+              </span>
+              <span className="font-bold px-1.5 py-0.2 rounded-full border text-[9px] bg-indigo-50 text-indigo-700 border-indigo-200">
+                {metrics.averagePercentage}% Avg
+              </span>
+            </div>
+            <div className="mt-2 flex items-baseline space-x-1.5">
+              <span className="text-2xl font-black text-slate-900 tracking-tight">
+                {metrics.averageScore}
+              </span>
+              <span className="text-xs text-slate-400">/ {exam.totalPossiblePoints} pts</span>
+            </div>
+          </div>
+
+          {/* Metric 4: Highest Mark */}
+          <div className="px-4 py-3 sm:px-5 sm:py-3.5 hover:bg-slate-50/80 transition-colors flex flex-col justify-between group">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider group-hover:text-amber-700 transition-colors">
+                Top Score
+              </span>
+              <span className="font-bold px-1.5 py-0.2 rounded-full border text-[9px] bg-amber-50 text-amber-800 border-amber-200">
+                Rank #1
+              </span>
+            </div>
+            <div className="mt-2 flex items-baseline space-x-1.5">
+              <span className="text-2xl font-black text-amber-700 tracking-tight">
+                {metrics.highestScore}
+              </span>
+              <span className="text-xs text-slate-400">pts (Med: {metrics.medianScore})</span>
+            </div>
+          </div>
         </div>
+      </div>
+
+      {/* 2. Modern Segmented Tab Switcher */}
+      <div className="flex items-center p-1 bg-slate-100/90 rounded-xl space-x-1 w-fit overflow-x-auto max-w-full scrollbar-none print:hidden">
+        <button
+          type="button"
+          onClick={() => setActiveTab("GRADEBOOK")}
+          className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer whitespace-nowrap flex items-center space-x-1.5 ${
+            activeTab === "GRADEBOOK"
+              ? "bg-white text-slate-900 shadow-xs"
+              : "text-slate-600 hover:text-slate-900"
+          }`}
+        >
+          <Users className="w-3.5 h-3.5" />
+          <span>Candidate Gradebook ({filteredCandidates.length})</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab("QUESTION_ANALYSIS")}
+          className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer whitespace-nowrap flex items-center space-x-1.5 ${
+            activeTab === "QUESTION_ANALYSIS"
+              ? "bg-white text-slate-900 shadow-xs"
+              : "text-slate-600 hover:text-slate-900"
+          }`}
+        >
+          <BarChart3 className="w-3.5 h-3.5" />
+          <span>Question Item Accuracy ({questionAnalytics.length} Questions)</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab("DEPARTMENTS")}
+          className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer whitespace-nowrap flex items-center space-x-1.5 ${
+            activeTab === "DEPARTMENTS"
+              ? "bg-white text-slate-900 shadow-xs"
+              : "text-slate-600 hover:text-slate-900"
+          }`}
+        >
+          <Building2 className="w-3.5 h-3.5" />
+          <span>Faculty Benchmarks ({departmentBreakdown.length} Tracks)</span>
+        </button>
       </div>
 
       {/* ===================================================================
           TAB 1: CANDIDATE GRADEBOOK TABLE
          =================================================================== */}
       {activeTab === "GRADEBOOK" && (
-        <div className="bg-white border border-slate-200/90 rounded-2xl shadow-xs overflow-hidden space-y-4 p-5">
-          {/* Search & Filter Toolbar */}
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 border-b border-slate-100 pb-4 print:hidden">
-            {/* Search Input */}
-            <div className="relative flex-1 max-w-sm">
-              <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search candidate name, ID, or email..."
-                className="w-full pl-9 pr-3 py-2 text-xs bg-slate-50/70 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-600 font-medium text-slate-800"
-              />
-              {searchQuery && (
-                <button
-                  type="button"
-                  onClick={() => setSearchQuery("")}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                >
-                  <X className="w-3.5 h-3.5" />
-                </button>
-              )}
+        <div className="bg-white border border-slate-200/90 rounded-2xl overflow-hidden shadow-xs">
+          {/* Tier 1: Toolbar with Quick Filters & Integrated Search */}
+          <div className="p-3 sm:p-4 border-b border-slate-100 flex flex-col lg:flex-row lg:items-center justify-between gap-3 bg-slate-50/50 print:hidden">
+            {/* Quick Result Selector */}
+            <div className="flex items-center p-1 bg-slate-100/90 rounded-xl space-x-1 w-fit overflow-x-auto max-w-full scrollbar-none">
+              <button
+                type="button"
+                onClick={() => setSelectedResultFilter("ALL")}
+                className={`px-2.5 py-1 text-xs font-bold rounded-lg transition-all cursor-pointer whitespace-nowrap ${
+                  selectedResultFilter === "ALL"
+                    ? "bg-white text-slate-900 shadow-xs"
+                    : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                All Statuses
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedResultFilter("PASS")}
+                className={`px-2.5 py-1 text-xs font-bold rounded-lg transition-all cursor-pointer whitespace-nowrap text-emerald-800 ${
+                  selectedResultFilter === "PASS"
+                    ? "bg-white shadow-xs font-extrabold"
+                    : "hover:text-emerald-900"
+                }`}
+              >
+                Pass ({metrics.passCount})
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedResultFilter("FAIL")}
+                className={`px-2.5 py-1 text-xs font-bold rounded-lg transition-all cursor-pointer whitespace-nowrap text-red-700 ${
+                  selectedResultFilter === "FAIL"
+                    ? "bg-white shadow-xs font-extrabold"
+                    : "hover:text-red-900"
+                }`}
+              >
+                Fail ({metrics.failCount})
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedResultFilter("IN_PROGRESS")}
+                className={`px-2.5 py-1 text-xs font-bold rounded-lg transition-all cursor-pointer whitespace-nowrap text-blue-700 ${
+                  selectedResultFilter === "IN_PROGRESS"
+                    ? "bg-white shadow-xs font-extrabold"
+                    : "hover:text-blue-900"
+                }`}
+              >
+                Sitting ({metrics.totalAppeared - metrics.totalSubmitted})
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedResultFilter("ABSENT")}
+                className={`px-2.5 py-1 text-xs font-bold rounded-lg transition-all cursor-pointer whitespace-nowrap text-slate-600 ${
+                  selectedResultFilter === "ABSENT"
+                    ? "bg-white shadow-xs font-extrabold"
+                    : "hover:text-slate-900"
+                }`}
+              >
+                Absent ({metrics.totalEnrolled - metrics.totalAppeared})
+              </button>
             </div>
 
-            {/* Filter Dropdowns */}
-            <div className="flex flex-wrap items-center gap-2">
-              {/* Department Filter */}
-              <select
-                value={selectedDepartment}
-                onChange={(e) => setSelectedDepartment(e.target.value)}
-                className="px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-700 focus:outline-none"
-              >
-                <option value="ALL">All Departments</option>
-                {departmentBreakdown.map((d) => (
-                  <option key={d.departmentCode} value={d.departmentCode}>
-                    {d.departmentCode} Track
-                  </option>
-                ))}
-              </select>
+            {/* Search Box & Sort */}
+            <div className="flex items-center space-x-2">
+              <div className="relative w-full sm:w-72">
+                <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Search candidate name, ID, email..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-9 pr-8 py-1.5 text-xs bg-white border border-slate-200 rounded-xl text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all shadow-2xs"
+                />
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchQuery("")}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
 
-              {/* Result Filter */}
-              <select
-                value={selectedResultFilter}
-                onChange={(e) => setSelectedResultFilter(e.target.value)}
-                className="px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-700 focus:outline-none"
-              >
-                <option value="ALL">All Results / Statuses</option>
-                <option value="PASS">Pass Only</option>
-                <option value="FAIL">Fail Only</option>
-                <option value="IN_PROGRESS">Sitting In Progress</option>
-                <option value="ABSENT">Absent</option>
-                <option value="DISQUALIFIED">Disqualified</option>
-              </select>
-
-              {/* Client Environment */}
-              <select
-                value={selectedClientFilter}
-                onChange={(e) => setSelectedClientFilter(e.target.value)}
-                className="px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-700 focus:outline-none"
-              >
-                <option value="ALL">All Client Types</option>
-                <option value="Web Browser">Web Browser</option>
-                <option value="Windows Desktop">Windows Desktop</option>
-              </select>
-
-              {/* Sort Order */}
               <select
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value as any)}
-                className="px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl font-bold text-blue-700 focus:outline-none"
+                className="px-2.5 py-1.5 text-xs bg-white border border-slate-200 rounded-xl font-bold text-blue-700 focus:outline-none cursor-pointer shadow-2xs"
               >
                 <option value="SCORE_DESC">Score: High to Low</option>
                 <option value="SCORE_ASC">Score: Low to High</option>
@@ -623,77 +564,121 @@ export default function ExamResultsGradebookPage() {
             </div>
           </div>
 
-          {/* Roster Table */}
+          {/* Tier 2: Department Filter Tabs */}
+          {departmentBreakdown.length > 0 && (
+            <div className="px-4 py-2.5 border-b border-slate-100 flex items-center space-x-1.5 overflow-x-auto scrollbar-none bg-white print:hidden">
+              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mr-1 flex-shrink-0">
+                Department:
+              </span>
+              <button
+                type="button"
+                onClick={() => setSelectedDepartment("ALL")}
+                className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all whitespace-nowrap cursor-pointer flex-shrink-0 ${
+                  selectedDepartment === "ALL"
+                    ? "bg-blue-600 text-white shadow-2xs"
+                    : "bg-slate-100/90 text-slate-600 hover:bg-slate-200/90"
+                }`}
+              >
+                All Departments ({data.candidates.length})
+              </button>
+              {departmentBreakdown.map((d) => (
+                <button
+                  key={d.departmentCode}
+                  type="button"
+                  onClick={() => setSelectedDepartment(d.departmentCode)}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all whitespace-nowrap cursor-pointer flex-shrink-0 ${
+                    selectedDepartment === d.departmentCode
+                      ? "bg-blue-600 text-white shadow-2xs"
+                      : "bg-slate-100/90 text-slate-600 hover:bg-slate-200/90"
+                  }`}
+                >
+                  {d.departmentCode} ({d.enrolledCount})
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Candidates Roster Table */}
           {filteredCandidates.length === 0 ? (
-            <div className="py-12 text-center text-slate-400 text-xs space-y-1">
-              <Users className="w-8 h-8 mx-auto text-slate-300" />
-              <p className="font-semibold text-slate-600">No candidates match your filters.</p>
-              <p className="text-[11px]">Try adjusting your search query or reset the filter criteria.</p>
+            <div className="p-16 text-center space-y-3">
+              <div className="w-12 h-12 mx-auto rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                <Users className="w-6 h-6" />
+              </div>
+              <h3 className="text-sm font-bold text-slate-900">No candidates match your criteria</h3>
+              <p className="text-xs text-slate-500 max-w-sm mx-auto">
+                Try clearing your search query or reset the department filter to view all enrolled examinees.
+              </p>
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse text-xs">
-                <thead>
-                  <tr className="border-b border-slate-200 bg-slate-50/70 text-[10px] uppercase font-bold text-slate-500 tracking-wider">
-                    <th className="py-2.5 px-3 w-12 text-center">Rank</th>
-                    <th className="py-2.5 px-3">Candidate</th>
-                    <th className="py-2.5 px-3">Department</th>
-                    <th className="py-2.5 px-3">Status</th>
-                    <th className="py-2.5 px-3">Attempted</th>
-                    <th className="py-2.5 px-3">Score &amp; %</th>
-                    <th className="py-2.5 px-3">Result</th>
-                    <th className="py-2.5 px-3">Duration</th>
-                    <th className="py-2.5 px-3">Strikes</th>
-                    <th className="py-2.5 px-3 text-right print:hidden">Action</th>
+              <table className="w-full text-left text-xs">
+                <thead className="bg-slate-50/80 text-slate-500 font-bold uppercase tracking-wider text-[11px] border-b border-slate-200">
+                  <tr>
+                    <th className="py-3 px-3 sm:px-4 w-12 text-center">Rank</th>
+                    <th className="py-3 px-3 sm:px-4">Candidate &amp; Identity</th>
+                    <th className="py-3 px-3 sm:px-4">Department</th>
+                    <th className="py-3 px-3 sm:px-4">Session Status</th>
+                    <th className="py-3 px-3 sm:px-4">Attempted</th>
+                    <th className="py-3 px-3 sm:px-4">Score &amp; %</th>
+                    <th className="py-3 px-3 sm:px-4">Result</th>
+                    <th className="py-3 px-3 sm:px-4">Duration</th>
+                    <th className="py-3 px-3 sm:px-4">Strikes</th>
+                    <th className="py-3 px-3 sm:px-4 text-right print:hidden">Action</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100 text-slate-700">
+                <tbody className="divide-y divide-slate-100 bg-white">
                   {filteredCandidates.map((c, idx) => {
                     const isPassed = c.result === "PASS";
                     const isFailed = c.result === "FAIL";
                     const isSubmitted = c.status === "SUBMITTED";
+                    const initials = getInitials(c.fullName);
 
                     return (
-                      <tr
-                        key={c.studentId}
-                        className="hover:bg-slate-50/60 transition-colors"
-                      >
+                      <tr key={c.studentId} className="hover:bg-slate-50/70 transition-colors">
                         {/* Rank */}
-                        <td className="py-3 px-3 text-center font-mono font-bold text-slate-400">
+                        <td className="py-3.5 px-3 sm:px-4 text-center font-mono font-bold text-slate-400">
                           {isSubmitted ? `#${idx + 1}` : "—"}
                         </td>
 
                         {/* Candidate Details */}
-                        <td className="py-3 px-3">
-                          <div className="font-bold text-slate-900">{c.fullName}</div>
-                          <div className="flex items-center space-x-1.5 mt-0.5">
-                            <span className="font-mono text-[10px] text-blue-700 font-semibold">
-                              {c.applicationNumber}
-                            </span>
-                            {c.clientType === "Web Browser" ? (
-                              <span className="text-[9px] font-bold bg-blue-50 text-blue-700 px-1.5 py-0.2 rounded border border-blue-200 inline-flex items-center">
-                                <Globe className="w-2.5 h-2.5 mr-0.5" />
-                                Web
-                              </span>
-                            ) : c.clientType === "Windows Desktop" ? (
-                              <span className="text-[9px] font-bold bg-slate-100 text-slate-700 px-1.5 py-0.2 rounded border border-slate-200 inline-flex items-center">
-                                <Monitor className="w-2.5 h-2.5 mr-0.5" />
-                                Desktop
-                              </span>
-                            ) : null}
+                        <td className="py-3.5 px-3 sm:px-4">
+                          <div className="flex items-center space-x-3">
+                            <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-700 font-bold text-xs flex items-center justify-center border border-blue-200/60 flex-shrink-0">
+                              {initials}
+                            </div>
+                            <div>
+                              <div className="font-bold text-slate-900 text-sm tracking-tight">
+                                {c.fullName}
+                              </div>
+                              <div className="flex items-center space-x-1.5 mt-0.5">
+                                <span className="font-mono text-[11px] font-bold text-slate-600">
+                                  {c.applicationNumber}
+                                </span>
+                                {c.clientType === "Web Browser" ? (
+                                  <span className="text-[9px] font-bold bg-blue-50 text-blue-700 px-1.5 py-0.2 rounded border border-blue-200 inline-flex items-center">
+                                    <Globe className="w-2.5 h-2.5 mr-0.5" />
+                                    Web
+                                  </span>
+                                ) : c.clientType === "Windows Desktop" ? (
+                                  <span className="text-[9px] font-bold bg-slate-100 text-slate-700 px-1.5 py-0.2 rounded border border-slate-200 inline-flex items-center">
+                                    <Monitor className="w-2.5 h-2.5 mr-0.5" />
+                                    Desktop
+                                  </span>
+                                ) : null}
+                              </div>
+                            </div>
                           </div>
-                          <div className="text-[10px] text-slate-400 truncate max-w-xs">{c.email}</div>
                         </td>
 
                         {/* Department */}
-                        <td className="py-3 px-3">
-                          <span className="text-[10px] font-bold bg-purple-50 text-purple-700 px-2 py-0.5 rounded border border-purple-200">
+                        <td className="py-3.5 px-3 sm:px-4">
+                          <span className="text-[11px] font-bold bg-blue-50 text-blue-700 px-2 py-0.5 rounded-md border border-blue-200/80">
                             {c.departmentCode}
                           </span>
                         </td>
 
                         {/* Status */}
-                        <td className="py-3 px-3">
+                        <td className="py-3.5 px-3 sm:px-4">
                           <span
                             className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold border ${
                               c.status === "SUBMITTED"
@@ -709,13 +694,13 @@ export default function ExamResultsGradebookPage() {
                           </span>
                         </td>
 
-                        {/* Attempted */}
-                        <td className="py-3 px-3 font-medium text-slate-600">
+                        {/* Questions Attempted out of ALL questions in exam */}
+                        <td className="py-3.5 px-3 sm:px-4 font-semibold text-slate-700">
                           {c.questionsAttempted} / {c.totalQuestions}
                         </td>
 
                         {/* Score & Progress */}
-                        <td className="py-3 px-3">
+                        <td className="py-3.5 px-3 sm:px-4">
                           <div className="flex items-center space-x-2">
                             <span className="font-extrabold text-slate-900 font-mono text-sm">
                               {c.score}
@@ -744,7 +729,7 @@ export default function ExamResultsGradebookPage() {
                         </td>
 
                         {/* Result Badge */}
-                        <td className="py-3 px-3 whitespace-nowrap">
+                        <td className="py-3.5 px-3 sm:px-4 whitespace-nowrap">
                           {isPassed ? (
                             <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-extrabold bg-emerald-100 text-emerald-900 border border-emerald-300">
                               <CheckCircle2 className="w-3 h-3 mr-1 text-emerald-700" />
@@ -763,12 +748,12 @@ export default function ExamResultsGradebookPage() {
                         </td>
 
                         {/* Duration */}
-                        <td className="py-3 px-3 text-slate-600 font-mono text-[11px] whitespace-nowrap">
+                        <td className="py-3.5 px-3 sm:px-4 text-slate-600 font-mono text-[11px] whitespace-nowrap">
                           {c.durationMinutes > 0 ? `${c.durationMinutes}m` : "—"}
                         </td>
 
                         {/* Strikes */}
-                        <td className="py-3 px-3 font-mono">
+                        <td className="py-3.5 px-3 sm:px-4 font-mono">
                           {c.strikesCount > 0 ? (
                             <span className="text-[10px] font-bold text-red-700 bg-red-50 px-2 py-0.5 rounded border border-red-200">
                               {c.strikesCount} strike{c.strikesCount > 1 ? "s" : ""}
@@ -779,7 +764,7 @@ export default function ExamResultsGradebookPage() {
                         </td>
 
                         {/* Inspect Action */}
-                        <td className="py-3 px-3 text-right whitespace-nowrap print:hidden">
+                        <td className="py-3.5 px-3 sm:px-4 text-right whitespace-nowrap print:hidden">
                           {c.sessionId ? (
                             <button
                               type="button"
@@ -788,7 +773,7 @@ export default function ExamResultsGradebookPage() {
                                 setInspectFilter("ALL");
                               }}
                               className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 transition-colors cursor-pointer shadow-2xs"
-                              title="Inspect question responses and rubric scoring"
+                              title="Inspect complete answer sheet across all exam questions"
                             >
                               <Eye className="w-3 h-3 mr-1" />
                               <span>Inspect</span>
@@ -808,22 +793,22 @@ export default function ExamResultsGradebookPage() {
       )}
 
       {/* ===================================================================
-          TAB 2: QUESTION ITEM ANALYSIS (ACCURACY & DIFFICULTY)
+          TAB 2: QUESTION ITEM ANALYSIS (ALL QUESTIONS IN EXAM)
          =================================================================== */}
       {activeTab === "QUESTION_ANALYSIS" && (
-        <div className="bg-white border border-slate-200/90 rounded-2xl shadow-xs overflow-hidden space-y-4 p-5">
-          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+        <div className="bg-white border border-slate-200/90 rounded-2xl shadow-xs overflow-hidden">
+          <div className="p-4 sm:p-5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50/50">
             <div>
               <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800">
-                Item Analysis &amp; Topic Difficulty
+                Question Item Analysis ({questionAnalytics.length} Institutional Questions)
               </h3>
-              <p className="text-[11px] text-slate-400">
-                Accurate evaluation of candidate answer patterns across all submitted sittings.
+              <p className="text-[11px] text-slate-500 mt-0.5">
+                Evaluates candidate answer accuracy across all common and department-track questions in this examination paper.
               </p>
             </div>
             <div className="flex items-center space-x-2 text-[10px] font-bold">
               <span className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200">
-                Easy: ≥70% Correct
+                Easy: ≥70%
               </span>
               <span className="px-2 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200">
                 Medium: 40-69%
@@ -835,54 +820,56 @@ export default function ExamResultsGradebookPage() {
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse text-xs">
-              <thead>
-                <tr className="border-b border-slate-200 bg-slate-50/70 text-[10px] uppercase font-bold text-slate-500 tracking-wider">
-                  <th className="py-2.5 px-3 w-12 text-center">#</th>
-                  <th className="py-2.5 px-3">Section</th>
-                  <th className="py-2.5 px-3">Question Prompt</th>
-                  <th className="py-2.5 px-3 text-center">Pts</th>
-                  <th className="py-2.5 px-3 text-center">Correct</th>
-                  <th className="py-2.5 px-3 text-center">Incorrect</th>
-                  <th className="py-2.5 px-3 text-center">Skipped</th>
-                  <th className="py-2.5 px-3">Accuracy</th>
-                  <th className="py-2.5 px-3 text-right">Difficulty</th>
+            <table className="w-full text-left text-xs">
+              <thead className="bg-slate-50/80 text-slate-500 font-bold uppercase tracking-wider text-[11px] border-b border-slate-200">
+                <tr>
+                  <th className="py-3 px-3 sm:px-4 w-12 text-center">#</th>
+                  <th className="py-3 px-3 sm:px-4">Section / Curriculum</th>
+                  <th className="py-3 px-3 sm:px-4">Question Prompt</th>
+                  <th className="py-3 px-3 sm:px-4 text-center">Pts</th>
+                  <th className="py-3 px-3 sm:px-4 text-center">Correct</th>
+                  <th className="py-3 px-3 sm:px-4 text-center">Incorrect</th>
+                  <th className="py-3 px-3 sm:px-4 text-center">Skipped</th>
+                  <th className="py-3 px-3 sm:px-4">Accuracy</th>
+                  <th className="py-3 px-3 sm:px-4 text-right">Difficulty</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 text-slate-700">
+              <tbody className="divide-y divide-slate-100 bg-white">
                 {questionAnalytics.map((q, idx) => (
-                  <tr key={q.questionId} className="hover:bg-slate-50/60 transition-colors">
-                    <td className="py-3 px-3 text-center font-bold text-slate-500">
+                  <tr key={q.questionId} className="hover:bg-slate-50/70 transition-colors">
+                    <td className="py-3 px-3 sm:px-4 text-center font-bold text-slate-500">
                       {idx + 1}
                     </td>
 
-                    <td className="py-3 px-3 font-semibold text-slate-800 whitespace-nowrap">
-                      {q.sectionTitle}
+                    <td className="py-3 px-3 sm:px-4 font-semibold text-slate-800 whitespace-nowrap">
+                      <span className="inline-block px-2 py-0.5 rounded bg-slate-100 text-slate-700 text-[10px] font-bold border border-slate-200">
+                        {q.sectionTitle}
+                      </span>
                     </td>
 
-                    <td className="py-3 px-3 max-w-md">
+                    <td className="py-3 px-3 sm:px-4 max-w-md">
                       <p className="line-clamp-2 leading-relaxed text-slate-900 font-medium">
                         {q.prompt}
                       </p>
                     </td>
 
-                    <td className="py-3 px-3 text-center font-mono font-bold text-slate-700">
+                    <td className="py-3 px-3 sm:px-4 text-center font-mono font-bold text-slate-700">
                       +{q.points}
                     </td>
 
-                    <td className="py-3 px-3 text-center font-bold text-emerald-700">
+                    <td className="py-3 px-3 sm:px-4 text-center font-bold text-emerald-700">
                       {q.correctAttempts}
                     </td>
 
-                    <td className="py-3 px-3 text-center font-bold text-red-600">
+                    <td className="py-3 px-3 sm:px-4 text-center font-bold text-red-600">
                       {q.incorrectAttempts}
                     </td>
 
-                    <td className="py-3 px-3 text-center font-medium text-slate-400">
+                    <td className="py-3 px-3 sm:px-4 text-center font-medium text-slate-400">
                       {q.skippedAttempts}
                     </td>
 
-                    <td className="py-3 px-3">
+                    <td className="py-3 px-3 sm:px-4">
                       <div className="flex items-center space-x-2">
                         <span className="font-extrabold text-slate-900 font-mono">
                           {q.accuracyRate}%
@@ -902,7 +889,7 @@ export default function ExamResultsGradebookPage() {
                       </div>
                     </td>
 
-                    <td className="py-3 px-3 text-right">
+                    <td className="py-3 px-3 sm:px-4 text-right">
                       <span
                         className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-black uppercase ${
                           q.difficultyRating === "EASY"
@@ -924,7 +911,66 @@ export default function ExamResultsGradebookPage() {
       )}
 
       {/* ===================================================================
-          MODAL: CANDIDATE ANSWER SHEET INSPECTOR
+          TAB 3: DEPARTMENT BENCHMARKS & COMPARATIVE PERFORMANCE
+         =================================================================== */}
+      {activeTab === "DEPARTMENTS" && (
+        <div className="bg-white border border-slate-200/90 rounded-2xl p-5 shadow-xs space-y-4">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+            <div>
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800">
+                Departmental Performance Breakdown ({departmentBreakdown.length} Academic Tracks)
+              </h3>
+              <p className="text-[11px] text-slate-500 mt-0.5">
+                Comparative examination outcomes aggregated across candidate departmental affiliations.
+              </p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            {departmentBreakdown.map((dept) => (
+              <div
+                key={dept.departmentCode}
+                className="p-4 rounded-xl border border-slate-200/90 bg-slate-50/50 space-y-3"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="font-mono font-bold text-xs bg-white text-blue-700 px-2.5 py-1 rounded-lg border border-blue-200 shadow-2xs">
+                    {dept.departmentCode}
+                  </span>
+                  <span className="text-[11px] text-slate-500 font-semibold">
+                    {dept.submittedCount} / {dept.enrolledCount} Finalized
+                  </span>
+                </div>
+
+                <div className="font-bold text-sm text-slate-900 truncate">
+                  {dept.departmentName}
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 text-xs pt-2 border-t border-slate-200/80">
+                  <div>
+                    <span className="text-slate-400 block text-[10px] uppercase font-bold">Class Average</span>
+                    <span className="font-extrabold text-slate-900">
+                      {dept.averageScore} pt ({dept.averagePercentage}%)
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block text-[10px] uppercase font-bold">Pass Rate</span>
+                    <span
+                      className={`font-extrabold ${
+                        dept.passRate >= 60 ? "text-emerald-700" : "text-amber-700"
+                      }`}
+                    >
+                      {dept.passRate}% ({dept.passCount} cleared)
+                    </span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ===================================================================
+          MODAL: CANDIDATE ANSWER SHEET INSPECTOR (ALL QUESTIONS EVALUATED)
          =================================================================== */}
       {inspectCandidate && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-6 print:hidden">
@@ -949,7 +995,7 @@ export default function ExamResultsGradebookPage() {
                 <div className="flex items-center space-x-2 text-[11px] text-slate-500 font-mono">
                   <span>ID: {inspectCandidate.applicationNumber}</span>
                   <span>•</span>
-                  <span>{inspectCandidate.departmentName} ({inspectCandidate.departmentCode})</span>
+                  <span>Department: {inspectCandidate.departmentName} ({inspectCandidate.departmentCode})</span>
                   <span>•</span>
                   <span>Score: {inspectCandidate.score} / {inspectCandidate.maxScore} pts</span>
                 </div>
@@ -967,7 +1013,7 @@ export default function ExamResultsGradebookPage() {
             {/* Filter Bar inside Modal */}
             <div className="px-5 py-2.5 border-b border-slate-100 flex items-center justify-between bg-white">
               <span className="text-xs font-bold text-slate-700">
-                Responses Breakdown ({inspectedQuestions.length} Questions)
+                Complete Examination Paper ({inspectedQuestions.length} Questions Evaluated)
               </span>
 
               <div className="flex items-center space-x-1.5 text-xs">
@@ -978,7 +1024,7 @@ export default function ExamResultsGradebookPage() {
                     onClick={() => setInspectFilter(mode)}
                     className={`px-2.5 py-1 rounded-lg font-semibold text-[11px] transition-colors cursor-pointer ${
                       inspectFilter === mode
-                        ? "bg-blue-700 text-white shadow-2xs"
+                        ? "bg-blue-600 text-white shadow-2xs"
                         : "bg-slate-100 text-slate-600 hover:bg-slate-200"
                     }`}
                   >
@@ -1008,7 +1054,7 @@ export default function ExamResultsGradebookPage() {
                         <span className="font-extrabold text-xs text-blue-800">
                           Question {idx + 1}
                         </span>
-                        <span className="text-[10px] text-slate-400">
+                        <span className="text-[10px] text-slate-500 font-medium bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">
                           Section: {q.sectionTitle}
                         </span>
                       </div>
@@ -1050,7 +1096,7 @@ export default function ExamResultsGradebookPage() {
                           </div>
                         ) : (
                           <span className="text-slate-400 italic text-[11px]">
-                            No option selected
+                            Not attempted / No option selected
                           </span>
                         )}
                       </div>
@@ -1086,4 +1132,3 @@ export default function ExamResultsGradebookPage() {
     </div>
   );
 }
-

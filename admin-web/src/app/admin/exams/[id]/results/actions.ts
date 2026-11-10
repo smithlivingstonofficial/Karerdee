@@ -128,6 +128,7 @@ export async function getExamGradebookAction(examId: string): Promise<{
 
     const examConfig = (exam.config as any) || {};
     const passingScorePercentage = Number(examConfig.passing_score ?? 50);
+    const isNegativeMarking = Boolean(exam.enable_negative_marking);
 
     // 2. Fetch Sections & Questions with Options
     const { data: sections } = await supabaseAdmin
@@ -141,6 +142,7 @@ export async function getExamGradebookAction(examId: string): Promise<{
       sectionTitleMap.set(sec.id, sec.title);
     });
 
+    // Fetch ALL questions for this exam paper
     const { data: dbQuestions, error: qErr } = await supabaseAdmin
       .from("exam_questions")
       .select(`
@@ -166,7 +168,7 @@ export async function getExamGradebookAction(examId: string): Promise<{
       return { error: qErr.message || "Failed to load examination questions." };
     }
 
-    // Question lookup map
+    // Calculate total possible points across ALL questions in the exam paper
     const questionsMap = new Map<string, any>();
     let totalPossiblePoints = 0;
 
@@ -175,7 +177,37 @@ export async function getExamGradebookAction(examId: string): Promise<{
       totalPossiblePoints += Number(q.points) || 1;
     });
 
-    // 3. Fetch Eligible Students (Enrolled Roster)
+    // 3. Fetch All Sessions for this Exam first so no active/submitted candidates are missed
+    const { data: sessions, error: sessErr } = await supabaseAdmin
+      .from("exam_sessions")
+      .select(`
+        id,
+        exam_id,
+        student_id,
+        status,
+        strikes_count,
+        extra_time_minutes,
+        hardware_fingerprint,
+        started_at,
+        submitted_at,
+        auto_score,
+        final_score
+      `)
+      .eq("exam_id", examId);
+
+    if (sessErr) {
+      return { error: sessErr.message || "Failed to load exam sessions." };
+    }
+
+    const sessionByStudentId = new Map<string, any>();
+    const sessionIds: string[] = [];
+
+    (sessions || []).forEach((sess: any) => {
+      sessionByStudentId.set(sess.student_id, sess);
+      sessionIds.push(sess.id);
+    });
+
+    // 4. Fetch Eligible Students (Enrolled Roster)
     const targetDeptCodes = new Set<string>();
     (sections || []).forEach((sec: any) => {
       if (sec.target_departments && Array.isArray(sec.target_departments)) {
@@ -207,41 +239,13 @@ export async function getExamGradebookAction(examId: string): Promise<{
       return { error: stuErr.message || "Failed to load candidate roster." };
     }
 
+    // Candidates: Include any candidate who sat the exam, or candidates enrolled in the target faculties
     const eligibleStudents = (studentsData || []).filter((s: any) => {
+      if (sessionByStudentId.has(s.id)) return true;
       if (targetDeptCodes.size === 0) return true;
       const deptObj = Array.isArray(s.department) ? s.department[0] : s.department;
       const deptCode = deptObj?.code?.toUpperCase();
       return deptCode && targetDeptCodes.has(deptCode);
-    });
-
-    // 4. Fetch All Sessions for this Exam
-    const { data: sessions, error: sessErr } = await supabaseAdmin
-      .from("exam_sessions")
-      .select(`
-        id,
-        exam_id,
-        student_id,
-        status,
-        strikes_count,
-        extra_time_minutes,
-        hardware_fingerprint,
-        started_at,
-        submitted_at,
-        auto_score,
-        final_score
-      `)
-      .eq("exam_id", examId);
-
-    if (sessErr) {
-      return { error: sessErr.message || "Failed to load exam sessions." };
-    }
-
-    const sessionByStudentId = new Map<string, any>();
-    const sessionIds: string[] = [];
-
-    (sessions || []).forEach((sess: any) => {
-      sessionByStudentId.set(sess.student_id, sess);
-      sessionIds.push(sess.id);
     });
 
     // 5. Fetch Submissions for All Sessions in this Exam
@@ -277,7 +281,7 @@ export async function getExamGradebookAction(examId: string): Promise<{
     const scoresForMedian: number[] = [];
     let totalViolationsRecorded = 0;
 
-    // Track question-level stats
+    // Track question-level stats across all questions
     const questionStatsMap = new Map<
       string,
       { attempts: number; correct: number; incorrect: number; skipped: number }
@@ -295,14 +299,8 @@ export async function getExamGradebookAction(examId: string): Promise<{
       if (isAppeared) appearedCount++;
       if (isSubmitted) submittedCount++;
 
-      let calculatedScore = 0;
       if (sess) {
         totalViolationsRecorded += sess.strikes_count || 0;
-        if (typeof sess.auto_score === "number") {
-          calculatedScore = sess.auto_score;
-        } else if (typeof sess.final_score === "number") {
-          calculatedScore = sess.final_score;
-        }
       }
 
       // Calculate time spent
@@ -327,7 +325,7 @@ export async function getExamGradebookAction(examId: string): Promise<{
         }
       }
 
-      // Build Question Breakdown for this student
+      // Build Question Breakdown for this student covering ALL questions of the exam paper
       const userSubmissions = sess ? submissionsBySession.get(sess.id) || [] : [];
       const userSubMap = new Map<string, any>();
       userSubmissions.forEach((sub: any) => {
@@ -338,7 +336,7 @@ export async function getExamGradebookAction(examId: string): Promise<{
       let attemptedCount = 0;
 
       (dbQuestions || []).forEach((q: any) => {
-        const sectionTitle = sectionTitleMap.get(q.section_id) || "General";
+        const sectionTitle = sectionTitleMap.get(q.section_id) || "Section";
         const optionsList = q.question_options || [];
         const optMap = new Map<string, string>();
         const correctOptIds: string[] = [];
@@ -358,7 +356,7 @@ export async function getExamGradebookAction(examId: string): Promise<{
         const isAttempted = selectedIds.length > 0;
         if (isAttempted) attemptedCount++;
 
-        let awardedPoints = Number(sub?.awarded_points || 0);
+        let awardedPoints = 0;
         let isCorrect = false;
 
         if (isAttempted && correctOptIds.length > 0) {
@@ -367,11 +365,18 @@ export async function getExamGradebookAction(examId: string): Promise<{
             selectedIds.every((id) => correctOptIds.includes(id));
           if (isExactMatch) {
             isCorrect = true;
+            awardedPoints = Number(q.points) || 1;
+          } else {
+            isCorrect = false;
+            awardedPoints = isNegativeMarking ? -(Number(q.negative_points) || 0) : 0;
           }
+        } else if (typeof sub?.awarded_points === "number") {
+          awardedPoints = sub.awarded_points;
+          isCorrect = awardedPoints > 0;
         }
 
-        // Update question item analysis stats if session submitted
-        if (isSubmitted) {
+        // Update question item analysis stats if session submitted or appeared
+        if (isSubmitted || isAppeared) {
           const qStat = questionStatsMap.get(q.id);
           if (qStat) {
             if (isAttempted) {
@@ -404,14 +409,24 @@ export async function getExamGradebookAction(examId: string): Promise<{
         });
       });
 
-      // Recalculate score from submissions if auto_score was missing
-      if (sess && typeof sess.auto_score !== "number" && typeof sess.final_score !== "number") {
-        calculatedScore = Math.max(
-          0,
-          questionBreakdown.reduce((acc, curr) => acc + curr.awardedPoints, 0)
-        );
+      // Calculate candidate's actual earned marks across their answers
+      const earnedScore = Math.max(
+        0,
+        questionBreakdown.reduce((acc, curr) => acc + curr.awardedPoints, 0)
+      );
+
+      let calculatedScore = 0;
+      if (typeof sess?.final_score === "number") {
+        calculatedScore = sess.final_score;
+      } else if (typeof sess?.auto_score === "number" && sess.auto_score > 0) {
+        calculatedScore = sess.auto_score;
+      } else if (earnedScore > 0) {
+        calculatedScore = earnedScore;
+      } else {
+        calculatedScore = 0;
       }
 
+      // Percentage scored against the entire exam paper total marks
       const percentage =
         totalPossiblePoints > 0
           ? Math.round((calculatedScore / totalPossiblePoints) * 1000) / 10
@@ -427,6 +442,8 @@ export async function getExamGradebookAction(examId: string): Promise<{
         scoresForMedian.push(calculatedScore);
         if (calculatedScore > highest) highest = calculatedScore;
         if (calculatedScore < lowest) lowest = calculatedScore;
+      } else if (isAppeared) {
+        result = "PENDING";
       }
 
       const status: "SUBMITTED" | "IN_PROGRESS" | "LOCKED" | "DISQUALIFIED" | "ABSENT" = sess
@@ -539,7 +556,7 @@ export async function getExamGradebookAction(examId: string): Promise<{
       }
     );
 
-    // 8. Question Item Analysis
+    // 8. Question Item Analysis for ALL questions in the exam
     const questionAnalytics: QuestionAnalyticsItem[] = (dbQuestions || []).map((q: any) => {
       const stat = questionStatsMap.get(q.id) || {
         attempts: 0,
@@ -547,9 +564,9 @@ export async function getExamGradebookAction(examId: string): Promise<{
         incorrect: 0,
         skipped: 0,
       };
-      const totalExamined = submittedCount;
+      const totalExamined = Math.max(1, appearedCount || submittedCount);
       const accuracyRate =
-        totalExamined > 0 ? Math.round((stat.correct / totalExamined) * 1000) / 10 : 0;
+        stat.attempts > 0 ? Math.round((stat.correct / stat.attempts) * 1000) / 10 : 0;
 
       let difficultyRating: "EASY" | "MEDIUM" | "HARD" = "MEDIUM";
       if (accuracyRate >= 70) difficultyRating = "EASY";
@@ -557,7 +574,7 @@ export async function getExamGradebookAction(examId: string): Promise<{
 
       return {
         questionId: q.id,
-        sectionTitle: sectionTitleMap.get(q.section_id) || "General",
+        sectionTitle: sectionTitleMap.get(q.section_id) || "Section",
         prompt: q.prompt,
         orderIndex: q.order_index,
         points: Number(q.points) || 1,

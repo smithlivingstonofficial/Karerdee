@@ -15,9 +15,9 @@ export async function createStudentAction(formData: FormData) {
     const email = (formData.get("email") as string)?.trim().toLowerCase();
     const departmentId = (formData.get("departmentId") as string)?.trim();
 
-    // Student Email and Application Number are the official login credentials
-    if (!fullName || !applicationNumber || !email) {
-      return { error: "Student Name, Application Number, and Institutional Email are required." };
+    // Student Email, Application Number, and Department are strictly mandatory
+    if (!fullName || !applicationNumber || !email || !departmentId) {
+      return { error: "Candidate Name, Application Number, Institutional Email, and Academic Department are all strictly required." };
     }
 
     // 1. Check application number uniqueness
@@ -113,8 +113,8 @@ export async function updateStudentAction(id: string, formData: FormData) {
     const email = (formData.get("email") as string)?.trim().toLowerCase();
     const departmentId = (formData.get("departmentId") as string)?.trim();
 
-    if (!fullName || !applicationNumber || !email) {
-      return { error: "Student Name, Application Number, and Institutional Email are required." };
+    if (!fullName || !applicationNumber || !email || !departmentId) {
+      return { error: "Candidate Name, Application Number, Institutional Email, and Academic Department are all strictly required." };
     }
 
     // 1. Fetch current student record
@@ -317,8 +317,12 @@ export async function bulkImportStudentsAction(
     for (const r of validRows) {
       const appNum = r.applicationNumber.trim().toUpperCase();
       const studentEmail = r.email.trim().toLowerCase();
-      const code = r.departmentCode?.trim().toUpperCase();
-      const deptId = deptMap.get(code) || null;
+      const code = r.departmentCode?.trim().toUpperCase() || "GEN";
+      let deptId = deptMap.get(code);
+      if (!deptId) {
+        // Fallback to first available department if unmapped
+        deptId = Array.from(deptMap.values())[0];
+      }
       const existingId = studentByRoll.get(appNum) || studentByEmail.get(studentEmail);
 
       let authUserId: string | null = null;
