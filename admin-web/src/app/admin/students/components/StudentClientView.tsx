@@ -28,6 +28,9 @@ import {
   Laptop,
   Lock,
   Unlock,
+  Filter,
+  X,
+  Sparkles,
 } from "lucide-react";
 
 export interface StudentRecord {
@@ -73,7 +76,7 @@ export function StudentClientView({
 
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedDeptId, setSelectedDeptId] = useState<string>("ALL");
-  const [workstationFilter, setWorkstationFilter] = useState<"ALL" | "BOUND" | "LOCKED" | "IDLE">("ALL");
+  const [workstationFilter, setWorkstationFilter] = useState<"ALL" | "BOUND" | "LOCKED" | "IDLE" | "UNASSIGNED">("ALL");
   const [studentModalOpen, setStudentModalOpen] = useState(false);
   const [csvModalOpen, setCsvModalOpen] = useState(false);
   const [editingStudent, setEditingStudent] = useState<StudentRecord | null>(null);
@@ -115,6 +118,8 @@ export function StudentClientView({
         ? isBound
         : workstationFilter === "LOCKED"
         ? isLockedInfraction
+        : workstationFilter === "UNASSIGNED"
+        ? !s.department_id
         : !isBound;
 
     return matchesSearch && matchesDept && matchesWorkstation;
@@ -192,7 +197,6 @@ export function StudentClientView({
           message: `Workstation binding released for ${studentName}. The candidate can now log in immediately on any computer.`,
         });
 
-        // Refresh server data
         router.refresh();
       }
     } catch (err: any) {
@@ -221,93 +225,151 @@ export function StudentClientView({
     setStudentModalOpen(true);
   }
 
+  function getInitials(name: string) {
+    return name
+      .split(" ")
+      .map((n) => n[0])
+      .filter(Boolean)
+      .slice(0, 2)
+      .join("")
+      .toUpperCase();
+  }
+
   return (
-    <div className="space-y-6">
-      {/* Top Banner */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white border border-slate-200/90 rounded-2xl p-6 sm:p-7 shadow-xs">
-        <div>
-          <div className="flex items-center space-x-2.5">
-            <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">
-              Candidate Registry
-            </h1>
-            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200">
-              {initialStudents.length} Registered
-            </span>
-          </div>
-          <p className="text-xs text-slate-500 mt-1">
-            Supervise enrolled candidates, institutional application numbers, and emergency workstation hardware bindings.
-          </p>
-        </div>
+    <div className="space-y-4 max-w-7xl mx-auto pb-12 w-full">
+      {/* 1. Master Executive Command Cockpit Header */}
+      <div className="bg-white border border-slate-200/90 rounded-2xl shadow-xs overflow-hidden">
+        {/* Top Header Row */}
+        <div className="px-4 py-3 sm:px-5 sm:py-3.5 flex flex-col md:flex-row md:items-center justify-between gap-3 bg-gradient-to-r from-white via-slate-50/30 to-blue-50/20">
+          <div className="flex items-center space-x-3 min-w-0">
+            {/* Official Square KARE Logo */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <div className="w-9 h-9 rounded-xl bg-white border border-slate-200/90 p-0.5 flex items-center justify-center flex-shrink-0 shadow-2xs overflow-hidden">
+              <img
+                src="/kare-square-logo.png"
+                alt="KARE Logo"
+                className="w-full h-full object-contain rounded-lg"
+              />
+            </div>
 
-        <div className="flex flex-wrap items-center gap-2.5">
-          <button
-            type="button"
-            onClick={() => setCsvModalOpen(true)}
-            className="inline-flex items-center px-4 py-2 text-xs font-bold text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 rounded-xl shadow-xs transition-colors cursor-pointer"
-          >
-            <FileSpreadsheet className="w-4 h-4 mr-2 text-emerald-600" />
-            Bulk Import CSV
-          </button>
-          <button
-            type="button"
-            onClick={handleOpenCreate}
-            className="inline-flex items-center px-4 py-2 text-xs font-bold text-white bg-blue-700 hover:bg-blue-800 rounded-xl shadow-xs transition-colors cursor-pointer"
-          >
-            <PlusCircle className="w-4 h-4 mr-2" />
-            Register Candidate
-          </button>
-        </div>
-      </div>
-
-      {/* Metric Cards Row */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="bg-white border border-slate-200/90 rounded-2xl p-5 shadow-xs">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500">Total Enrolled Candidates</span>
-            <div className="p-2 rounded-xl bg-blue-50 text-blue-700">
-              <Users className="w-4 h-4" />
+            <div className="min-w-0">
+              <div className="flex items-center space-x-2 flex-wrap">
+                <h1 className="text-sm sm:text-base font-bold text-slate-900 tracking-tight">
+                  Candidate Registry
+                </h1>
+                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-blue-50 text-blue-700 border border-blue-200/80">
+                  {students.length} Registered Scholars
+                </span>
+              </div>
             </div>
           </div>
-          <div className="text-2xl font-extrabold text-slate-900 mt-2">
-            {students.length}
-          </div>
-          <div className="text-[11px] text-slate-500 mt-1">
-            Across {departments.length} academic departments
+
+          {/* Right Action Buttons */}
+          <div className="flex items-center space-x-2 flex-wrap gap-y-1.5 flex-shrink-0">
+            <button
+              type="button"
+              onClick={() => setCsvModalOpen(true)}
+              className="inline-flex items-center space-x-1.5 px-3 py-1.5 text-xs font-bold text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 hover:border-slate-300 rounded-lg shadow-2xs transition-all cursor-pointer"
+            >
+              <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
+              <span>Bulk Import CSV</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleOpenCreate}
+              className="inline-flex items-center space-x-1.5 px-3 py-1.5 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 active:scale-[0.98] rounded-lg shadow-xs hover:shadow transition-all cursor-pointer"
+            >
+              <PlusCircle className="w-3.5 h-3.5" />
+              <span>Register Candidate</span>
+            </button>
           </div>
         </div>
 
-        <div className="bg-white border border-slate-200/90 rounded-2xl p-5 shadow-xs">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500">Active Workstation Bindings</span>
-            <div className="p-2 rounded-xl bg-emerald-50 text-emerald-700">
-              <MonitorCheck className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="text-2xl font-extrabold text-slate-900 mt-2">
-            {boundWorkstationsCount}
-          </div>
-          <div className="text-[11px] text-slate-500 mt-1 flex items-center space-x-1.5">
-            <span>Locked to specific client hardware</span>
-            {lockedWorkstationsCount > 0 && (
-              <span className="px-1.5 py-0.2 rounded text-[10px] font-extrabold bg-red-100 text-red-700 border border-red-200">
-                {lockedWorkstationsCount} locked
+        {/* 4 Clean Metric Cells */}
+        <div className="border-t border-slate-200/80 grid grid-cols-2 lg:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-slate-200/80">
+          {/* Metric 1: Total Enrolled Candidates */}
+          <div className="px-4 py-3 sm:px-5 sm:py-3.5 hover:bg-slate-50/80 transition-colors flex flex-col justify-between group">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider group-hover:text-blue-700 transition-colors">
+                Total Enrolled
               </span>
-            )}
-          </div>
-        </div>
-
-        <div className="bg-white border border-slate-200/90 rounded-2xl p-5 shadow-xs">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500">Institutional Departments</span>
-            <div className="p-2 rounded-xl bg-indigo-50 text-indigo-700">
-              <Building2 className="w-4 h-4" />
+              <span className="font-bold px-1.5 py-0.2 rounded-full border text-[9px] bg-blue-50 text-blue-700 border-blue-200">
+                {students.length} Scholars
+              </span>
+            </div>
+            <div className="mt-2 flex items-baseline space-x-1.5">
+              <span className="text-2xl font-black text-slate-900 tracking-tight">
+                {students.length}
+              </span>
+              <span className="text-xs text-slate-400">candidates</span>
             </div>
           </div>
-          <div className="text-2xl font-extrabold text-slate-900 mt-2">
-            {departments.length}
+
+          {/* Metric 2: Active Workstation Bindings */}
+          <div className="px-4 py-3 sm:px-5 sm:py-3.5 hover:bg-slate-50/80 transition-colors flex flex-col justify-between group">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider group-hover:text-amber-700 transition-colors">
+                Hardware Locked
+              </span>
+              <span className="font-bold px-1.5 py-0.2 rounded-full border text-[9px] bg-amber-50 text-amber-700 border-amber-200">
+                {boundWorkstationsCount} Bound
+              </span>
+            </div>
+            <div className="mt-2 flex items-baseline space-x-1.5">
+              <span className="text-2xl font-black text-amber-700 tracking-tight">
+                {boundWorkstationsCount}
+              </span>
+              <span className="text-xs text-slate-400">locked to lab PCs</span>
+            </div>
           </div>
-          <div className="text-[11px] text-slate-500 mt-1">
-            Configured for examination routing
+
+          {/* Metric 3: Infraction Lockouts */}
+          <div className="px-4 py-3 sm:px-5 sm:py-3.5 hover:bg-slate-50/80 transition-colors flex flex-col justify-between group">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider group-hover:text-red-700 transition-colors">
+                Security Lockouts
+              </span>
+              <span
+                className={`font-bold px-1.5 py-0.2 rounded-full border text-[9px] ${
+                  lockedWorkstationsCount > 0
+                    ? "bg-red-50 text-red-700 border-red-200 animate-pulse"
+                    : "bg-emerald-50 text-emerald-700 border-emerald-200"
+                }`}
+              >
+                {lockedWorkstationsCount > 0 ? `${lockedWorkstationsCount} Struck Out` : "Zero Strikes"}
+              </span>
+            </div>
+            <div className="mt-2 flex items-baseline space-x-1.5">
+              <span
+                className={`text-2xl font-black tracking-tight ${
+                  lockedWorkstationsCount > 0 ? "text-red-600" : "text-slate-900"
+                }`}
+              >
+                {lockedWorkstationsCount}
+              </span>
+              <span className="text-xs text-slate-400">
+                {lockedWorkstationsCount > 0 ? "requires unfreeze" : "all sessions clean"}
+              </span>
+            </div>
+          </div>
+
+          {/* Metric 4: Institutional Departments */}
+          <div className="px-4 py-3 sm:px-5 sm:py-3.5 hover:bg-slate-50/80 transition-colors flex flex-col justify-between group">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider group-hover:text-indigo-700 transition-colors">
+                Academic Faculties
+              </span>
+              <span className="font-bold px-1.5 py-0.2 rounded-full border text-[9px] bg-slate-100 text-slate-600 border-slate-200">
+                {departments.length} Depts
+              </span>
+            </div>
+            <div className="mt-2 flex items-baseline space-x-1.5">
+              <span className="text-2xl font-black text-slate-900 tracking-tight">
+                {departments.length}
+              </span>
+              <span className="text-xs text-slate-400">curricula allocated</span>
+            </div>
           </div>
         </div>
       </div>
@@ -315,7 +377,7 @@ export function StudentClientView({
       {/* Action Notification Banner */}
       {actionNotice && (
         <div
-          className={`p-4 rounded-xl border text-xs font-semibold flex items-center justify-between animate-in fade-in ${
+          className={`p-3 rounded-xl border text-xs font-semibold flex items-center justify-between animate-in fade-in shadow-2xs ${
             actionNotice.type === "success"
               ? "bg-emerald-50 text-emerald-800 border-emerald-200"
               : "bg-red-50 text-red-800 border-red-200"
@@ -339,123 +401,149 @@ export function StudentClientView({
         </div>
       )}
 
-      {/* Candidates Table Container */}
+      {/* 2. Main Candidate Registry Card */}
       <div className="bg-white border border-slate-200/90 rounded-2xl overflow-hidden shadow-xs">
-        {/* Filter and Search Bar */}
-        <div className="p-4 sm:p-5 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-4">
-          {/* Department & Workstation Filter Pills */}
-          <div className="flex flex-wrap items-center gap-1.5 overflow-x-auto pb-1 md:pb-0 scrollbar-none">
-            <button
-              type="button"
-              onClick={() => setSelectedDeptId("ALL")}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
-                selectedDeptId === "ALL"
-                  ? "bg-blue-700 text-white shadow-2xs"
-                  : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-              }`}
-            >
-              All Departments ({students.length})
-            </button>
-            {departments.map((d) => {
-              const count = students.filter((s) => s.department_id === d.id).length;
-              return (
-                <button
-                  key={d.id}
-                  type="button"
-                  onClick={() => setSelectedDeptId(d.id)}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
-                    selectedDeptId === d.id
-                      ? "bg-blue-700 text-white shadow-2xs"
-                      : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                  }`}
-                >
-                  {d.code} ({count})
-                </button>
-              );
-            })}
-            {unassignedCount > 0 && (
-              <button
-                type="button"
-                onClick={() => setSelectedDeptId("UNASSIGNED")}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
-                  selectedDeptId === "UNASSIGNED"
-                    ? "bg-blue-700 text-white shadow-2xs"
-                    : "bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100"
-                }`}
-              >
-                Unassigned ({unassignedCount})
-              </button>
-            )}
-
-            {/* Separator */}
-            <span className="text-slate-300 mx-1">|</span>
-
-            {/* Workstation Lock Quick Filter */}
+        {/* Tier 1: Toolbar with Workstation Status Tabs & Quick Search */}
+        <div className="p-3 sm:p-4 border-b border-slate-100 flex flex-col lg:flex-row lg:items-center justify-between gap-3 bg-slate-50/50">
+          {/* Segmented Workstation Status Selector */}
+          <div className="flex items-center p-1 bg-slate-100/90 rounded-xl space-x-1 w-fit overflow-x-auto max-w-full scrollbar-none">
             <button
               type="button"
               onClick={() => setWorkstationFilter("ALL")}
-              className={`px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
+              className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer whitespace-nowrap ${
                 workstationFilter === "ALL"
-                  ? "bg-slate-800 text-white shadow-2xs"
-                  : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                  ? "bg-white text-slate-900 shadow-xs"
+                  : "text-slate-600 hover:text-slate-900"
               }`}
             >
-              All Workstations
+              All ({students.length})
             </button>
             <button
               type="button"
               onClick={() => setWorkstationFilter("BOUND")}
-              className={`px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
+              className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer whitespace-nowrap flex items-center space-x-1.5 ${
                 workstationFilter === "BOUND"
-                  ? "bg-amber-600 text-white shadow-2xs"
-                  : "bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100"
+                  ? "bg-white text-amber-800 shadow-xs"
+                  : "text-slate-600 hover:text-slate-900"
               }`}
             >
-              Locked to PC ({boundWorkstationsCount})
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+              <span>Locked to PC ({boundWorkstationsCount})</span>
             </button>
             {lockedWorkstationsCount > 0 && (
               <button
                 type="button"
                 onClick={() => setWorkstationFilter("LOCKED")}
-                className={`px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
+                className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer whitespace-nowrap flex items-center space-x-1.5 ${
                   workstationFilter === "LOCKED"
-                    ? "bg-red-700 text-white shadow-2xs"
-                    : "bg-red-50 text-red-700 border border-red-200 hover:bg-red-100"
+                    ? "bg-white text-red-700 shadow-xs"
+                    : "text-red-600 hover:text-red-700"
                 }`}
               >
-                Infractions ({lockedWorkstationsCount})
+                <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse"></span>
+                <span>Infractions ({lockedWorkstationsCount})</span>
+              </button>
+            )}
+            {unassignedCount > 0 && (
+              <button
+                type="button"
+                onClick={() => setWorkstationFilter("UNASSIGNED")}
+                className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer whitespace-nowrap ${
+                  workstationFilter === "UNASSIGNED"
+                    ? "bg-white text-blue-700 shadow-xs"
+                    : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                Unassigned ({unassignedCount})
               </button>
             )}
           </div>
 
-          {/* Search Box */}
-          <div className="relative w-full md:w-72">
-            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          {/* Integrated Search Box */}
+          <div className="relative w-full lg:w-80">
+            <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
-              placeholder="Search by name, app no, email, HW..."
+              placeholder="Search candidate name, email, app no..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-700 focus:bg-white transition-all"
+              className="w-full pl-9 pr-8 py-1.5 text-xs bg-white border border-slate-200 rounded-xl text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all shadow-2xs"
             />
+            {searchTerm && (
+              <button
+                type="button"
+                onClick={() => setSearchTerm("")}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
           </div>
         </div>
 
-        {/* Table View */}
+        {/* Tier 2: Horizontal Department Scope Filter Pills */}
+        <div className="px-4 py-2.5 border-b border-slate-100 flex items-center space-x-1.5 overflow-x-auto scrollbar-none bg-white">
+          <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mr-1 flex-shrink-0">
+            Faculty:
+          </span>
+          <button
+            type="button"
+            onClick={() => setSelectedDeptId("ALL")}
+            className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all whitespace-nowrap cursor-pointer flex-shrink-0 ${
+              selectedDeptId === "ALL"
+                ? "bg-blue-600 text-white shadow-2xs"
+                : "bg-slate-100/90 text-slate-600 hover:bg-slate-200/90"
+            }`}
+          >
+            All Departments ({students.length})
+          </button>
+          {departments.map((d) => {
+            const count = students.filter((s) => s.department_id === d.id).length;
+            return (
+              <button
+                key={d.id}
+                type="button"
+                onClick={() => setSelectedDeptId(d.id)}
+                className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all whitespace-nowrap cursor-pointer flex-shrink-0 ${
+                  selectedDeptId === d.id
+                    ? "bg-blue-600 text-white shadow-2xs"
+                    : "bg-slate-100/90 text-slate-600 hover:bg-slate-200/90"
+                }`}
+              >
+                {d.code} ({count})
+              </button>
+            );
+          })}
+          {unassignedCount > 0 && (
+            <button
+              type="button"
+              onClick={() => setSelectedDeptId("UNASSIGNED")}
+              className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all whitespace-nowrap cursor-pointer flex-shrink-0 ${
+                selectedDeptId === "UNASSIGNED"
+                  ? "bg-blue-600 text-white shadow-2xs"
+                  : "bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100"
+              }`}
+            >
+              Unassigned ({unassignedCount})
+            </button>
+          )}
+        </div>
+
+        {/* 3. Candidates High-Contrast Table View */}
         {filteredStudents.length > 0 ? (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
-              <thead className="bg-slate-50/75 text-slate-600 font-bold uppercase tracking-wider border-b border-slate-200">
+              <thead className="bg-slate-50/80 text-slate-500 font-bold uppercase tracking-wider text-[11px] border-b border-slate-200">
                 <tr>
-                  <th className="py-3 px-5">Candidate Name</th>
-                  <th className="py-3 px-5">Login Username (Email)</th>
-                  <th className="py-3 px-5">Password (App Number)</th>
-                  <th className="py-3 px-5">Department</th>
-                  <th className="py-3 px-5">Workstation Status &amp; Hardware Binding</th>
-                  <th className="py-3 px-5 text-right">Actions</th>
+                  <th className="py-3 px-4 sm:px-5">Candidate &amp; Identity</th>
+                  <th className="py-3 px-4 sm:px-5">Login Email</th>
+                  <th className="py-3 px-4 sm:px-5">Application / Passcode</th>
+                  <th className="py-3 px-4 sm:px-5">Department</th>
+                  <th className="py-3 px-4 sm:px-5">Workstation &amp; Hardware Lock</th>
+                  <th className="py-3 px-4 sm:px-5 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-slate-100 bg-white">
                 {filteredStudents.map((s) => {
                   const isBound = Boolean(
                     s.activeSession &&
@@ -473,28 +561,36 @@ export function StudentClientView({
                   );
 
                   const isLockedInfraction = s.activeSession?.status === "LOCKED";
+                  const initials = getInitials(s.full_name);
 
                   return (
-                    <tr key={s.id} className="hover:bg-slate-50/60 transition-colors">
-                      {/* Name */}
-                      <td className="py-3.5 px-5">
-                        <div className="font-bold text-slate-900 text-sm">
-                          {s.full_name}
-                        </div>
-                        <div className="text-[10px] text-slate-400" suppressHydrationWarning>
-                          Registered {formatDate(s.created_at)}
+                    <tr key={s.id} className="hover:bg-slate-50/70 transition-colors">
+                      {/* Candidate Name & Registered Date */}
+                      <td className="py-3.5 px-4 sm:px-5">
+                        <div className="flex items-center space-x-3">
+                          <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-700 font-bold text-xs flex items-center justify-center border border-blue-200/60 flex-shrink-0">
+                            {initials}
+                          </div>
+                          <div>
+                            <div className="font-bold text-slate-900 text-sm tracking-tight">
+                              {s.full_name}
+                            </div>
+                            <div className="text-[11px] text-slate-400 mt-0.5" suppressHydrationWarning>
+                              Registered {formatDate(s.created_at)}
+                            </div>
+                          </div>
                         </div>
                       </td>
 
-                      {/* Login Username (Email) */}
-                      <td className="py-3.5 px-5">
+                      {/* Login Username / Email */}
+                      <td className="py-3.5 px-4 sm:px-5">
                         <div className="inline-flex items-center space-x-1.5 text-slate-700 font-mono text-xs">
-                          <span>{s.email}</span>
+                          <span className="font-medium">{s.email || "—"}</span>
                           {s.email && (
                             <button
                               type="button"
                               onClick={() => handleCopy(s.email!)}
-                              className="text-slate-400 hover:text-slate-700 transition-colors"
+                              className="text-slate-400 hover:text-slate-700 transition-colors cursor-pointer p-0.5 rounded"
                               title="Copy Email ID"
                             >
                               {copiedAppNum === s.email ? (
@@ -507,9 +603,9 @@ export function StudentClientView({
                         </div>
                       </td>
 
-                      {/* Login Password (Application Number) */}
-                      <td className="py-3.5 px-5">
-                        <div className="inline-flex items-center space-x-1.5 bg-slate-100 hover:bg-slate-200/70 px-2.5 py-1 rounded-lg border border-slate-200 transition-colors">
+                      {/* Application Number (Security Token Badge) */}
+                      <td className="py-3.5 px-4 sm:px-5">
+                        <div className="inline-flex items-center space-x-1.5 bg-slate-50 hover:bg-slate-100/90 px-2.5 py-1 rounded-lg border border-slate-200/90 transition-colors shadow-2xs">
                           <KeyRound className="w-3 h-3 text-slate-400" />
                           <span className="font-mono font-bold text-slate-900 text-xs">
                             {s.application_number}
@@ -517,8 +613,8 @@ export function StudentClientView({
                           <button
                             type="button"
                             onClick={() => handleCopy(s.application_number)}
-                            className="text-slate-400 hover:text-slate-700 transition-colors"
-                            title="Copy Password / Application Number"
+                            className="text-slate-400 hover:text-slate-700 transition-colors cursor-pointer p-0.5 rounded"
+                            title="Copy Application Number"
                           >
                             {copiedAppNum === s.application_number ? (
                               <Check className="w-3.5 h-3.5 text-emerald-600" />
@@ -530,20 +626,20 @@ export function StudentClientView({
                       </td>
 
                       {/* Department */}
-                      <td className="py-3.5 px-5">
+                      <td className="py-3.5 px-4 sm:px-5">
                         {s.department ? (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-200/80">
                             {s.department.code}
                           </span>
                         ) : (
-                          <span className="text-slate-400 font-italic text-[11px]">
+                          <span className="text-slate-400 italic text-[11px]">
                             Unassigned
                           </span>
                         )}
                       </td>
 
                       {/* Workstation Status & Hardware Binding Details */}
-                      <td className="py-3.5 px-5">
+                      <td className="py-3.5 px-4 sm:px-5">
                         {isBound ? (
                           <div className="space-y-1.5 min-w-[210px]">
                             {/* Badges: Status + Client Version */}
@@ -569,8 +665,8 @@ export function StudentClientView({
                             </div>
 
                             {/* Hardware Fingerprint display with 1-click copy */}
-                            <div className="flex items-center space-x-1.5 text-[11px] font-mono text-slate-800 bg-slate-50 hover:bg-slate-100/90 border border-slate-200 rounded-md px-2 py-1 transition-colors w-fit">
-                              <Monitor className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
+                            <div className="flex items-center space-x-1.5 text-[11px] font-mono text-slate-800 bg-slate-50 hover:bg-slate-100/90 border border-slate-200 rounded-md px-2 py-0.5 transition-colors w-fit">
+                              <Monitor className="w-3 h-3 text-slate-400 flex-shrink-0" />
                               <span className="truncate max-w-[130px] font-bold" title={s.activeSession?.hardware_fingerprint}>
                                 {s.activeSession?.hardware_fingerprint}
                               </span>
@@ -588,20 +684,13 @@ export function StudentClientView({
                               </button>
                             </div>
 
-                            {/* Associated Exam Title */}
-                            {s.activeSession?.examTitle && (
-                              <div className="text-[10px] text-slate-500 truncate max-w-[210px]" title={s.activeSession.examTitle}>
-                                Exam: <span className="font-semibold text-slate-700">{s.activeSession.examTitle}</span>
-                              </div>
-                            )}
-
                             {/* Emergency Reset Workstation Button */}
                             <div>
                               <button
                                 type="button"
                                 disabled={resettingId === s.id}
                                 onClick={() => handleResetWorkstation(s.id, s.full_name)}
-                                className="inline-flex items-center px-2.5 py-1 text-[10px] font-bold text-amber-900 bg-amber-100 hover:bg-amber-200/90 border border-amber-300 rounded-lg shadow-2xs transition-all cursor-pointer disabled:opacity-50"
+                                className="inline-flex items-center px-2 py-0.5 text-[10px] font-bold text-amber-900 bg-amber-100 hover:bg-amber-200/90 border border-amber-300 rounded-md shadow-2xs transition-all cursor-pointer disabled:opacity-50"
                                 title="Click to release hardware lock so candidate can immediately log in from a new/replacement PC"
                               >
                                 <RotateCcw className={`w-3 h-3 mr-1 text-amber-700 ${resettingId === s.id ? "animate-spin" : ""}`} />
@@ -640,8 +729,8 @@ export function StudentClientView({
                       </td>
 
                       {/* Action Buttons */}
-                      <td className="py-3.5 px-5 text-right">
-                        <div className="flex items-center justify-end space-x-1.5">
+                      <td className="py-3.5 px-4 sm:px-5 text-right">
+                        <div className="flex items-center justify-end space-x-1">
                           {isBound && (
                             <button
                               type="button"
@@ -650,7 +739,7 @@ export function StudentClientView({
                               className="p-1.5 rounded-lg text-amber-700 hover:text-amber-900 hover:bg-amber-100 transition-colors cursor-pointer disabled:opacity-50"
                               title="Reset Workstation Lock"
                             >
-                              <RotateCcw className={`w-4 h-4 ${resettingId === s.id ? "animate-spin" : ""}`} />
+                              <RotateCcw className={`w-3.5 h-3.5 ${resettingId === s.id ? "animate-spin" : ""}`} />
                             </button>
                           )}
                           <button
@@ -659,7 +748,7 @@ export function StudentClientView({
                             className="p-1.5 rounded-lg text-slate-500 hover:text-blue-700 hover:bg-blue-50 transition-colors cursor-pointer"
                             title="Edit Candidate"
                           >
-                            <Edit2 className="w-4 h-4" />
+                            <Edit2 className="w-3.5 h-3.5" />
                           </button>
                           <button
                             type="button"
@@ -667,7 +756,7 @@ export function StudentClientView({
                             className="p-1.5 rounded-lg text-slate-400 hover:text-red-700 hover:bg-red-50 transition-colors cursor-pointer"
                             title="Delete Candidate"
                           >
-                            <Trash2 className="w-4 h-4" />
+                            <Trash2 className="w-3.5 h-3.5" />
                           </button>
                         </div>
                       </td>
@@ -683,13 +772,13 @@ export function StudentClientView({
               <Users className="w-6 h-6" />
             </div>
             <h3 className="text-sm font-bold text-slate-900">
-              {searchTerm || selectedDeptId !== "ALL"
+              {searchTerm || selectedDeptId !== "ALL" || workstationFilter !== "ALL"
                 ? "No matching candidates found"
                 : "No candidates enrolled yet"}
             </h3>
             <p className="text-xs text-slate-500 max-w-sm mx-auto">
-              {searchTerm || selectedDeptId !== "ALL"
-                ? "Try adjusting your search criteria or department filter."
+              {searchTerm || selectedDeptId !== "ALL" || workstationFilter !== "ALL"
+                ? "Try clearing your search query or switching the faculty filter."
                 : "Register individual candidates or import complete student cohorts using the Bulk Import CSV template."}
             </p>
             <div className="pt-2 flex items-center justify-center gap-2">
@@ -704,7 +793,7 @@ export function StudentClientView({
               <button
                 type="button"
                 onClick={handleOpenCreate}
-                className="inline-flex items-center px-3.5 py-1.5 text-xs font-bold text-white bg-blue-700 hover:bg-blue-800 rounded-lg transition-colors cursor-pointer"
+                className="inline-flex items-center px-3.5 py-1.5 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors cursor-pointer"
               >
                 <PlusCircle className="w-3.5 h-3.5 mr-1.5" />
                 Register Candidate
