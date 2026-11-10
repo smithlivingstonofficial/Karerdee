@@ -365,50 +365,177 @@ export function LiveProctoringClientView({
     }
   }
 
+  const formatViolationType = (type: string) => {
+    switch (type) {
+      case "WINDOW_UNFOCUSED":
+        return "Window Lost Focus";
+      case "FULLSCREEN_EXIT":
+        return "Full-Screen Exited";
+      case "MULTIPLE_DISPLAYS":
+        return "Multiple Displays";
+      case "KEYBOARD_RESTRICTION":
+        return "Prohibited Keystroke";
+      case "DEVTOOLS_ATTEMPT":
+        return "DevTools Detected";
+      case "CLIPBOARD_ACCESS":
+        return "Clipboard Blocked";
+      case "SUSPICIOUS_WEBCAM_ACTIVITY":
+        return "Suspicious Gaze / Head Pose";
+      default:
+        return type.replace(/_/g, " ").toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
+    }
+  };
+
   const pendingLateEntries = sessions.filter((s) => s.isPendingLateEntry && s.status === "LOCKED");
 
   return (
-    <div className="space-y-6">
-      {/* SaaS Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white border border-slate-200/90 rounded-2xl p-6 shadow-xs">
-        <div className="space-y-1">
-          <div className="flex items-center space-x-2.5">
-            <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center font-bold text-xs border border-emerald-200">
-              <Activity className="w-4 h-4" />
+    <div className="space-y-4 max-w-7xl mx-auto pb-12 w-full">
+      {/* 1. Combined Executive Command Center & Proctoring Telemetry Deck */}
+      <div className="bg-white border border-slate-200/90 rounded-2xl shadow-xs overflow-hidden">
+        {/* Top Header Row */}
+        <div className="px-4 py-3 sm:px-5 sm:py-3.5 flex flex-col md:flex-row md:items-center justify-between gap-3 bg-gradient-to-r from-white via-slate-50/30 to-blue-50/20">
+          <div className="flex items-center space-x-3 min-w-0">
+            {/* Official Square KARE Logo */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <div className="w-9 h-9 rounded-xl bg-white border border-slate-200/90 p-0.5 flex items-center justify-center flex-shrink-0 shadow-2xs overflow-hidden">
+              <img
+                src="/kare-square-logo.png"
+                alt="KARE Logo"
+                className="w-full h-full object-contain rounded-lg"
+              />
             </div>
-            <h1 className="text-xl font-bold tracking-tight text-slate-900">
-              Live Proctoring &amp; Workstation Command Center
-            </h1>
-            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 mr-1.5 animate-pulse" />
-              Live Telemetry
-            </span>
+
+            <div className="min-w-0">
+              <div className="flex items-center space-x-2 flex-wrap">
+                <h1 className="text-sm sm:text-base font-bold text-slate-900 tracking-tight">
+                  Live Proctoring &amp; Invigilation Deck
+                </h1>
+                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-50 text-emerald-700 border border-emerald-200/80">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 mr-1.5 animate-pulse" />
+                  Live Telemetry
+                </span>
+              </div>
+            </div>
           </div>
-          <p className="text-xs text-slate-500">
-            Realtime hardware monitor, low-level Win32 integrity feeds, and remote proctor intervention controls.
-          </p>
+
+          {/* Right Action Buttons */}
+          <div className="flex items-center space-x-2 flex-shrink-0">
+            <button
+              type="button"
+              onClick={handleManualRefresh}
+              disabled={isRefreshing}
+              className="inline-flex items-center space-x-1.5 px-3 py-1.5 text-xs font-bold text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 hover:border-slate-300 rounded-lg shadow-2xs transition-all cursor-pointer disabled:opacity-50"
+              title="Refresh active workstations and live telemetry"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 mr-1 text-blue-700 ${isRefreshing ? "animate-spin" : ""}`} />
+              <span>Refresh Feed</span>
+            </button>
+
+            <Link
+              href="/sitting"
+              target="_blank"
+              className="inline-flex items-center space-x-1.5 px-3 py-1.5 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 active:scale-[0.98] rounded-lg shadow-xs hover:shadow transition-all cursor-pointer"
+            >
+              <ExternalLink className="w-3.5 h-3.5" />
+              <span>Sitting Simulator</span>
+            </Link>
+          </div>
         </div>
 
-        <div className="flex items-center space-x-2.5">
-          <button
-            type="button"
-            onClick={handleManualRefresh}
-            disabled={isRefreshing}
-            className="inline-flex items-center px-3.5 py-2 text-xs font-semibold text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 rounded-xl transition-colors shadow-2xs cursor-pointer disabled:opacity-50"
-            title="Refresh active workstations and live telemetry"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 mr-1.5 text-blue-700 ${isRefreshing ? "animate-spin" : ""}`} />
-            Refresh Feed
-          </button>
+        {/* 4 Clean Metric Cells (Zero Unwanted Text, Streamlined Academic Padding) */}
+        <div className="border-t border-slate-200/80 grid grid-cols-2 lg:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-slate-200/80">
+          {/* Metric 1: Active Workstations */}
+          <div className="px-4 py-3 sm:px-5 sm:py-3.5 hover:bg-slate-50/80 transition-colors flex flex-col justify-between group">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider group-hover:text-emerald-700 transition-colors">
+                Active Workstations
+              </span>
+              <span
+                className={`font-bold px-1.5 py-0.2 rounded-full border text-[9px] flex items-center space-x-1 ${
+                  activeCount > 0
+                    ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                    : "bg-slate-100 text-slate-600 border-slate-200"
+                }`}
+              >
+                {activeCount > 0 && (
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-ping mr-0.5" />
+                )}
+                <span>{activeCount > 0 ? "In Session" : "Idle"}</span>
+              </span>
+            </div>
+            <div className="mt-2 flex items-baseline space-x-1.5">
+              <span className="text-2xl font-black text-slate-900 tracking-tight">
+                {activeCount}
+              </span>
+              <span className="text-xs text-slate-400">examinees sitting</span>
+            </div>
+          </div>
 
-          <Link
-            href="/sitting"
-            target="_blank"
-            className="inline-flex items-center px-3.5 py-2 text-xs font-semibold text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 rounded-xl transition-colors shadow-2xs"
-          >
-            <ExternalLink className="w-3.5 h-3.5 mr-1.5 text-slate-500" />
-            Launch Sitting Engine Simulator
-          </Link>
+          {/* Metric 2: Integrity Warnings */}
+          <div className="px-4 py-3 sm:px-5 sm:py-3.5 hover:bg-slate-50/80 transition-colors flex flex-col justify-between group">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider group-hover:text-amber-700 transition-colors">
+                Integrity Warnings
+              </span>
+              <span
+                className={`font-bold px-1.5 py-0.2 rounded-full border text-[9px] ${
+                  warningCount > 0
+                    ? "bg-amber-50 text-amber-800 border-amber-200"
+                    : "bg-emerald-50 text-emerald-700 border-emerald-200"
+                }`}
+              >
+                {warningCount > 0 ? `${warningCount} Flagged` : "Clean"}
+              </span>
+            </div>
+            <div className="mt-2 flex items-baseline space-x-1.5">
+              <span className="text-2xl font-black text-amber-700 tracking-tight">
+                {warningCount}
+              </span>
+              <span className="text-xs text-slate-400">infractions recorded</span>
+            </div>
+          </div>
+
+          {/* Metric 3: Locked Workstations */}
+          <div className="px-4 py-3 sm:px-5 sm:py-3.5 hover:bg-slate-50/80 transition-colors flex flex-col justify-between group">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider group-hover:text-red-700 transition-colors">
+                Locked Workstations
+              </span>
+              <span
+                className={`font-bold px-1.5 py-0.2 rounded-full border text-[9px] ${
+                  lockedCount > 0
+                    ? "bg-red-50 text-red-700 border-red-200"
+                    : "bg-slate-100 text-slate-600 border-slate-200"
+                }`}
+              >
+                {lockedCount > 0 ? "Struck Out" : "Zero Frozen"}
+              </span>
+            </div>
+            <div className="mt-2 flex items-baseline space-x-1.5">
+              <span className="text-2xl font-black text-red-700 tracking-tight">
+                {lockedCount}
+              </span>
+              <span className="text-xs text-slate-400">proctor frozen</span>
+            </div>
+          </div>
+
+          {/* Metric 4: Completed Submissions */}
+          <div className="px-4 py-3 sm:px-5 sm:py-3.5 hover:bg-slate-50/80 transition-colors flex flex-col justify-between group">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider group-hover:text-blue-700 transition-colors">
+                Completed Submissions
+              </span>
+              <span className="font-bold px-1.5 py-0.2 rounded-full border text-[9px] bg-blue-50 text-blue-700 border-blue-200">
+                {submittedCount} Finalized
+              </span>
+            </div>
+            <div className="mt-2 flex items-baseline space-x-1.5">
+              <span className="text-2xl font-black text-slate-900 tracking-tight">
+                {submittedCount}
+              </span>
+              <span className="text-xs text-slate-400">auto-graded</span>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -432,7 +559,7 @@ export function LiveProctoringClientView({
           <button
             type="button"
             onClick={() => setNotice(null)}
-            className="text-slate-400 hover:text-slate-600 text-xs font-bold"
+            className="text-slate-400 hover:text-slate-600 text-xs font-bold cursor-pointer"
           >
             Dismiss
           </button>
@@ -513,87 +640,47 @@ export function LiveProctoringClientView({
         </div>
       )}
 
-      {/* Metric Tiles */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-xs">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500">Active Workstations</span>
-            <div className="p-1.5 rounded-lg bg-emerald-50 text-emerald-700">
-              <Monitor className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="text-2xl font-black text-slate-900 mt-2">{activeCount}</div>
-          <span className="text-[10px] text-emerald-700 font-bold block mt-1">Live in-session</span>
-        </div>
-
-        <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-xs">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500">Integrity Warnings</span>
-            <div className="p-1.5 rounded-lg bg-amber-50 text-amber-700">
-              <ShieldAlert className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="text-2xl font-black text-amber-700 mt-2">{warningCount}</div>
-          <span className="text-[10px] text-amber-700 font-bold block mt-1">1-2 infractions recorded</span>
-        </div>
-
-        <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-xs">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500">Locked Workstations</span>
-            <div className="p-1.5 rounded-lg bg-red-50 text-red-700">
-              <Lock className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="text-2xl font-black text-red-700 mt-2">{lockedCount}</div>
-          <span className="text-[10px] text-red-700 font-bold block mt-1">Struck out / proctor frozen</span>
-        </div>
-
-        <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-xs">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500">Submissions Completed</span>
-            <div className="p-1.5 rounded-lg bg-blue-50 text-blue-700">
-              <CheckCircle2 className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="text-2xl font-black text-slate-900 mt-2">{submittedCount}</div>
-          <span className="text-[10px] text-blue-700 font-bold block mt-1">Auto-graded &amp; finalized</span>
-        </div>
-      </div>
-
       {/* Main Grid: Workstations Table (8 cols) + Realtime Feed (4 cols) */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
         {/* Left Column: Active Candidate Sittings */}
         <div className="lg:col-span-8 space-y-4">
-          <div className="bg-white border border-slate-200/90 rounded-2xl p-5 shadow-xs space-y-4">
+          <div className="bg-white border border-slate-200/90 rounded-2xl overflow-hidden shadow-xs">
             {/* Filter & Search Bar */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
-              <div className="flex items-center space-x-2">
-                <Users className="w-4 h-4 text-slate-400" />
-                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700">
-                  Candidate Workstations ({filtered.length})
-                </h3>
+            <div className="p-4 sm:p-4.5 border-b border-slate-200/90 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center space-x-2.5">
+                <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-700 flex items-center justify-center border border-blue-100 flex-shrink-0">
+                  <Monitor className="w-4 h-4" />
+                </div>
+                <div className="flex items-center space-x-2">
+                  <h3 className="text-sm font-bold text-slate-900 tracking-tight">
+                    Candidate Workstations
+                  </h3>
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
+                    {filtered.length} Total
+                  </span>
+                </div>
               </div>
 
-              <div className="flex items-center space-x-2">
+              <div className="flex items-center space-x-2 flex-wrap gap-y-2">
                 <div className="relative">
-                  <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
                   <input
                     type="text"
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     placeholder="Search candidate / app no..."
-                    className="pl-8 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-blue-500 text-slate-900 w-48 sm:w-60"
+                    className="pl-9 pr-3 py-1.5 text-xs bg-slate-50 hover:bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 text-slate-900 w-48 sm:w-60 transition-all shadow-2xs"
                   />
                 </div>
 
                 <select
                   value={statusFilter}
                   onChange={(e) => setStatusFilter(e.target.value)}
-                  className="px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none text-slate-700 font-semibold cursor-pointer"
+                  className="px-3 py-1.5 text-xs bg-slate-50 hover:bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 text-slate-700 font-semibold cursor-pointer shadow-2xs transition-all"
                 >
                   <option value="ALL">All Status</option>
                   <option value="ACTIVE">Active (In Session)</option>
-                  <option value="WARNING">Warnings (&gt;= 1 Strike)</option>
+                  <option value="WARNING">Warnings (≥ 1 Strike)</option>
                   <option value="LOCKED">Locked Workstations</option>
                   <option value="SUBMITTED">Completed Submissions</option>
                 </select>
@@ -604,7 +691,7 @@ export function LiveProctoringClientView({
             {filtered.length === 0 ? (
               <div className="p-12 text-center text-slate-400 text-xs space-y-2">
                 <Monitor className="w-8 h-8 mx-auto text-slate-300" />
-                <p className="font-semibold">No active examination workstations match the query.</p>
+                <p className="font-semibold text-slate-700">No active examination workstations match the query.</p>
                 <p className="text-[11px] text-slate-400">
                   Workstations appear here automatically when candidates launch the Windows Lockdown Client.
                 </p>
@@ -612,14 +699,14 @@ export function LiveProctoringClientView({
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs">
-                  <thead>
-                    <tr className="border-b border-slate-100 text-[10px] font-bold text-slate-400 uppercase tracking-wider bg-slate-50/50">
-                      <th className="py-2.5 px-3">Candidate</th>
-                      <th className="py-2.5 px-3">Dept</th>
-                      <th className="py-2.5 px-3">Workstation &amp; Strikes</th>
-                      <th className="py-2.5 px-3">Extra Time</th>
-                      <th className="py-2.5 px-3">Status</th>
-                      <th className="py-2.5 px-3 text-right">Intervention</th>
+                  <thead className="bg-slate-50/80 text-slate-500 font-bold uppercase tracking-wider text-[10px] border-b border-slate-200/80">
+                    <tr>
+                      <th className="py-3 px-4">Candidate</th>
+                      <th className="py-3 px-3">Dept</th>
+                      <th className="py-3 px-3">Workstation &amp; Strikes</th>
+                      <th className="py-3 px-3">Extra Time</th>
+                      <th className="py-3 px-3">Status</th>
+                      <th className="py-3 px-4 text-right">Intervention</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 text-slate-700">
@@ -635,7 +722,7 @@ export function LiveProctoringClientView({
                             isLocked ? "bg-red-50/30" : s.strikesCount > 0 ? "bg-amber-50/20" : ""
                           }`}
                         >
-                          <td className="py-3 px-3">
+                          <td className="py-3 px-4">
                             <div className="font-bold text-slate-900">{s.candidateName}</div>
                             <div className="flex items-center space-x-1.5 mt-0.5">
                               <span className="font-mono text-[10px] text-blue-700 font-semibold">
@@ -657,7 +744,7 @@ export function LiveProctoringClientView({
                           </td>
 
                           <td className="py-3 px-3">
-                            <span className="text-[10px] font-bold bg-purple-50 text-purple-700 px-2 py-0.5 rounded border border-purple-200">
+                            <span className="text-[10px] font-bold bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-md border border-indigo-200/60">
                               {s.departmentCode}
                             </span>
                           </td>
@@ -665,12 +752,12 @@ export function LiveProctoringClientView({
                           <td className="py-3 px-3">
                             <div className="flex items-center space-x-1.5">
                               <span
-                                className={`font-mono text-[10px] font-black px-2 py-0.5 rounded border ${
+                                className={`font-mono text-[10px] font-black px-2 py-0.5 rounded-md border ${
                                   s.strikesCount === 0
                                     ? "bg-emerald-50 text-emerald-700 border-emerald-200"
                                     : s.strikesCount >= s.maxStrikes
-                                    ? "bg-red-100 text-red-700 border-red-300"
-                                    : "bg-amber-50 text-amber-700 border-amber-300"
+                                    ? "bg-red-50 text-red-700 border-red-300"
+                                    : "bg-amber-50 text-amber-800 border-amber-300"
                                 }`}
                               >
                                 Strikes: {s.strikesCount} / {s.maxStrikes}
@@ -684,7 +771,7 @@ export function LiveProctoringClientView({
                                   <button
                                     type="button"
                                     onClick={() => setSelectedEvidence(sessionEvidence)}
-                                    className="inline-flex items-center px-1.5 py-0.5 rounded bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 text-[9px] font-bold transition-colors cursor-pointer shadow-2xs"
+                                    className="inline-flex items-center px-1.5 py-0.5 rounded-md bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 text-[9px] font-bold transition-colors cursor-pointer shadow-2xs"
                                     title="View forensic webcam snapshot"
                                   >
                                     <Camera className="w-2.5 h-2.5 mr-0.5" />
@@ -700,7 +787,7 @@ export function LiveProctoringClientView({
 
                           <td className="py-3 px-3 whitespace-nowrap">
                             {s.extraTimeMinutes > 0 ? (
-                              <span className="text-[10px] font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
+                              <span className="text-[10px] font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-200">
                                 +{s.extraTimeMinutes} Mins
                               </span>
                             ) : (
@@ -716,25 +803,35 @@ export function LiveProctoringClientView({
                               </span>
                             ) : (
                               <span
-                                className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold border ${
+                                className={`inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-extrabold tracking-wide border shadow-2xs ${
                                   s.status === "IN_PROGRESS"
-                                    ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                                    ? "bg-emerald-50 text-emerald-700 border-emerald-200/90"
                                     : s.status === "LOCKED"
-                                    ? "bg-red-50 text-red-700 border-red-200 animate-pulse"
+                                    ? "bg-red-50 text-red-700 border-red-200/90 animate-pulse"
                                     : s.status === "SUBMITTED"
-                                    ? "bg-blue-50 text-blue-700 border-blue-200"
+                                    ? "bg-blue-50 text-blue-700 border-blue-200/90"
                                     : "bg-slate-100 text-slate-700 border-slate-200"
                                 }`}
                               >
-                                {s.status === "IN_PROGRESS" && (
-                                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 mr-1.5 animate-pulse" />
-                                )}
-                                {s.status}
+                                <span
+                                  className={`w-1.5 h-1.5 rounded-full mr-1.5 ${
+                                    s.status === "IN_PROGRESS"
+                                      ? "bg-emerald-600 animate-pulse"
+                                      : s.status === "LOCKED"
+                                      ? "bg-red-600 animate-pulse"
+                                      : s.status === "SUBMITTED"
+                                      ? "bg-blue-600"
+                                      : "bg-slate-400"
+                                  }`}
+                                />
+                                {s.status === "IN_PROGRESS"
+                                  ? "IN SESSION"
+                                  : s.status}
                               </span>
                             )}
                           </td>
 
-                          <td className="py-3 px-3 text-right whitespace-nowrap">
+                          <td className="py-3 px-4 text-right whitespace-nowrap">
                             {isSubmitted ? (
                               <span className="text-[10px] text-slate-400 font-semibold">Finalized</span>
                             ) : (
@@ -756,7 +853,7 @@ export function LiveProctoringClientView({
                                     type="button"
                                     disabled={isLoading}
                                     onClick={() => handleUnlock(s.id)}
-                                    className="p-1.5 rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 transition-colors cursor-pointer"
+                                    className="p-1.5 rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 transition-colors cursor-pointer shadow-2xs"
                                     title="Unlock Workstation"
                                   >
                                     <Unlock className="w-3.5 h-3.5" />
@@ -766,7 +863,7 @@ export function LiveProctoringClientView({
                                     type="button"
                                     disabled={isLoading}
                                     onClick={() => handleLock(s.id)}
-                                    className="p-1.5 rounded-lg bg-red-50 text-red-700 hover:bg-red-100 border border-red-200 transition-colors cursor-pointer"
+                                    className="p-1.5 rounded-lg bg-red-50 text-red-700 hover:bg-red-100 border border-red-200 transition-colors cursor-pointer shadow-2xs"
                                     title="Freeze Workstation Immediately"
                                   >
                                     <Lock className="w-3.5 h-3.5" />
@@ -778,7 +875,7 @@ export function LiveProctoringClientView({
                                   type="button"
                                   disabled={isLoading}
                                   onClick={() => setWarningTarget({ sessionId: s.id, candidateName: s.candidateName })}
-                                  className="p-1.5 rounded-lg bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200 transition-colors cursor-pointer"
+                                  className="p-1.5 rounded-lg bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200 transition-colors cursor-pointer shadow-2xs"
                                   title="Dispatch Warning to Candidate Screen"
                                 >
                                   <Bell className="w-3.5 h-3.5" />
@@ -789,7 +886,7 @@ export function LiveProctoringClientView({
                                   type="button"
                                   disabled={isLoading}
                                   onClick={() => handleAddExtraTime(s.id, 5)}
-                                  className="px-2 py-1 text-[10px] font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg transition-colors cursor-pointer"
+                                  className="px-2 py-1 text-[10px] font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg transition-colors cursor-pointer shadow-2xs"
                                   title="Add +5 Minutes Compensatory Time"
                                 >
                                   +5m
@@ -798,7 +895,7 @@ export function LiveProctoringClientView({
                                   type="button"
                                   disabled={isLoading}
                                   onClick={() => handleAddExtraTime(s.id, 10)}
-                                  className="px-2 py-1 text-[10px] font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg transition-colors cursor-pointer"
+                                  className="px-2 py-1 text-[10px] font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg transition-colors cursor-pointer shadow-2xs"
                                   title="Add +10 Minutes Compensatory Time"
                                 >
                                   +10m
@@ -810,7 +907,7 @@ export function LiveProctoringClientView({
                                     type="button"
                                     disabled={isLoading}
                                     onClick={() => handleResetStrikes(s.id)}
-                                    className="p-1.5 rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200 transition-colors cursor-pointer"
+                                    className="p-1.5 rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200 transition-colors cursor-pointer shadow-2xs"
                                     title="Clear Strikes Counter"
                                   >
                                     <RotateCcw className="w-3.5 h-3.5" />
@@ -822,7 +919,7 @@ export function LiveProctoringClientView({
                                   type="button"
                                   disabled={isLoading}
                                   onClick={() => handleRebindPC(s.studentId, s.candidateName)}
-                                  className="p-1.5 rounded-lg bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200 transition-colors cursor-pointer"
+                                  className="p-1.5 rounded-lg bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200 transition-colors cursor-pointer shadow-2xs"
                                   title="Reset PC Hardware Lock (Release to New Machine)"
                                 >
                                   <Monitor className="w-3.5 h-3.5" />
@@ -842,7 +939,7 @@ export function LiveProctoringClientView({
 
         {/* Right Column: Live Infraction Feed */}
         <div className="lg:col-span-4 space-y-4">
-          <div className="bg-white border border-slate-200/90 rounded-2xl p-5 shadow-xs space-y-3.5">
+          <div className="bg-white border border-slate-200/90 rounded-2xl p-4 sm:p-5 shadow-xs space-y-3">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div className="flex items-center space-x-2">
                 <ShieldAlert className="w-4 h-4 text-red-600" />
@@ -862,28 +959,28 @@ export function LiveProctoringClientView({
                 <p className="text-[11px] text-slate-400">Zero security infractions registered.</p>
               </div>
             ) : (
-              <div className="space-y-2.5 max-h-[500px] overflow-y-auto pr-1">
+              <div className="space-y-2 max-h-[500px] overflow-y-auto pr-1">
                 {violations.map((v) => (
                   <div
                     key={v.id}
-                    className="p-3 rounded-xl bg-slate-50 border border-slate-200/80 text-xs space-y-1.5 hover:border-red-300 transition-colors"
+                    className="p-2.5 rounded-xl bg-slate-50/80 border border-slate-200/80 text-xs space-y-1 hover:border-amber-300 transition-colors group"
                   >
                     <div className="flex items-center justify-between">
-                      <span className="font-bold text-slate-900 truncate max-w-[180px]">
+                      <span className="font-bold text-slate-900 truncate max-w-[170px]">
                         {v.candidateName}
                       </span>
-                      <span className="font-mono text-[9px] font-black px-1.5 py-0.2 rounded bg-red-100 text-red-700 border border-red-200">
+                      <span className="text-[9px] font-extrabold px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-800 border border-amber-200">
                         Strike #{v.strikeNumber}
                       </span>
                     </div>
 
-                    <div className="text-[11px] font-medium text-red-700 flex items-center space-x-1.5">
-                      <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" />
-                      <span className="truncate">{v.violationType}</span>
+                    <div className="text-[11px] font-semibold text-amber-700 flex items-center space-x-1.5">
+                      <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0 text-amber-600" />
+                      <span className="truncate">{formatViolationType(v.violationType)}</span>
                     </div>
 
                     <div className="flex items-center justify-between text-[10px] text-slate-400 pt-0.5">
-                      <span className="font-mono">{v.departmentCode} • {v.applicationNumber}</span>
+                      <span className="font-mono text-slate-500">{v.departmentCode} • {v.applicationNumber}</span>
                       <span suppressHydrationWarning>{formatTime(v.createdAt, true)}</span>
                     </div>
 
@@ -892,12 +989,12 @@ export function LiveProctoringClientView({
                         <button
                           type="button"
                           onClick={() => setSelectedEvidence(v)}
-                          className="inline-flex items-center px-2 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 text-[10px] font-bold transition-colors cursor-pointer shadow-2xs"
+                          className="inline-flex items-center px-2 py-0.5 rounded-md bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 text-[10px] font-bold transition-colors cursor-pointer shadow-2xs"
                         >
                           <Camera className="w-3 h-3 mr-1" />
-                          View Photo Evidence
+                          View Photo
                         </button>
-                        <span className="text-[9px] text-emerald-700 font-bold bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                        <span className="text-[9px] text-emerald-700 font-bold bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200">
                           Photo Captured
                         </span>
                       </div>
