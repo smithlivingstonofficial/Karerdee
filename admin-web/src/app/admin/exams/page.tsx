@@ -37,6 +37,7 @@ import {
   Shield,
   Printer,
   BarChart2,
+  Radio,
 } from "lucide-react";
 
 type FilterStatus = "ALL" | "SCHEDULED" | "ACTIVE" | "DRAFT" | "COMPLETED";
@@ -146,31 +147,154 @@ export default function ExaminationsDirectoryPage() {
   });
 
   return (
-    <div className="space-y-6 pb-12 w-full">
-      {/* 1. Header Banner */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white border border-slate-200/90 rounded-2xl p-5 sm:p-6 shadow-xs">
-        <div className="space-y-1">
-          <div className="flex items-center space-x-2">
-            <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">
-              Examinations Hub
-            </h1>
-            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200">
-              KARE PhD Registry
-            </span>
+    <div className="space-y-4 max-w-7xl mx-auto pb-12 w-full">
+      {/* 1. Combined Executive Command Center & Examinations KPI Cockpit */}
+      <div className="bg-white border border-slate-200/90 rounded-2xl shadow-xs overflow-hidden">
+        {/* Top Header Row */}
+        <div className="px-4 py-3 sm:px-5 sm:py-3.5 flex flex-col md:flex-row md:items-center justify-between gap-3 bg-gradient-to-r from-white via-slate-50/30 to-blue-50/20">
+          <div className="flex items-center space-x-3 min-w-0">
+            {/* Official Square KARE Logo */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <div className="w-9 h-9 rounded-xl bg-white border border-slate-200/90 p-0.5 flex items-center justify-center flex-shrink-0 shadow-2xs overflow-hidden">
+              <img
+                src="/kare-square-logo.png"
+                alt="KARE Logo"
+                className="w-full h-full object-contain rounded-lg"
+              />
+            </div>
+
+            <div className="min-w-0">
+              <div className="flex items-center space-x-2 flex-wrap">
+                <h1 className="text-sm sm:text-base font-bold text-slate-900 tracking-tight">
+                  Examinations Hub
+                </h1>
+                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-blue-50 text-blue-700 border border-blue-200/80">
+                  PhD Registry
+                </span>
+              </div>
+            </div>
           </div>
-          <p className="text-xs text-slate-500 max-w-xl">
-            Central repository of scheduled, live, completed, and drafted examination papers with integrated candidate hall ticket generation.
-          </p>
+
+          {/* Right Action Buttons */}
+          <div className="flex items-center space-x-2 flex-shrink-0">
+            {activeCount > 0 && (
+              <Link
+                href="/admin/proctoring"
+                className="inline-flex items-center px-3 py-1.5 text-xs font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300/80 rounded-lg shadow-2xs transition-all cursor-pointer group"
+                title="Open Live Proctoring & Security Telemetry Grid"
+              >
+                <Radio className="w-3.5 h-3.5 mr-1.5 text-emerald-600 animate-pulse" />
+                <span>Live Invigilation</span>
+                <span className="ml-1.5 px-1.5 py-0.2 bg-emerald-600 text-white rounded-full text-[10px] font-black shadow-2xs">
+                  {activeCount}
+                </span>
+              </Link>
+            )}
+
+            <Link
+              href="/admin/exams/new"
+              className="inline-flex items-center space-x-1.5 px-3 py-1.5 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 active:scale-[0.98] rounded-lg shadow-xs hover:shadow transition-all cursor-pointer"
+            >
+              <PlusCircle className="w-3.5 h-3.5" />
+              <span>Create Examination</span>
+            </Link>
+          </div>
         </div>
 
-        <div className="flex items-center space-x-2.5 flex-shrink-0">
-          <Link
-            href="/admin/exams/new"
-            className="inline-flex items-center px-4 py-2.5 text-xs font-bold text-white bg-blue-700 hover:bg-blue-800 rounded-xl shadow-xs transition-colors cursor-pointer"
-          >
-            <PlusCircle className="w-4 h-4 mr-2" />
-            Create Examination
-          </Link>
+        {/* 4 Clean Metric Cells (Zero Unwanted Text, Streamlined Padding) */}
+        <div className="border-t border-slate-200/80 grid grid-cols-2 lg:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-slate-200/80">
+          {/* Metric 1: Total Examinations */}
+          <div className="px-4 py-3 sm:px-5 sm:py-3.5 hover:bg-slate-50/80 transition-colors flex flex-col justify-between group">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider group-hover:text-blue-700 transition-colors">
+                Total Exams
+              </span>
+              <span className="font-bold px-1.5 py-0.2 rounded-full border text-[9px] bg-slate-100 text-slate-600 border-slate-200">
+                {totalCount} Total
+              </span>
+            </div>
+            <div className="mt-2 flex items-baseline space-x-1.5">
+              <span className="text-2xl font-black text-slate-900 tracking-tight">
+                {totalCount}
+              </span>
+              <span className="text-xs text-slate-400">authored papers</span>
+            </div>
+          </div>
+
+          {/* Metric 2: In Session */}
+          <div className="px-4 py-3 sm:px-5 sm:py-3.5 hover:bg-slate-50/80 transition-colors flex flex-col justify-between group">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider group-hover:text-emerald-700 transition-colors">
+                In Session
+              </span>
+              <span
+                className={`font-bold px-1.5 py-0.2 rounded-full border text-[9px] flex items-center space-x-1 ${
+                  activeCount > 0
+                    ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                    : "bg-slate-100 text-slate-600 border-slate-200"
+                }`}
+              >
+                {activeCount > 0 && (
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-ping mr-0.5" />
+                )}
+                <span>{activeCount > 0 ? "Running" : "Idle"}</span>
+              </span>
+            </div>
+            <div className="mt-2 flex items-baseline space-x-1.5">
+              <span className="text-2xl font-black text-slate-900 tracking-tight">
+                {activeCount}
+              </span>
+              <span className="text-xs text-slate-400">live telemetry</span>
+            </div>
+          </div>
+
+          {/* Metric 3: Scheduled Upcoming */}
+          <div className="px-4 py-3 sm:px-5 sm:py-3.5 hover:bg-slate-50/80 transition-colors flex flex-col justify-between group">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider group-hover:text-indigo-700 transition-colors">
+                Scheduled
+              </span>
+              <span
+                className={`font-bold px-1.5 py-0.2 rounded-full border text-[9px] ${
+                  scheduledCount > 0
+                    ? "bg-blue-50 text-blue-700 border-blue-200"
+                    : "bg-slate-100 text-slate-600 border-slate-200"
+                }`}
+              >
+                {scheduledCount > 0 ? "Upcoming" : "None"}
+              </span>
+            </div>
+            <div className="mt-2 flex items-baseline space-x-1.5">
+              <span className="text-2xl font-black text-slate-900 tracking-tight">
+                {scheduledCount}
+              </span>
+              <span className="text-xs text-slate-400">ready to sit</span>
+            </div>
+          </div>
+
+          {/* Metric 4: Drafts in Database */}
+          <div className="px-4 py-3 sm:px-5 sm:py-3.5 hover:bg-slate-50/80 transition-colors flex flex-col justify-between group">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider group-hover:text-amber-700 transition-colors">
+                Drafts in DB
+              </span>
+              <span
+                className={`font-bold px-1.5 py-0.2 rounded-full border text-[9px] ${
+                  draftCount > 0
+                    ? "bg-amber-50 text-amber-800 border-amber-200"
+                    : "bg-slate-100 text-slate-600 border-slate-200"
+                }`}
+              >
+                {draftCount > 0 ? "In dev" : "Clean"}
+              </span>
+            </div>
+            <div className="mt-2 flex items-baseline space-x-1.5">
+              <span className="text-2xl font-black text-slate-900 tracking-tight">
+                {draftCount}
+              </span>
+              <span className="text-xs text-slate-400">unpublished</span>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -192,73 +316,10 @@ export default function ExaminationsDirectoryPage() {
         </div>
       )}
 
-      {/* 3. Executive Metrics Row */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        <div className="bg-white border border-slate-200/90 rounded-xl p-4 shadow-xs">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-              Total Examinations
-            </span>
-            <div className="w-7 h-7 rounded-lg bg-blue-50 text-blue-700 flex items-center justify-center font-bold text-xs">
-              <FileText className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="mt-2 flex items-baseline space-x-2">
-            <span className="text-2xl font-black text-slate-900">{totalCount}</span>
-            <span className="text-xs text-slate-400">Authored papers</span>
-          </div>
-        </div>
-
-        <div className="bg-white border border-slate-200/90 rounded-xl p-4 shadow-xs">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-              In Session (Active)
-            </span>
-            <div className="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center font-bold text-xs">
-              <Activity className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="mt-2 flex items-baseline space-x-2">
-            <span className="text-2xl font-black text-emerald-700">{activeCount}</span>
-            <span className="text-xs text-slate-400">Live telemetry</span>
-          </div>
-        </div>
-
-        <div className="bg-white border border-slate-200/90 rounded-xl p-4 shadow-xs">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-              Scheduled Upcoming
-            </span>
-            <div className="w-7 h-7 rounded-lg bg-indigo-50 text-indigo-700 flex items-center justify-center font-bold text-xs">
-              <Calendar className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="mt-2 flex items-baseline space-x-2">
-            <span className="text-2xl font-black text-indigo-700">{scheduledCount}</span>
-            <span className="text-xs text-slate-400">Ready to sit</span>
-          </div>
-        </div>
-
-        <div className="bg-white border border-slate-200/90 rounded-xl p-4 shadow-xs">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-              Drafts in Database
-            </span>
-            <div className="w-7 h-7 rounded-lg bg-amber-50 text-amber-700 flex items-center justify-center font-bold text-xs">
-              <Bookmark className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="mt-2 flex items-baseline space-x-2">
-            <span className="text-2xl font-black text-amber-700">{draftCount}</span>
-            <span className="text-xs text-slate-400">In development</span>
-          </div>
-        </div>
-      </div>
-
-      {/* 4. Filter Toolbar & Search Bar */}
-      <div className="bg-white border border-slate-200/90 rounded-2xl p-3 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-3">
+      {/* 3. Segmented Filter Toolbar & Filter Search */}
+      <div className="bg-white border border-slate-200/90 rounded-2xl p-2.5 sm:p-3 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-3">
         {/* Status Segmented Tabs */}
-        <div className="inline-flex items-center p-1 bg-slate-100/90 rounded-xl border border-slate-200/80 space-x-1 overflow-x-auto">
+        <div className="inline-flex items-center p-1 bg-slate-100/90 rounded-xl border border-slate-200/70 space-x-1 overflow-x-auto text-xs font-semibold text-slate-600">
           {[
             { id: "ALL", label: "All Papers", count: totalCount },
             { id: "SCHEDULED", label: "Scheduled", count: scheduledCount },
@@ -272,10 +333,10 @@ export default function ExaminationsDirectoryPage() {
                 key={tab.id}
                 type="button"
                 onClick={() => setStatusFilter(tab.id as FilterStatus)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center space-x-1.5 ${
+                className={`px-3 py-1.5 rounded-lg text-xs transition-all cursor-pointer whitespace-nowrap flex items-center space-x-1.5 ${
                   isSelected
-                    ? "bg-white text-blue-700 shadow-2xs border border-slate-200"
-                    : "text-slate-600 hover:text-slate-900 hover:bg-white/60"
+                    ? "bg-white text-blue-700 shadow-xs font-bold border border-slate-200/60"
+                    : "hover:text-slate-900 hover:bg-white/40 font-medium"
                 }`}
               >
                 <span>{tab.label}</span>
@@ -294,19 +355,28 @@ export default function ExaminationsDirectoryPage() {
         </div>
 
         {/* Search Input */}
-        <div className="relative min-w-[240px] sm:min-w-[280px]">
-          <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+        <div className="relative w-full md:w-72">
+          <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search by title, code or passcode..."
-            className="w-full pl-9 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 text-slate-900 placeholder:text-slate-400"
+            className="w-full pl-9 pr-7 py-1.5 text-xs bg-slate-50 hover:bg-white border border-slate-200 rounded-xl text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 focus:bg-white transition-all shadow-2xs"
           />
+          {searchQuery && (
+            <button
+              type="button"
+              onClick={() => setSearchQuery("")}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 hover:text-slate-700 px-1 font-bold"
+            >
+              ✕
+            </button>
+          )}
         </div>
       </div>
 
-      {/* 5. Examinations List Cards */}
+      {/* 4. Examinations List Cards */}
       {isLoading ? (
         <div className="bg-white border border-slate-200/90 rounded-2xl p-12 text-center text-slate-500 text-xs font-semibold shadow-xs">
           <Loader2 className="w-6 h-6 animate-spin text-blue-700 mx-auto mb-2" />
@@ -330,10 +400,10 @@ export default function ExaminationsDirectoryPage() {
           <div className="pt-2">
             <Link
               href="/admin/exams/new"
-              className="inline-flex items-center px-4 py-2 text-xs font-bold text-white bg-blue-700 hover:bg-blue-800 rounded-xl shadow-xs transition-colors cursor-pointer"
+              className="inline-flex items-center space-x-1.5 px-4 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-xs transition-colors cursor-pointer"
             >
-              <PlusCircle className="w-3.5 h-3.5 mr-1.5" />
-              Open Authoring Studio
+              <PlusCircle className="w-3.5 h-3.5" />
+              <span>Open Authoring Studio</span>
             </Link>
           </div>
         </div>
@@ -345,51 +415,60 @@ export default function ExaminationsDirectoryPage() {
             const isActive = exam.status === "ACTIVE";
             const isScheduled = exam.status === "SCHEDULED";
             const isCompleted = exam.status === "COMPLETED";
+            const isCopied = copiedId === exam.id;
 
             return (
               <div
                 key={exam.id}
-                className="bg-white border border-slate-200/90 rounded-2xl p-4 sm:p-5 shadow-xs hover:border-slate-300 transition-all flex flex-col md:flex-row md:items-center justify-between gap-4"
+                className="bg-white border border-slate-200/90 rounded-2xl p-4 sm:p-5 shadow-xs hover:border-slate-300 hover:shadow-sm transition-all flex flex-col md:flex-row md:items-center justify-between gap-4 group"
               >
                 {/* Left: Exam Info & Badges */}
                 <div className="space-y-2 flex-1 min-w-0">
-                  <div className="flex items-center space-x-2.5 flex-wrap gap-y-1">
-                    {/* Status Badge */}
+                  <div className="flex items-center space-x-2 flex-wrap gap-y-1">
+                    {/* Status Badge with colored dot */}
                     <span
-                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-extrabold border ${
+                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-extrabold border shadow-2xs ${
                         isActive
-                          ? "bg-emerald-50 text-emerald-700 border-emerald-200 animate-pulse"
+                          ? "bg-emerald-50 text-emerald-700 border-emerald-200/90"
                           : isScheduled
-                          ? "bg-blue-50 text-blue-700 border-blue-200"
+                          ? "bg-blue-50 text-blue-700 border-blue-200/90"
                           : isDraft
-                          ? "bg-amber-50 text-amber-800 border-amber-200"
+                          ? "bg-amber-50 text-amber-800 border-amber-200/90"
                           : "bg-slate-100 text-slate-700 border-slate-200"
                       }`}
                     >
-                      {isActive && <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 mr-1.5 animate-ping" />}
-                      {exam.status === "ACTIVE"
+                      <span
+                        className={`w-1.5 h-1.5 rounded-full mr-1.5 ${
+                          isActive
+                            ? "bg-emerald-600 animate-pulse"
+                            : isScheduled
+                            ? "bg-blue-600"
+                            : isDraft
+                            ? "bg-amber-600"
+                            : "bg-slate-400"
+                        }`}
+                      />
+                      {isActive
                         ? "IN SESSION"
-                        : exam.status === "SCHEDULED"
+                        : isScheduled
                         ? "SCHEDULED"
-                        : exam.status === "DRAFT"
+                        : isDraft
                         ? "DRAFT IN DB"
-                        : exam.status}
+                        : "CONCLUDED"}
                     </span>
 
                     {/* Course Code */}
-                    {exam.courseCode && (
-                      <span className="text-[10px] font-mono font-bold bg-slate-100 text-slate-700 px-2 py-0.5 rounded border border-slate-200">
-                        {exam.courseCode}
-                      </span>
-                    )}
+                    <span className="text-[10px] font-mono font-bold bg-slate-100 text-slate-700 px-2 py-0.5 rounded-md border border-slate-200/80">
+                      {exam.courseCode || "GEN-CORE"}
+                    </span>
 
                     {/* Department Tracks Badges */}
-                    {exam.targetDepartments.length > 0 ? (
+                    {exam.targetDepartments && exam.targetDepartments.length > 0 ? (
                       <div className="flex items-center space-x-1">
                         {exam.targetDepartments.map((dept) => (
                           <span
                             key={dept}
-                            className="text-[10px] font-bold bg-purple-50 text-purple-700 px-1.5 py-0.2 rounded border border-purple-200"
+                            className="text-[10px] font-bold bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-md border border-indigo-200/60"
                           >
                             {dept}
                           </span>
@@ -398,47 +477,62 @@ export default function ExaminationsDirectoryPage() {
                     ) : (
                       <span className="text-[10px] font-medium text-slate-400">Common Core</span>
                     )}
+
+                    {/* Strikes Indicator */}
+                    <span className="text-[10px] font-medium text-slate-400">
+                      • {exam.maxStrikes} Strikes Max
+                    </span>
                   </div>
 
                   {/* Title */}
-                  <h2 className="text-base font-bold text-slate-900 tracking-tight truncate">
+                  <Link
+                    href={`/admin/exams/${exam.id}`}
+                    className="text-base font-bold text-slate-900 tracking-tight truncate block hover:text-blue-600 transition-colors"
+                  >
                     {exam.title}
-                  </h2>
+                  </Link>
 
                   {/* Quick Meta Row */}
-                  <div className="flex items-center space-x-4 text-xs text-slate-500 flex-wrap gap-y-1">
-                    <div className="flex items-center space-x-1">
+                  <div className="flex items-center space-x-3.5 text-xs text-slate-500 flex-wrap gap-y-1.5 pt-0.5">
+                    <div className="flex items-center space-x-1.5 font-medium text-slate-600">
                       <Clock className="w-3.5 h-3.5 text-slate-400" />
                       <span>{exam.durationMinutes} Mins</span>
                     </div>
 
-                    <div className="flex items-center space-x-1">
+                    <div className="flex items-center space-x-1.5 font-medium text-slate-600">
                       <HelpCircle className="w-3.5 h-3.5 text-slate-400" />
                       <span>{exam.totalQuestions} Questions</span>
                     </div>
 
-                    <div className="flex items-center space-x-1">
+                    <div className="flex items-center space-x-1.5 font-medium text-slate-600">
                       <Layers className="w-3.5 h-3.5 text-slate-400" />
                       <span>{exam.totalSections} Sections</span>
                     </div>
 
-                    {/* Passcode Pill */}
-                    <div className="flex items-center space-x-1.5 bg-slate-50 px-2 py-0.5 rounded-md border border-slate-200 font-mono text-[11px] text-slate-700">
-                      <KeyRound className="w-3 h-3 text-slate-400" />
-                      <span className="font-bold">{exam.passcode}</span>
-                      <button
-                        type="button"
-                        onClick={() => copyPasscode(exam.id, exam.passcode)}
-                        className="text-slate-400 hover:text-blue-700 transition-colors ml-1 cursor-pointer"
-                        title="Copy Passcode"
-                      >
-                        {copiedId === exam.id ? (
-                          <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                        ) : (
-                          <Copy className="w-3 h-3" />
-                        )}
-                      </button>
-                    </div>
+                    {/* Passcode Voucher Token */}
+                    <button
+                      type="button"
+                      onClick={() => copyPasscode(exam.id, exam.passcode)}
+                      className={`inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-lg border font-mono font-bold text-xs transition-all cursor-pointer shadow-2xs group/btn ${
+                        isCopied
+                          ? "bg-emerald-50 text-emerald-700 border-emerald-300 ring-1 ring-emerald-200"
+                          : "bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-800 hover:border-slate-300"
+                      }`}
+                      title="Click to copy passcode"
+                    >
+                      <KeyRound className="w-3 h-3 text-slate-400 group-hover/btn:text-blue-600" />
+                      <span>{exam.passcode}</span>
+                      {isCopied ? (
+                        <CheckCircle2 className="w-3 h-3 text-emerald-600 animate-in fade-in" />
+                      ) : (
+                        <Copy className="w-3 h-3 text-slate-400 group-hover/btn:text-blue-600 transition-colors" />
+                      )}
+                      {isCopied && (
+                        <span className="text-[9px] text-emerald-600 font-bold ml-0.5">
+                          Copied
+                        </span>
+                      )}
+                    </button>
                   </div>
                 </div>
 
@@ -449,10 +543,10 @@ export default function ExaminationsDirectoryPage() {
                     <>
                       <Link
                         href={`/admin/exams/new?id=${exam.id}`}
-                        className="inline-flex items-center px-3.5 py-1.5 text-xs font-bold text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-lg shadow-2xs transition-all cursor-pointer"
+                        className="inline-flex items-center space-x-1 px-3 py-1.5 text-xs font-bold text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-200/90 rounded-lg shadow-2xs transition-all active:scale-[0.98] cursor-pointer"
                       >
                         <span>Resume Draft</span>
-                        <ArrowRight className="w-3.5 h-3.5 ml-1" />
+                        <ArrowRight className="w-3.5 h-3.5 ml-1 text-amber-600" />
                       </Link>
                       <button
                         type="button"
@@ -461,7 +555,7 @@ export default function ExaminationsDirectoryPage() {
                         className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg border border-transparent hover:border-red-200 transition-all cursor-pointer"
                         title="Delete Draft"
                       >
-                        <Trash2 className="w-4 h-4" />
+                        <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     </>
                   )}
@@ -469,33 +563,33 @@ export default function ExaminationsDirectoryPage() {
                   {/* SCHEDULED Actions */}
                   {isScheduled && (
                     <>
-                      <Link
-                        href={`/admin/exams/${exam.id}`}
-                        className="inline-flex items-center px-3 py-1.5 text-xs font-bold text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg shadow-2xs transition-all cursor-pointer"
-                      >
-                        <FileText className="w-3.5 h-3.5 mr-1 text-slate-500" />
-                        <span>Details &amp; Slips</span>
-                      </Link>
-
                       <button
                         type="button"
                         onClick={() => handleStatusChange(exam.id, "ACTIVE", "Active / In Session")}
                         disabled={isActing}
-                        className="inline-flex items-center px-3.5 py-1.5 text-xs font-bold text-white bg-emerald-700 hover:bg-emerald-800 rounded-lg shadow-2xs transition-all cursor-pointer disabled:opacity-50"
+                        className="inline-flex items-center space-x-1 px-3 py-1.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shadow-2xs transition-all active:scale-[0.98] cursor-pointer disabled:opacity-50"
                         title="Activate Examination for Candidate Sitting"
                       >
                         <Play className="w-3 h-3 mr-1 fill-current" />
                         <span>Activate Now</span>
                       </button>
 
+                      <Link
+                        href={`/admin/exams/${exam.id}`}
+                        className="inline-flex items-center space-x-1 px-3 py-1.5 text-xs font-bold text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 hover:border-slate-300 rounded-lg shadow-2xs transition-all active:scale-[0.98] cursor-pointer"
+                      >
+                        <FileText className="w-3.5 h-3.5 mr-1 text-slate-400" />
+                        <span>Details &amp; Slips</span>
+                      </Link>
+
                       <button
                         type="button"
                         onClick={() => handleDuplicate(exam.id)}
                         disabled={isActing}
-                        className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-50 rounded-lg border border-transparent hover:border-slate-200 transition-all cursor-pointer"
+                        className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-50 rounded-lg border border-slate-200/80 hover:border-slate-300 transition-all cursor-pointer"
                         title="Duplicate as Draft"
                       >
-                        <Copy className="w-4 h-4" />
+                        <Copy className="w-3.5 h-3.5" />
                       </button>
 
                       <button
@@ -505,7 +599,7 @@ export default function ExaminationsDirectoryPage() {
                         className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg border border-transparent hover:border-red-200 transition-all cursor-pointer"
                         title="Delete Examination"
                       >
-                        <Trash2 className="w-4 h-4" />
+                        <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     </>
                   )}
@@ -514,18 +608,28 @@ export default function ExaminationsDirectoryPage() {
                   {isActive && (
                     <>
                       <Link
+                        href="/admin/proctoring"
+                        className="inline-flex items-center space-x-1 px-3 py-1.5 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-2xs transition-all active:scale-[0.98] cursor-pointer"
+                        title="Enter Live Proctoring Stream"
+                      >
+                        <Radio className="w-3.5 h-3.5 fill-current animate-pulse mr-1" />
+                        <span>Invigilate</span>
+                      </Link>
+
+                      <Link
                         href={`/admin/exams/${exam.id}/results`}
-                        className="inline-flex items-center px-3 py-1.5 text-xs font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-lg shadow-2xs transition-all cursor-pointer"
+                        className="inline-flex items-center space-x-1 px-3 py-1.5 text-xs font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200/90 rounded-lg shadow-2xs transition-all active:scale-[0.98] cursor-pointer"
                         title="Live Submissions & Gradebook"
                       >
                         <BarChart2 className="w-3.5 h-3.5 mr-1 text-emerald-600" />
                         <span>Results</span>
                       </Link>
+
                       <Link
                         href={`/admin/exams/${exam.id}`}
-                        className="inline-flex items-center px-3 py-1.5 text-xs font-bold text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg shadow-2xs transition-all cursor-pointer"
+                        className="inline-flex items-center space-x-1 px-3 py-1.5 text-xs font-bold text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 hover:border-slate-300 rounded-lg shadow-2xs transition-all active:scale-[0.98] cursor-pointer"
                       >
-                        <FileText className="w-3.5 h-3.5 mr-1 text-slate-500" />
+                        <FileText className="w-3.5 h-3.5 mr-1 text-slate-400" />
                         <span>Details</span>
                       </Link>
 
@@ -533,10 +637,10 @@ export default function ExaminationsDirectoryPage() {
                         type="button"
                         onClick={() => handleStatusChange(exam.id, "COMPLETED", "Completed")}
                         disabled={isActing}
-                        className="inline-flex items-center px-3 py-1.5 text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded-lg shadow-2xs transition-all cursor-pointer disabled:opacity-50"
+                        className="inline-flex items-center space-x-1 px-3 py-1.5 text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded-lg shadow-2xs transition-all cursor-pointer disabled:opacity-50"
                         title="Conclude Examination Sitting"
                       >
-                        <Square className="w-3 h-3 mr-1 fill-current" />
+                        <Square className="w-3 h-3 mr-1 fill-current text-slate-500" />
                         <span>End Exam</span>
                       </button>
                     </>
@@ -547,27 +651,29 @@ export default function ExaminationsDirectoryPage() {
                     <>
                       <Link
                         href={`/admin/exams/${exam.id}/results`}
-                        className="inline-flex items-center px-3.5 py-1.5 text-xs font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-lg shadow-2xs transition-all cursor-pointer"
+                        className="inline-flex items-center space-x-1 px-3 py-1.5 text-xs font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200/90 rounded-lg shadow-2xs transition-all active:scale-[0.98] cursor-pointer"
                         title="View Gradebook & Candidate Submissions"
                       >
                         <BarChart2 className="w-3.5 h-3.5 mr-1 text-emerald-600" />
                         <span>Gradebook &amp; Results</span>
                       </Link>
+
                       <Link
                         href={`/admin/exams/${exam.id}`}
-                        className="inline-flex items-center px-3 py-1.5 text-xs font-bold text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg shadow-2xs transition-all cursor-pointer"
+                        className="inline-flex items-center space-x-1 px-3 py-1.5 text-xs font-bold text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 hover:border-slate-300 rounded-lg shadow-2xs transition-all active:scale-[0.98] cursor-pointer"
                       >
-                        <FileText className="w-3.5 h-3.5 mr-1 text-slate-500" />
+                        <FileText className="w-3.5 h-3.5 mr-1 text-slate-400" />
                         <span>View Records</span>
                       </Link>
+
                       <button
                         type="button"
                         onClick={() => handleDuplicate(exam.id)}
                         disabled={isActing}
-                        className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-50 rounded-lg border border-transparent hover:border-slate-200 transition-all cursor-pointer"
+                        className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-50 rounded-lg border border-slate-200/80 hover:border-slate-300 transition-all cursor-pointer"
                         title="Duplicate as New Draft"
                       >
-                        <Copy className="w-4 h-4" />
+                        <Copy className="w-3.5 h-3.5" />
                       </button>
                     </>
                   )}
