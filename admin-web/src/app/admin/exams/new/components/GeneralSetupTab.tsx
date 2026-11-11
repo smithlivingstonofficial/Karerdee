@@ -205,9 +205,9 @@ export function GeneralSetupTab({ general, onChange }: GeneralSetupTabProps) {
 
         {/* Bottom Guidance Pill */}
         <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[10px] text-slate-500">
-          <span>Displayed on candidate desktop terminal</span>
+          <span>Displayed on candidate examination screen</span>
           <span className="font-semibold text-blue-700 bg-blue-50 px-2 py-0.2 rounded border border-blue-100">
-            KARE-SES Native
+            KARE-SES Online
           </span>
         </div>
       </div>

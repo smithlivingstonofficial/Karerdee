@@ -654,17 +654,10 @@ export default function ExamResultsGradebookPage() {
                                 <span className="font-mono text-[11px] font-bold text-slate-600">
                                   {c.applicationNumber}
                                 </span>
-                                {c.clientType === "Web Browser" ? (
-                                  <span className="text-[9px] font-bold bg-blue-50 text-blue-700 px-1.5 py-0.2 rounded border border-blue-200 inline-flex items-center">
-                                    <Globe className="w-2.5 h-2.5 mr-0.5" />
-                                    Web
-                                  </span>
-                                ) : c.clientType === "Windows Desktop" ? (
-                                  <span className="text-[9px] font-bold bg-slate-100 text-slate-700 px-1.5 py-0.2 rounded border border-slate-200 inline-flex items-center">
-                                    <Monitor className="w-2.5 h-2.5 mr-0.5" />
-                                    Desktop
-                                  </span>
-                                ) : null}
+                                <span className="text-[9px] font-bold bg-blue-50 text-blue-700 px-1.5 py-0.2 rounded border border-blue-200 inline-flex items-center">
+                                  <Globe className="w-2.5 h-2.5 mr-0.5" />
+                                  Online
+                                </span>
                               </div>
                             </div>
                           </div>

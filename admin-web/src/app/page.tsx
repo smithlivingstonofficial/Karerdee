@@ -2,6 +2,7 @@ import React from "react";
 import Link from "next/link";
 import {
   ShieldCheck,
+  Globe,
   Download,
   ExternalLink,
   Search,
@@ -65,12 +66,12 @@ export default function PublicLandingPage() {
             Exam Guidelines
           </Link>
           <Link
-            href="/api/download/client"
-            className="inline-flex items-center px-3.5 py-2 text-slate-700 bg-white hover:bg-slate-50 border border-slate-300 rounded-xl shadow-2xs transition-colors"
+            href="/sitting"
+            className="inline-flex items-center px-3.5 py-2 text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-xl shadow-2xs transition-colors"
           >
-            <Download className="w-3.5 h-3.5 mr-1.5 text-slate-500" />
-            <span className="hidden sm:inline">Download Windows Client</span>
-            <span className="sm:hidden">Download</span>
+            <Globe className="w-3.5 h-3.5 mr-1.5 text-blue-700" />
+            <span className="hidden sm:inline">Enter Exam Portal</span>
+            <span className="sm:hidden">Sitting</span>
           </Link>
           <Link
             href="/login"
@@ -172,11 +173,11 @@ export default function PublicLandingPage() {
           {/* Quick Action Badges */}
           <div className="pt-2 flex flex-wrap items-center justify-center gap-3 text-xs">
             <Link
-              href="/api/download/client"
-              className="inline-flex items-center px-4 py-2 font-bold text-slate-800 bg-white hover:bg-slate-100 border border-slate-300 rounded-xl shadow-2xs transition-all"
+              href="/sitting"
+              className="inline-flex items-center px-4 py-2 font-bold text-white bg-blue-700 hover:bg-blue-800 rounded-xl shadow-xs transition-all"
             >
-              <Download className="w-4 h-4 mr-2 text-blue-700" />
-              Download Safe Exam Client (.exe)
+              <Globe className="w-4 h-4 mr-2" />
+              Enter Online Examination Portal
             </Link>
             <Link
               href="/candidate"
@@ -218,10 +219,10 @@ export default function PublicLandingPage() {
                 1
               </div>
               <h3 className="text-sm font-bold text-slate-900">
-                Download Client
+                Open Web Portal
               </h3>
               <p className="text-xs text-slate-600 leading-relaxed">
-                Download the standalone <code className="bg-white px-1 py-0.5 rounded border border-slate-200 text-slate-800 font-mono text-[11px]">SafeExamClient.exe</code> for Windows 10/11. No installation required.
+                Navigate directly to the official KARE-SES Web Examination Portal on your computer or laptop. No software installation needed.
               </p>
             </div>
 
@@ -231,10 +232,10 @@ export default function PublicLandingPage() {
                 2
               </div>
               <h3 className="text-sm font-bold text-slate-900">
-                Click Secure Launch
+                Authenticate Identity
               </h3>
               <p className="text-xs text-slate-600 leading-relaxed">
-                Click your personalized one-click invitation link or look up your Application Number on this portal to automatically trigger the software.
+                Sign in with your registered Institutional Email, your official Application Number (as password), and your exam security passcode.
               </p>
             </div>
 
@@ -244,10 +245,10 @@ export default function PublicLandingPage() {
                 3
               </div>
               <h3 className="text-sm font-bold text-slate-900">
-                Waiting Room Verification
+                Pre-Flight Verification
               </h3>
               <p className="text-xs text-slate-600 leading-relaxed">
-                The client opens directly into the Waiting Room. Verify your candidate particulars, camera stream, and agree to the academic honor code.
+                Review your allocated department track, verify your live webcam proctoring preview, and agree to the institutional code of conduct.
               </p>
             </div>
 
@@ -257,10 +258,10 @@ export default function PublicLandingPage() {
                 4
               </div>
               <h3 className="text-sm font-bold text-slate-900">
-                Complete &amp; Submit
+                Attempt &amp; Auto-Sync
               </h3>
               <p className="text-xs text-slate-600 leading-relaxed">
-                Navigate your curriculum questions with dual-track routing. Answers are encrypted and saved locally in case of brief connectivity interruptions.
+                Attempt questions routed to your department curriculum. Responses are automatically synchronized to the cloud in real time.
               </p>
             </div>
           </div>
@@ -272,13 +273,13 @@ export default function PublicLandingPage() {
         <div className="max-w-5xl mx-auto px-4 sm:px-6 space-y-10">
           <div className="text-center space-y-2 max-w-xl mx-auto">
             <span className="text-xs font-bold uppercase tracking-widest text-blue-700">
-              Hardware Security Standards
+              Examination Security Standards
             </span>
             <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
               Tamper-Proof Academic Integrity
             </h2>
             <p className="text-xs sm:text-sm text-slate-500">
-              The KARE Safe Exam Client enforces multi-layered Win32 OS-level barriers to protect candidate merit.
+              The KARE-SES Web Examination Engine enforces multi-layered browser barriers and automated AI proctoring to protect candidate merit.
             </p>
           </div>
 
@@ -398,8 +399,8 @@ export default function PublicLandingPage() {
               Candidate Portal
             </Link>
             <span>•</span>
-            <Link href="/api/download/client" className="hover:text-blue-700 transition-colors">
-              Download Client
+            <Link href="/sitting" className="hover:text-blue-700 transition-colors">
+              Exam Sitting Portal
             </Link>
             <span>•</span>
             <Link href="/login" className="text-blue-700 hover:text-blue-800 font-bold transition-colors">

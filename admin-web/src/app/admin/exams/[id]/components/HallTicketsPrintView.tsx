@@ -271,14 +271,14 @@ export function HallTicketsPrintView({
               <div className="bg-amber-50/70 border border-amber-200/80 rounded-xl p-3 text-[10px] text-amber-900 space-y-1">
                 <div className="font-bold uppercase tracking-wider flex items-center text-amber-800">
                   <ShieldCheck className="w-3.5 h-3.5 mr-1" />
-                  KARE-SES Institutional Lockdown Environment Warning
+                  KARE-SES Institutional Online Examination Guidelines
                 </div>
                 <p className="leading-relaxed">
-                  1. Launch the <strong>KARE-SES Windows Desktop Client</strong> and log in with your Application Number and the Passcode printed above.
+                  1. Navigate to the official <strong>KARE-SES Online Examination Portal</strong> in your web browser and sign in using your Institutional Email, Application Number (as password), and the Passcode printed above.
                   <br />
-                  2. Native Win32 hardware security will immediately freeze non-essential background applications. Switching windows, pressing restricted hotkeys (<code>Alt+Tab</code>, <code>WinKey</code>), or attaching secondary monitors will register an automatic infraction strike.
+                  2. Automated browser security enforces fullscreen kiosk mode and active webcam proctoring. Exiting fullscreen, switching tabs, minimizing the window, or connecting secondary displays will register an automatic security infraction strike.
                   <br />
-                  3. Answers are buffered locally and synchronized periodically to the cloud. Do not power off your workstation until submission confirmation is displayed.
+                  3. Answers are automatically preserved and synchronized to the cloud in real time. Do not close or refresh your browser tab until your cryptographic submission receipt is generated.
                 </p>
               </div>
 

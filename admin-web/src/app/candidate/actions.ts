@@ -130,9 +130,8 @@ export async function lookupCandidateExam(
       { expiresIn: secondsUntilEnd }
     );
 
-    const launchUrl = `/launch?ticket=${ticket}`;
-    const protocolUrl = `kareses://launch?ticket=${ticket}`;
     const webSittingUrl = `/sitting?ticket=${ticket}&email=${encodeURIComponent(student.email)}&appNo=${encodeURIComponent(verifiedAppNo)}&passcode=${encodeURIComponent(exam.passcode)}`;
+    const launchUrl = webSittingUrl;
 
     return {
       success: true,
@@ -155,7 +154,6 @@ export async function lookupCandidateExam(
         status: exam.status,
       },
       launchUrl,
-      protocolUrl,
       webSittingUrl,
     };
   } catch (err: any) {

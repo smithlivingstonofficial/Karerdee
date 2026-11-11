@@ -323,10 +323,8 @@ export async function getExamGradebookAction(examId: string): Promise<{
       let clientType: "Web Browser" | "Windows Desktop" | "Unbound" = "Unbound";
       if (sess?.hardware_fingerprint) {
         const fp = sess.hardware_fingerprint.toUpperCase();
-        if (fp.startsWith("WEB") || fp.startsWith("BROWSER")) {
+        if (fp !== "UNBOUND" && fp !== "UNBOUND_RESET_BY_ADMIN") {
           clientType = "Web Browser";
-        } else if (fp !== "UNBOUND" && fp !== "UNBOUND_RESET_BY_ADMIN") {
-          clientType = "Windows Desktop";
         }
       }
 

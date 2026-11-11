@@ -24,6 +24,7 @@ import {
   BarChart2,
   ChevronRight,
   Monitor,
+  Globe,
   Compass,
   AlertTriangle,
 } from "lucide-react";
@@ -769,27 +770,25 @@ export function AdminDashboardClientView({
               )}
             </div>
 
-            {/* Integrated Windows Client Download Action */}
+            {/* Candidate Online Exam Portal Action */}
             <div className="p-3 border-t border-slate-100 bg-slate-50/60 flex items-center justify-between gap-2.5">
               <div className="flex items-center space-x-2 min-w-0">
                 <div className="w-7 h-7 rounded-lg bg-blue-50 text-blue-700 flex items-center justify-center font-bold text-xs border border-blue-100 flex-shrink-0">
-                  <Monitor className="w-3.5 h-3.5" />
+                  <Globe className="w-3.5 h-3.5" />
                 </div>
                 <div className="min-w-0">
-                  <h4 className="text-xs font-bold text-slate-900 truncate">Windows Client</h4>
-                  <p className="text-[10px] text-slate-400 truncate">v3.0.4 • .NET 8 WPF</p>
+                  <h4 className="text-xs font-bold text-slate-900 truncate">Candidate Portal</h4>
+                  <p className="text-[10px] text-slate-400 truncate">Online Web Examination</p>
                 </div>
               </div>
 
-              <a
-                href="/api/download/client"
-                download
-                className="inline-flex items-center px-2.5 py-1 text-[11px] font-bold text-slate-800 bg-white hover:bg-slate-100 border border-slate-200 rounded-lg transition-colors cursor-pointer flex-shrink-0 shadow-2xs"
-                title="Download Desktop Launcher"
+              <Link
+                href="/sitting"
+                className="inline-flex items-center px-2.5 py-1 text-[11px] font-bold text-blue-700 bg-white hover:bg-blue-50 border border-slate-200 rounded-lg transition-colors cursor-pointer flex-shrink-0 shadow-2xs"
+                title="Open Candidate Exam Sitting Portal"
               >
-                <Download className="w-3 h-3 mr-1 text-slate-600" />
-                <span>.exe</span>
-              </a>
+                <span>Open Portal →</span>
+              </Link>
             </div>
           </div>
         </div>

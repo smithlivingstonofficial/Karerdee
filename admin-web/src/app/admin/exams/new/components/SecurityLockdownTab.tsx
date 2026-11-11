@@ -176,7 +176,7 @@ export function SecurityLockdownTab({ general, onChange }: SecurityLockdownTabPr
               {general.strikeAction === "LOCK_WORKSTATION" &&
                 "Locks workstation with a security overlay; candidate cannot proceed without invigilator physical key."}
               {general.strikeAction === "FORCE_SUBMIT" &&
-                "Auto-grades answered items, force-submits exam record, and immediately terminates the desktop client."}
+                "Auto-grades answered items, force-submits exam record, and immediately concludes the candidate session."}
               {general.strikeAction === "FLAG_SILENT" &&
                 "Session continues uninterrupted; telemetry flags candidate audit transcript for post-exam review."}
             </div>
@@ -279,10 +279,10 @@ export function SecurityLockdownTab({ general, onChange }: SecurityLockdownTabPr
               </div>
               <div>
                 <h3 className="text-xs font-bold text-slate-900 tracking-tight">
-                  Win32 Desktop Lockdown Architecture
+                  Online Examination Lockdown Architecture
                 </h3>
                 <p className="text-[10px] text-slate-500">
-                  Native Windows OS defense barriers enforced inside the desktop client.
+                  Active automated defense barriers enforced across candidate examination sitting.
                 </p>
               </div>
             </div>

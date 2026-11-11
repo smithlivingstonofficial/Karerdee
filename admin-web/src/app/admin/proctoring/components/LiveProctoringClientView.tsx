@@ -728,17 +728,10 @@ export function LiveProctoringClientView({
                               <span className="font-mono text-[10px] text-blue-700 font-semibold">
                                 {s.applicationNumber}
                               </span>
-                              {s.hardwareFingerprint?.startsWith("WEB-") || s.hardwareFingerprint?.startsWith("BROWSER-") ? (
-                                <span className="text-[9px] font-bold bg-blue-50 text-blue-700 px-1.5 py-0.2 rounded border border-blue-200 inline-flex items-center">
-                                  <Globe className="w-2.5 h-2.5 mr-0.5" />
-                                  Web
-                                </span>
-                              ) : (
-                                <span className="text-[9px] font-bold bg-slate-100 text-slate-700 px-1.5 py-0.2 rounded border border-slate-200 inline-flex items-center">
-                                  <Monitor className="w-2.5 h-2.5 mr-0.5" />
-                                  Desktop
-                                </span>
-                              )}
+                              <span className="text-[9px] font-bold bg-blue-50 text-blue-700 px-1.5 py-0.2 rounded border border-blue-200 inline-flex items-center">
+                                <Globe className="w-2.5 h-2.5 mr-0.5" />
+                                Online
+                              </span>
                             </div>
                             <div className="text-[10px] text-slate-400 truncate max-w-xs">{s.email}</div>
                           </td>

@@ -72,7 +72,7 @@ export default function ExamDetailsPage() {
         return;
       }
 
-      const launchUrl = `${window.location.origin}/launch?ticket=${data.ticket}`;
+      const launchUrl = `${window.location.origin}/sitting?ticket=${data.ticket}`;
       await navigator.clipboard.writeText(launchUrl);
       setCopiedCandId(candId);
       setTimeout(() => setCopiedCandId(null), 2500);
@@ -100,7 +100,7 @@ export default function ExamDetailsPage() {
         });
         const data = await res.json();
         if (res.ok && data.ticket) {
-          links.push(`${c.fullName} (${c.applicationNumber}) - ${c.email}:\n${window.location.origin}/launch?ticket=${data.ticket}\n`);
+          links.push(`${c.fullName} (${c.applicationNumber}) - ${c.email}:\n${window.location.origin}/sitting?ticket=${data.ticket}\n`);
         }
       }
 

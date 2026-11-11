@@ -91,7 +91,7 @@ export function StudentModal({
                 {student ? "Edit Candidate Record" : "Register Candidate"}
               </h2>
               <p className="text-[11px] text-slate-500">
-                Institutional credentials used for desktop client authentication.
+                Institutional credentials used for candidate exam authentication.
               </p>
             </div>
           </div>
@@ -140,7 +140,7 @@ export function StudentModal({
                 className="w-full px-3.5 py-2 text-sm font-mono uppercase bg-white border border-slate-300 rounded-xl text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-700"
               />
               <p className="text-[11px] text-slate-500 mt-1">
-                Candidate login credential in desktop client.
+                Candidate login credential for examination portal.
               </p>
             </div>
 

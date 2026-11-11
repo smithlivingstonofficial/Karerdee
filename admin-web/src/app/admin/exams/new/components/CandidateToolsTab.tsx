@@ -394,7 +394,7 @@ export function CandidateToolsTab({ general, onChange }: CandidateToolsTabProps)
                   Candidate Honor Code &amp; Guidelines
                 </h3>
                 <p className="text-[10px] text-slate-500">
-                  Displayed on desktop terminal before entering lockdown.
+                  Displayed to candidates in instructions stage before entering examination.
                 </p>
               </div>
             </div>
