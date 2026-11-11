@@ -150,6 +150,8 @@ function CandidateSittingContent() {
   const [secondsRemaining, setSecondsRemaining] = useState<number>(90 * 60);
   const [clockSkewMs, setClockSkewMs] = useState<number>(0);
   const [examEndTime, setExamEndTime] = useState<string | null>(null);
+  const [currentServerIST, setCurrentServerIST] = useState<string>("");
+  const [liveEntranceIST, setLiveEntranceIST] = useState<string>("");
   const [lateEntryNotice, setLateEntryNotice] = useState<{
     delayMinutes: number;
     graceCutoff: string;
@@ -390,12 +392,12 @@ function CandidateSittingContent() {
         barY + 54
       );
 
-      // Row 4: Hardware Fingerprint & ISO UTC Timestamp (Slate-400)
+      // Row 4: Hardware Fingerprint & IST Server Timestamp (Slate-400)
       ctx.font = "9px monospace, sans-serif";
       ctx.fillStyle = "#94A3B8"; // Slate-400
-      const timestampIso = new Date().toISOString();
+      const istTimeStr = formatDateTime(new Date(), true, true);
       const hwStr = `HW: ${sessionId ? sessionId.slice(0, 16) : "BROWSER-SIM"}`;
-      ctx.fillText(`TIME: ${timestampIso}  •  ${hwStr}`, 14, barY + 68);
+      ctx.fillText(`TIME: ${istTimeStr}  •  ${hwStr}`, 14, barY + 68);
 
       return canvas.toDataURL("image/jpeg", 0.75);
     } catch (err) {
@@ -935,6 +937,20 @@ function CandidateSittingContent() {
     };
   }, []);
 
+  // Continuous Indian Standard Time (IST) Clock Engine
+  useEffect(() => {
+    function tickISTClock() {
+      const now = Date.now();
+      setLiveEntranceIST(formatDateTime(now, true, true));
+      const authoritativeServerEpoch = now + clockSkewMs;
+      setCurrentServerIST(formatTime(authoritativeServerEpoch, true, true));
+    }
+
+    tickISTClock();
+    const interval = setInterval(tickISTClock, 1000);
+    return () => clearInterval(interval);
+  }, [clockSkewMs]);
+
   // Initialize Session
   function initializeSession(
     jwtToken: string,
@@ -1028,6 +1044,9 @@ function CandidateSittingContent() {
 
       const data = await res.json();
       if (!res.ok) {
+        if (typeof data.serverEpochMs === "number") {
+          setClockSkewMs(data.serverEpochMs - Date.now());
+        }
         if (data.code === "LATE_ENTRY_DENIED") {
           setLateEntryNotice({
             delayMinutes: data.delayMinutes ?? 15,
@@ -1191,7 +1210,7 @@ function CandidateSittingContent() {
       });
 
       if (res.ok) {
-        setLastSyncedTime(formatTime(new Date(), true));
+        setLastSyncedTime(formatTime(new Date(), true, true));
       }
     } catch (err) {
       console.warn("Background sync retry queued:", err);
@@ -1391,6 +1410,17 @@ function CandidateSittingContent() {
             </div>
           </div>
 
+          {/* Institutional Indian Server Time (IST) Clock */}
+          <div className="bg-slate-50 border border-slate-200/90 rounded-xl px-3.5 py-2.5 flex items-center justify-between text-xs">
+            <div className="flex items-center space-x-2 text-slate-700">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span className="font-bold text-slate-800 text-xs">Server Time (IST):</span>
+            </div>
+            <div className="font-mono font-bold text-blue-700 text-xs">
+              {liveEntranceIST || "Synchronizing IST..."}
+            </div>
+          </div>
+
           {lateEntryNotice && (
             <div className="p-4 rounded-xl bg-amber-50 border border-amber-300 text-xs text-amber-900 space-y-2.5 shadow-2xs">
               <div className="flex items-start space-x-2.5">
@@ -1400,7 +1430,7 @@ function CandidateSittingContent() {
                     Late Arrival Gatekeeping Active (+{lateEntryNotice.delayMinutes} mins late)
                   </div>
                   <div className="text-[11px] text-amber-800 leading-relaxed">
-                    The scheduled entry grace period expired at {formatTime(lateEntryNotice.graceCutoff)}. Your arrival has been submitted to the Chief Proctor. Once an invigilator grants an exception, click below to enter.
+                    The scheduled entry grace period expired at {formatTime(lateEntryNotice.graceCutoff, false, true)}. Your arrival has been submitted to the Chief Proctor. Once an invigilator grants an exception, click below to enter.
                   </div>
                 </div>
               </div>
@@ -2012,6 +2042,18 @@ function CandidateSittingContent() {
               </div>
             )}
 
+            {/* Indian Server Time (IST) Clock */}
+            <div
+              className="hidden sm:flex items-center space-x-1.5 px-3 py-1.5 rounded-xl border bg-slate-50 text-slate-800 border-slate-200/90 font-mono text-xs font-bold shadow-2xs"
+              title="Authoritative Indian Standard Time (IST, UTC+05:30) synchronized with examination server"
+            >
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse flex-shrink-0" />
+              <span className="text-[10px] text-slate-500 font-sans uppercase font-bold tracking-wider">
+                Server IST:
+              </span>
+              <span className="text-slate-900 font-extrabold">{currentServerIST}</span>
+            </div>
+
             {/* Countdown Timer */}
             <div
               className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-xl border font-mono text-xs font-extrabold shadow-2xs ${
@@ -2019,9 +2061,10 @@ function CandidateSittingContent() {
                   ? "bg-red-50 text-red-700 border-red-300 animate-pulse"
                   : "bg-slate-50 text-slate-900 border-slate-200"
               }`}
+              title="Time remaining in examination window"
             >
               <Clock className="w-3.5 h-3.5 text-slate-500" />
-              <span>{timerDisplay}</span>
+              <span>{timerDisplay} Remaining</span>
             </div>
 
             {/* Digital Aids Quick Toggles */}

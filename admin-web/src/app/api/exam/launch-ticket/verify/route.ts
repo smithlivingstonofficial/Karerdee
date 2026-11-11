@@ -87,11 +87,13 @@ export async function POST(req: NextRequest) {
     if (exam.status === "COMPLETED" || exam.status === "ARCHIVED" || serverEpochMs > endTime.getTime()) {
       return NextResponse.json(
         {
-          error: `This examination has concluded. Access is strictly closed.`,
+          error: `This examination has concluded. The scheduled exam window ended at ${formatDateTime(endTime, false, true)}. Access is strictly closed.`,
           code: "EXAM_CONCLUDED",
           serverTime: serverNow.toISOString(),
+          serverTimeIST: formatDateTime(serverNow, true, true),
           serverEpochMs,
           endTime: endTime.toISOString(),
+          endTimeIST: formatDateTime(endTime, false, true),
         },
         { status: 403 }
       );
@@ -102,12 +104,15 @@ export async function POST(req: NextRequest) {
       const minutesUntilStart = Math.ceil((startTime.getTime() - serverEpochMs) / 60000);
       return NextResponse.json(
         {
-          error: `Examination has not commenced yet. Entry opens strictly at ${formatDateTime(startTime)}. Current server time: ${formatDateTime(serverNow)}.`,
+          error: `Examination has not commenced yet. Entry opens strictly at ${formatDateTime(startTime, false, true)}. Current server time: ${formatDateTime(serverNow, true, true)}.`,
           code: "EXAM_NOT_STARTED",
           serverTime: serverNow.toISOString(),
+          serverTimeIST: formatDateTime(serverNow, true, true),
           serverEpochMs,
           startTime: startTime.toISOString(),
+          startTimeIST: formatDateTime(startTime, false, true),
           endTime: endTime.toISOString(),
+          endTimeIST: formatDateTime(endTime, false, true),
           minutesUntilStart,
         },
         { status: 403 }
@@ -271,9 +276,12 @@ export async function POST(req: NextRequest) {
             error: `Late entry restricted. Examination commenced ${minutesLate} minutes ago (Grace entry window was ${graceBufferMinutes} minutes). Please report to the Chief Proctor.`,
             code: "LATE_ENTRY_DENIED",
             serverTime: serverNow.toISOString(),
+            serverTimeIST: formatDateTime(serverNow, true, true),
             serverEpochMs,
             startTime: startTime.toISOString(),
+            startTimeIST: formatDateTime(startTime, false, true),
             graceCutoff: graceCutoff.toISOString(),
+            graceCutoffIST: formatDateTime(graceCutoff, false, true),
           },
           { status: 403 }
         );
@@ -442,9 +450,12 @@ export async function POST(req: NextRequest) {
       token,
       sessionId: session.id,
       serverTime: serverNow.toISOString(),
+      serverTimeIST: formatDateTime(serverNow, true, true),
       serverEpochMs,
       startTime: startTime.toISOString(),
+      startTimeIST: formatDateTime(startTime, false, true),
       endTime: endTime.toISOString(),
+      endTimeIST: formatDateTime(endTime, false, true),
       graceCutoff: graceCutoff.toISOString(),
       remainingSeconds: serverRemainingSeconds,
       candidate: {
@@ -462,9 +473,12 @@ export async function POST(req: NextRequest) {
         durationMinutes: exam.duration_minutes + (session.extra_time_minutes || 0),
         remainingSeconds: serverRemainingSeconds,
         serverTime: serverNow.toISOString(),
+        serverTimeIST: formatDateTime(serverNow, true, true),
         serverEpochMs,
         startTime: startTime.toISOString(),
+        startTimeIST: formatDateTime(startTime, false, true),
         endTime: endTime.toISOString(),
+        endTimeIST: formatDateTime(endTime, false, true),
         maxStrikes: exam.max_strikes,
         currentStrikes: session.strikes_count || 0,
         status: session.status,

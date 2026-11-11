@@ -227,7 +227,7 @@ export default function ExamResultsGradebookPage() {
           Compiling Examination Gradebook &amp; Analytics...
         </h2>
         <p className="text-xs text-slate-500">
-          Aggregating all examination questions, candidate scores, and departmental benchmarks.
+          Evaluating candidate marks and responses strictly against their department-allocated questions.
         </p>
       </div>
     );
@@ -1013,7 +1013,7 @@ export default function ExamResultsGradebookPage() {
             {/* Filter Bar inside Modal */}
             <div className="px-5 py-2.5 border-b border-slate-100 flex items-center justify-between bg-white">
               <span className="text-xs font-bold text-slate-700">
-                Complete Examination Paper ({inspectedQuestions.length} Questions Evaluated)
+                Allocated Examination Questions ({inspectedQuestions.length} Questions)
               </span>
 
               <div className="flex items-center space-x-1.5 text-xs">

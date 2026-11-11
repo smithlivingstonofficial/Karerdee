@@ -16,6 +16,7 @@ import {
   ShieldCheck,
   Sparkles,
 } from "lucide-react";
+import { formatToISTDateTimeLocal, parseISTDateTime } from "@/lib/date";
 
 interface GeneralSetupTabProps {
   general: ExamGeneralState;
@@ -43,21 +44,12 @@ export function GeneralSetupTab({ general, onChange }: GeneralSetupTabProps) {
 
   const durationPresets = [45, 60, 90, 120, 180];
 
-  function formatToDateTimeLocal(date: Date): string {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, "0");
-    const day = String(date.getDate()).padStart(2, "0");
-    const hours = String(date.getHours()).padStart(2, "0");
-    const minutes = String(date.getMinutes()).padStart(2, "0");
-    return `${year}-${month}-${day}T${hours}:${minutes}`;
-  }
-
   function calculateEndTime(startStr: string, durationMins: number): string {
     if (!startStr) return "";
-    const startDate = new Date(startStr);
+    const startDate = parseISTDateTime(startStr);
     if (isNaN(startDate.getTime())) return "";
     const endDate = new Date(startDate.getTime() + durationMins * 60 * 1000);
-    return formatToDateTimeLocal(endDate);
+    return formatToISTDateTimeLocal(endDate);
   }
 
   function handleStartTimeChange(newStart: string) {
@@ -79,7 +71,7 @@ export function GeneralSetupTab({ general, onChange }: GeneralSetupTabProps) {
 
   function handleSetStartNow() {
     const now = new Date();
-    const startStr = formatToDateTimeLocal(now);
+    const startStr = formatToISTDateTimeLocal(now);
     handleStartTimeChange(startStr);
   }
 
@@ -339,8 +331,11 @@ export function GeneralSetupTab({ general, onChange }: GeneralSetupTabProps) {
           <div className="bg-slate-50/70 border border-slate-200/80 rounded-xl p-2.5 space-y-1.5">
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-1.5">
-                <label className="text-[11px] font-bold text-slate-800">
-                  Admission Window (Optional)
+                <label className="text-[11px] font-bold text-slate-800 flex items-center gap-1">
+                  <span>Admission Window</span>
+                  <span className="text-[9px] font-extrabold text-blue-700 bg-blue-100/70 px-1 py-0.2 rounded border border-blue-200">
+                    IST (UTC+05:30)
+                  </span>
                 </label>
                 {general.startTime && general.endTime && (
                   <span className="text-[9px] font-bold text-blue-700 bg-blue-50 px-1.5 py-0.2 rounded border border-blue-200 flex items-center">

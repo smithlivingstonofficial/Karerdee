@@ -473,10 +473,15 @@ namespace SafeExamClient
             };
             _examCountdownTimer.Tick += (s, args) =>
             {
+                // Authoritative Indian Standard Time (IST, UTC+05:30) Calculation
+                long currentServerEpoch = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + _clockSkewMs;
+                var serverNowOffset = DateTimeOffset.FromUnixTimeMilliseconds(currentServerEpoch);
+                var serverNowIst = serverNowOffset.ToOffset(TimeSpan.FromHours(5.5));
+                LblServerTime.Text = serverNowIst.ToString("hh:mm:ss tt") + " IST";
+
                 if (_examEndTimeUtc.HasValue)
                 {
-                    long currentServerEpoch = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + _clockSkewMs;
-                    var serverNowUtc = DateTimeOffset.FromUnixTimeMilliseconds(currentServerEpoch).UtcDateTime;
+                    var serverNowUtc = serverNowOffset.UtcDateTime;
                     int remaining = (int)Math.Max(0, (_examEndTimeUtc.Value - serverNowUtc).TotalSeconds);
                     _secondsRemaining = remaining;
                 }

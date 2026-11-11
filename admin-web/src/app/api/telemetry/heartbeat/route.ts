@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import jwt from "jsonwebtoken";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { formatDateTime } from "@/lib/date";
 
 interface HeartbeatRequestBody {
   sessionId: string;
@@ -114,6 +115,7 @@ export async function POST(req: NextRequest) {
       extraTimeMinutes: session.extra_time_minutes || 0,
       strikesCount: session.strikes_count || 0,
       serverTime: serverNow.toISOString(),
+      serverTimeIST: formatDateTime(serverNow, true, true),
       serverEpochMs,
       serverCalculatedSecondsRemaining: remainingSeconds,
     });

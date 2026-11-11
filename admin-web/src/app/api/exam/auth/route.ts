@@ -88,11 +88,13 @@ export async function POST(req: NextRequest) {
     if (exam.status === "COMPLETED" || exam.status === "ARCHIVED" || serverEpochMs > endTime.getTime()) {
       return NextResponse.json(
         {
-          error: `This examination has concluded. The scheduled exam window ended at ${formatDateTime(endTime)}. Access is strictly closed.`,
+          error: `This examination has concluded. The scheduled exam window ended at ${formatDateTime(endTime, false, true)}. Access is strictly closed.`,
           code: "EXAM_CONCLUDED",
           serverTime: serverNow.toISOString(),
+          serverTimeIST: formatDateTime(serverNow, true, true),
           serverEpochMs,
           endTime: endTime.toISOString(),
+          endTimeIST: formatDateTime(endTime, false, true),
         },
         { status: 403 }
       );
@@ -103,12 +105,15 @@ export async function POST(req: NextRequest) {
       const minutesUntilStart = Math.ceil((startTime.getTime() - serverEpochMs) / 60000);
       return NextResponse.json(
         {
-          error: `Examination has not commenced yet. Entry opens strictly at ${formatDateTime(startTime)}. Current server time: ${formatDateTime(serverNow)}.`,
+          error: `Examination has not commenced yet. Entry opens strictly at ${formatDateTime(startTime, false, true)}. Current server time: ${formatDateTime(serverNow, true, true)}.`,
           code: "EXAM_NOT_STARTED",
           serverTime: serverNow.toISOString(),
+          serverTimeIST: formatDateTime(serverNow, true, true),
           serverEpochMs,
           startTime: startTime.toISOString(),
+          startTimeIST: formatDateTime(startTime, false, true),
           endTime: endTime.toISOString(),
+          endTimeIST: formatDateTime(endTime, false, true),
           minutesUntilStart,
         },
         { status: 403 }
@@ -203,7 +208,7 @@ export async function POST(req: NextRequest) {
 
       if (conflictingSession) {
         const otherExam = (conflictingSession as any).exam;
-        const otherEndTimeFormatted = formatDateTime(otherExam.end_time);
+        const otherEndTimeFormatted = formatDateTime(otherExam.end_time, false, true);
         return NextResponse.json(
           {
             error: `Concurrent Examination Restricted: You already have an unfinished, active session in "${otherExam.title}". Simultaneous multiple exam sittings are strictly prohibited.\n\nYou may only access this exam once your active sitting is submitted or its scheduled window concludes at ${otherEndTimeFormatted}.`,
@@ -350,12 +355,15 @@ export async function POST(req: NextRequest) {
 
         return NextResponse.json(
           {
-            error: `Late Entry Restricted: The examination entry grace period of ${graceBufferMinutes} minutes expired at ${formatTime(graceCutoff)}. You arrived +${delayMinutes} minutes after scheduled start time.\n\nYour attempt has been reported to the Chief Proctor. If an invigilator grants an exception, you will be able to retry and access the exam.`,
+            error: `Late Entry Restricted: The examination entry grace period of ${graceBufferMinutes} minutes expired at ${formatTime(graceCutoff, false, true)}. You arrived +${delayMinutes} minutes after scheduled start time.\n\nYour attempt has been reported to the Chief Proctor. If an invigilator grants an exception, you will be able to retry and access the exam.`,
             code: "LATE_ENTRY_DENIED",
             serverTime: serverNow.toISOString(),
+            serverTimeIST: formatDateTime(serverNow, true, true),
             serverEpochMs,
             startTime: startTime.toISOString(),
+            startTimeIST: formatDateTime(startTime, false, true),
             graceCutoff: graceCutoff.toISOString(),
+            graceCutoffIST: formatDateTime(graceCutoff, false, true),
             delayMinutes,
             sessionId: session!.id,
             pendingProctorApproval: true,
@@ -515,9 +523,12 @@ export async function POST(req: NextRequest) {
       token,
       sessionId: session.id,
       serverTime: serverNow.toISOString(),
+      serverTimeIST: formatDateTime(serverNow, true, true),
       serverEpochMs,
       startTime: startTime.toISOString(),
+      startTimeIST: formatDateTime(startTime, false, true),
       endTime: endTime.toISOString(),
+      endTimeIST: formatDateTime(endTime, false, true),
       graceCutoff: graceCutoff.toISOString(),
       remainingSeconds: serverRemainingSeconds,
       candidate: {
@@ -535,9 +546,12 @@ export async function POST(req: NextRequest) {
         durationMinutes: exam.duration_minutes + (session.extra_time_minutes || 0),
         remainingSeconds: serverRemainingSeconds,
         serverTime: serverNow.toISOString(),
+        serverTimeIST: formatDateTime(serverNow, true, true),
         serverEpochMs,
         startTime: startTime.toISOString(),
+        startTimeIST: formatDateTime(startTime, false, true),
         endTime: endTime.toISOString(),
+        endTimeIST: formatDateTime(endTime, false, true),
         maxStrikes: exam.max_strikes,
         currentStrikes: session.strikes_count || 0,
         status: session.status,

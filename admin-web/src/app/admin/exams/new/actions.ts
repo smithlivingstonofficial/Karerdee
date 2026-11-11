@@ -5,6 +5,7 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 import { revalidatePath } from "next/cache";
 import { ExamGeneralState, SectionState, QuestionState, QuestionBankItem } from "./types";
 import { Department } from "@/types/database.types";
+import { parseISTDateTime, formatToISTDateTimeLocal } from "@/lib/date";
 
 export interface SaveExamPayload {
   examId?: string | null;
@@ -179,10 +180,10 @@ export async function saveExamAction(payload: SaveExamPayload) {
     const examStatus = isDraft ? "DRAFT" : "SCHEDULED";
     const resolvedPasscode = payload.exam.passcode?.trim() || "DRAFT";
     const resolvedStartTime = payload.exam.startTime
-      ? new Date(payload.exam.startTime).toISOString()
+      ? parseISTDateTime(payload.exam.startTime).toISOString()
       : new Date().toISOString();
     const resolvedEndTime = payload.exam.endTime
-      ? new Date(payload.exam.endTime).toISOString()
+      ? parseISTDateTime(payload.exam.endTime).toISOString()
       : new Date(Date.now() + 86400000).toISOString();
 
     if (examId) {
@@ -553,8 +554,8 @@ export async function getExamForEditingAction(examId: string): Promise<{
       instructions: exam.instructions || config.instructions || "",
       passcode: exam.passcode === "DRAFT" ? "" : exam.passcode || "",
       durationMinutes: exam.duration_minutes || 90,
-      startTime: exam.start_time ? new Date(exam.start_time).toISOString().slice(0, 16) : "",
-      endTime: exam.end_time ? new Date(exam.end_time).toISOString().slice(0, 16) : "",
+      startTime: exam.start_time ? formatToISTDateTimeLocal(exam.start_time) : "",
+      endTime: exam.end_time ? formatToISTDateTimeLocal(exam.end_time) : "",
       maxStrikes: exam.max_strikes || 3,
       randomizeQuestions: exam.randomize_questions ?? true,
       randomizeOptions: config.randomize_options ?? true,

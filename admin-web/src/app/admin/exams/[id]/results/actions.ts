@@ -138,8 +138,12 @@ export async function getExamGradebookAction(examId: string): Promise<{
       .order("order_index", { ascending: true });
 
     const sectionTitleMap = new Map<string, string>();
+    const sectionCommonMap = new Map<string, boolean>();
+    const sectionTargetDeptsMap = new Map<string, string[]>();
     (sections || []).forEach((sec) => {
       sectionTitleMap.set(sec.id, sec.title);
+      sectionCommonMap.set(sec.id, Boolean(sec.is_common));
+      sectionTargetDeptsMap.set(sec.id, sec.target_departments || []);
     });
 
     // Fetch ALL questions for this exam paper
@@ -168,7 +172,7 @@ export async function getExamGradebookAction(examId: string): Promise<{
       return { error: qErr.message || "Failed to load examination questions." };
     }
 
-    // Calculate total possible points across ALL questions in the exam paper
+    // Calculate total possible points across ALL questions in the master exam bank
     const questionsMap = new Map<string, any>();
     let totalPossiblePoints = 0;
 
@@ -177,7 +181,7 @@ export async function getExamGradebookAction(examId: string): Promise<{
       totalPossiblePoints += Number(q.points) || 1;
     });
 
-    // 3. Fetch All Sessions for this Exam first so no active/submitted candidates are missed
+    // 3. Fetch All Sessions for this Exam
     const { data: sessions, error: sessErr } = await supabaseAdmin
       .from("exam_sessions")
       .select(`
@@ -239,7 +243,7 @@ export async function getExamGradebookAction(examId: string): Promise<{
       return { error: stuErr.message || "Failed to load candidate roster." };
     }
 
-    // Candidates: Include any candidate who sat the exam, or candidates enrolled in the target faculties
+    // Candidates: Include any candidate who sat the exam, or candidates matching target departments
     const eligibleStudents = (studentsData || []).filter((s: any) => {
       if (sessionByStudentId.has(s.id)) return true;
       if (targetDeptCodes.size === 0) return true;
@@ -272,6 +276,7 @@ export async function getExamGradebookAction(examId: string): Promise<{
     // 6. Aggregate Candidate Gradebook Items
     const candidatesList: CandidateGradebookItem[] = [];
     let sumScore = 0;
+    let sumPercentage = 0;
     let highest = 0;
     let lowest = 999999;
     let submittedCount = 0;
@@ -325,17 +330,66 @@ export async function getExamGradebookAction(examId: string): Promise<{
         }
       }
 
-      // Build Question Breakdown for this student covering ALL questions of the exam paper
+      const deptObj = Array.isArray((student as any).department)
+        ? (student as any).department[0]
+        : (student as any).department;
+      const studentDeptCode = deptObj?.code?.trim()?.toUpperCase() || "";
+
+      // Candidate's submissions lookup
       const userSubmissions = sess ? submissionsBySession.get(sess.id) || [] : [];
       const userSubMap = new Map<string, any>();
       userSubmissions.forEach((sub: any) => {
         userSubMap.set(sub.question_id, sub);
       });
 
+      // =====================================================================
+      // STRICT CANDIDATE QUESTION ALLOCATION:
+      // A candidate is ONLY evaluated against:
+      // 1. Common Core questions (is_common = true), OR
+      // 2. Department track questions matching their enrolled department, OR
+      // 3. Questions the candidate actually submitted answers for.
+      // Questions from other departments are NEVER allocated or counted against them!
+      // =====================================================================
+      const allocatedQuestions = (dbQuestions || []).filter((q: any) => {
+        // If candidate submitted an answer for this question, always include it
+        if (userSubMap.has(q.id)) {
+          return true;
+        }
+
+        const isCommonSection = sectionCommonMap.get(q.section_id) ?? false;
+        if (isCommonSection) {
+          return true;
+        }
+
+        // Check if section restricts by target_departments
+        const secTargetDepts = sectionTargetDeptsMap.get(q.section_id) || [];
+        if (secTargetDepts.length > 0 && studentDeptCode) {
+          const isDeptInSec = secTargetDepts.some(
+            (d: string) => d.trim().toUpperCase() === studentDeptCode
+          );
+          if (!isDeptInSec) return false;
+        }
+
+        // Check question-level rubric criteria target_department
+        const targetDept = q.rubric_criteria?.target_department?.trim()?.toUpperCase();
+        if (!targetDept || targetDept === "GENERAL" || targetDept === "COMMON") {
+          return true;
+        }
+
+        return targetDept === studentDeptCode;
+      });
+
+      // Max score and total questions strictly for this candidate's allocation
+      const candidateMaxScore = allocatedQuestions.reduce(
+        (acc, q) => acc + (Number(q.points) || 1),
+        0
+      );
+      const candidateTotalQuestions = allocatedQuestions.length;
+
       const questionBreakdown: CandidateQuestionResult[] = [];
       let attemptedCount = 0;
 
-      (dbQuestions || []).forEach((q: any) => {
+      allocatedQuestions.forEach((q: any) => {
         const sectionTitle = sectionTitleMap.get(q.section_id) || "Section";
         const optionsList = q.question_options || [];
         const optMap = new Map<string, string>();
@@ -375,7 +429,7 @@ export async function getExamGradebookAction(examId: string): Promise<{
           isCorrect = awardedPoints > 0;
         }
 
-        // Update question item analysis stats if session submitted or appeared
+        // Update question item analysis stats
         if (isSubmitted || isAppeared) {
           const qStat = questionStatsMap.get(q.id);
           if (qStat) {
@@ -409,7 +463,7 @@ export async function getExamGradebookAction(examId: string): Promise<{
         });
       });
 
-      // Calculate candidate's actual earned marks across their answers
+      // Calculate candidate's actual earned marks across their allocated questions
       const earnedScore = Math.max(
         0,
         questionBreakdown.reduce((acc, curr) => acc + curr.awardedPoints, 0)
@@ -426,10 +480,10 @@ export async function getExamGradebookAction(examId: string): Promise<{
         calculatedScore = 0;
       }
 
-      // Percentage scored against the entire exam paper total marks
+      // Percentage scored against candidate's ALLOCATED maximum marks
       const percentage =
-        totalPossiblePoints > 0
-          ? Math.round((calculatedScore / totalPossiblePoints) * 1000) / 10
+        candidateMaxScore > 0
+          ? Math.round((calculatedScore / candidateMaxScore) * 1000) / 10
           : 0;
 
       let result: "PASS" | "FAIL" | "PENDING" = "PENDING";
@@ -439,6 +493,7 @@ export async function getExamGradebookAction(examId: string): Promise<{
         else failCount++;
 
         sumScore += calculatedScore;
+        sumPercentage += percentage;
         scoresForMedian.push(calculatedScore);
         if (calculatedScore > highest) highest = calculatedScore;
         if (calculatedScore < lowest) lowest = calculatedScore;
@@ -449,10 +504,6 @@ export async function getExamGradebookAction(examId: string): Promise<{
       const status: "SUBMITTED" | "IN_PROGRESS" | "LOCKED" | "DISQUALIFIED" | "ABSENT" = sess
         ? (sess.status as any)
         : "ABSENT";
-
-      const deptObj = Array.isArray((student as any).department)
-        ? (student as any).department[0]
-        : (student as any).department;
 
       candidatesList.push({
         sessionId: sess?.id,
@@ -465,7 +516,7 @@ export async function getExamGradebookAction(examId: string): Promise<{
         departmentName: deptObj?.name || "General Discipline",
         status,
         score: calculatedScore,
-        maxScore: totalPossiblePoints,
+        maxScore: candidateMaxScore,
         percentage,
         result,
         startedAt: sess?.started_at,
@@ -474,7 +525,7 @@ export async function getExamGradebookAction(examId: string): Promise<{
         strikesCount: sess?.strikes_count || 0,
         clientType,
         questionsAttempted: attemptedCount,
-        totalQuestions: (dbQuestions || []).length,
+        totalQuestions: candidateTotalQuestions,
         questionBreakdown,
       });
     }
@@ -495,7 +546,7 @@ export async function getExamGradebookAction(examId: string): Promise<{
     const averageScore =
       submittedCount > 0 ? Math.round((sumScore / submittedCount) * 10) / 10 : 0;
     const averagePercentage =
-      totalPossiblePoints > 0 ? Math.round((averageScore / totalPossiblePoints) * 1000) / 10 : 0;
+      submittedCount > 0 ? Math.round((sumPercentage / submittedCount) * 10) / 10 : 0;
     const overallPassRate =
       submittedCount > 0 ? Math.round((passCount / submittedCount) * 1000) / 10 : 0;
 
@@ -509,6 +560,7 @@ export async function getExamGradebookAction(examId: string): Promise<{
         submitted: number;
         pass: number;
         sumScores: number;
+        sumPercentages: number;
       }
     >();
 
@@ -521,6 +573,7 @@ export async function getExamGradebookAction(examId: string): Promise<{
         submitted: 0,
         pass: 0,
         sumScores: 0,
+        sumPercentages: 0,
       };
 
       existing.enrolled++;
@@ -529,6 +582,7 @@ export async function getExamGradebookAction(examId: string): Promise<{
         existing.submitted++;
         if (c.result === "PASS") existing.pass++;
         existing.sumScores += c.score;
+        existing.sumPercentages += c.percentage;
       }
 
       deptMap.set(dCode, existing);
@@ -538,7 +592,7 @@ export async function getExamGradebookAction(examId: string): Promise<{
       ([code, d]) => {
         const avg = d.submitted > 0 ? Math.round((d.sumScores / d.submitted) * 10) / 10 : 0;
         const avgPct =
-          totalPossiblePoints > 0 ? Math.round((avg / totalPossiblePoints) * 1000) / 10 : 0;
+          d.submitted > 0 ? Math.round((d.sumPercentages / d.submitted) * 10) / 10 : 0;
         const passRate =
           d.submitted > 0 ? Math.round((d.pass / d.submitted) * 1000) / 10 : 0;
 
@@ -556,7 +610,7 @@ export async function getExamGradebookAction(examId: string): Promise<{
       }
     );
 
-    // 8. Question Item Analysis for ALL questions in the exam
+    // 8. Question Item Analysis for questions in the exam
     const questionAnalytics: QuestionAnalyticsItem[] = (dbQuestions || []).map((q: any) => {
       const stat = questionStatsMap.get(q.id) || {
         attempts: 0,
@@ -564,7 +618,6 @@ export async function getExamGradebookAction(examId: string): Promise<{
         incorrect: 0,
         skipped: 0,
       };
-      const totalExamined = Math.max(1, appearedCount || submittedCount);
       const accuracyRate =
         stat.attempts > 0 ? Math.round((stat.correct / stat.attempts) * 1000) / 10 : 0;
 

@@ -290,14 +290,26 @@
                         </StackPanel>
                     </StackPanel>
 
-                    <!-- Center: Countdown Timer -->
-                    <Border Grid.Column="1" HorizontalAlignment="Center" Background="#F8FAFC" BorderBrush="#E2E8F0" BorderThickness="1" CornerRadius="20" Padding="14,6">
-                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                            <TextBlock Text="⏱" FontSize="14" Foreground="#1D4ED8" Margin="0,0,6,0" VerticalAlignment="Center" />
-                            <TextBlock x:Name="LblCountdown" Text="01:29:59" FontSize="14" FontWeight="Bold" FontFamily="Consolas" Foreground="#0F172A" VerticalAlignment="Center" />
-                            <TextBlock Text=" Remaining" FontSize="12" Foreground="#64748B" Margin="4,0,0,0" VerticalAlignment="Center" />
-                        </StackPanel>
-                    </Border>
+                    <!-- Center: Indian Server Time (IST) & Countdown Timer -->
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
+                        <!-- IST Server Clock Pill -->
+                        <Border Background="#F8FAFC" BorderBrush="#E2E8F0" BorderThickness="1" CornerRadius="20" Padding="12,6" Margin="0,0,8,0">
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <Ellipse Width="7" Height="7" Fill="#10B981" Margin="0,0,6,0" VerticalAlignment="Center" />
+                                <TextBlock Text="IST Server: " FontSize="11" FontWeight="SemiBold" Foreground="#64748B" VerticalAlignment="Center" />
+                                <TextBlock x:Name="LblServerTime" Text="--:--:-- IST" FontSize="13" FontWeight="Bold" FontFamily="Consolas" Foreground="#0F172A" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Remaining Timer Pill -->
+                        <Border Background="#F8FAFC" BorderBrush="#E2E8F0" BorderThickness="1" CornerRadius="20" Padding="12,6">
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <TextBlock Text="⏱" FontSize="14" Foreground="#1D4ED8" Margin="0,0,6,0" VerticalAlignment="Center" />
+                                <TextBlock x:Name="LblCountdown" Text="01:29:59" FontSize="13" FontWeight="Bold" FontFamily="Consolas" Foreground="#0F172A" VerticalAlignment="Center" />
+                                <TextBlock Text=" Remaining" FontSize="11" Foreground="#64748B" Margin="4,0,0,0" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
 
                     <!-- Right Controls: Strikes, Sync, Calculator, Submit, Exit -->
                     <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
