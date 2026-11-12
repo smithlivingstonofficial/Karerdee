@@ -400,10 +400,11 @@ export async function saveExamAction(payload: SaveExamPayload) {
 
     const savedQuestions: QuestionState[] = [];
 
-    for (const { q, resolvedSectionId, orderIndex } of questionsToSave) {
-      const { data: dbQ, error: qError } = await supabaseAdmin
-        .from("exam_questions")
-        .insert({
+    if (questionsToSave.length > 0) {
+      // 1. High-Performance Atomic Batch Insert for All Questions
+      const questionsInsertPayload = questionsToSave.map(({ q, resolvedSectionId, orderIndex }) => {
+        const cleanDept = q.targetDepartment ? q.targetDepartment.trim().toUpperCase() : null;
+        return {
           exam_id: examId,
           section_id: resolvedSectionId,
           question_type: q.questionType || "MCQ_SINGLE",
@@ -413,62 +414,80 @@ export async function saveExamAction(payload: SaveExamPayload) {
           negative_points: payload.exam.enableNegativeMarking ? q.negativePoints : 0,
           rubric_criteria: sectionIsCommonMap.get(resolvedSectionId)
             ? null
-            : q.targetDepartment
-            ? { target_department: q.targetDepartment }
+            : cleanDept
+            ? { target_department: cleanDept }
             : null,
           order_index: orderIndex,
-        })
-        .select("*")
-        .single();
+        };
+      });
 
-      if (qError || !dbQ) {
-        console.error("Question save error:", qError);
-        return { error: `Failed to save question: ${q.prompt.slice(0, 30)}...` };
+      const { data: insertedDbQuestions, error: qBatchError } = await supabaseAdmin
+        .from("exam_questions")
+        .insert(questionsInsertPayload)
+        .select("id, exam_id, section_id, question_type, prompt, code_snippet, points, negative_points, order_index, rubric_criteria");
+
+      if (qBatchError || !insertedDbQuestions || insertedDbQuestions.length === 0) {
+        console.error("Batch question save error:", qBatchError);
+        return { error: `Failed to save examination questions: ${qBatchError?.message || "Unknown error"}` };
       }
 
-      const savedOptions: any[] = [];
+      // 2. High-Performance Atomic Batch Insert for All Question Options
+      const optionsToInsert: any[] = [];
+      for (let i = 0; i < questionsToSave.length; i++) {
+        const dbQ = insertedDbQuestions[i];
+        const { q } = questionsToSave[i];
+        if (q.options && q.options.length > 0) {
+          q.options.forEach((opt, optIdx) => {
+            optionsToInsert.push({
+              question_id: dbQ.id,
+              option_text: opt.text?.trim() || `Option ${optIdx + 1}`,
+              is_correct: Boolean(opt.isCorrect),
+              order_index: opt.orderIndex || optIdx + 1,
+            });
+          });
+        }
+      }
 
-      // Insert Options
-      if (q.options && q.options.length > 0) {
-        const optionsToInsert = q.options.map((opt, optIdx) => ({
-          question_id: dbQ.id,
-          option_text: opt.text?.trim() || `Option ${optIdx + 1}`,
-          is_correct: Boolean(opt.isCorrect),
-          order_index: opt.orderIndex || optIdx + 1,
-        }));
-
-        const { data: dbOptions, error: optError } = await supabaseAdmin
+      const insertedOptionsMap = new Map<string, any[]>();
+      if (optionsToInsert.length > 0) {
+        const { data: dbOptions, error: optBatchError } = await supabaseAdmin
           .from("question_options")
           .insert(optionsToInsert)
-          .select("*");
+          .select("id, question_id, option_text, is_correct, order_index");
 
-        if (optError) {
-          console.error("Option save error:", optError);
-          return { error: "Failed to save options for question." };
+        if (optBatchError) {
+          console.error("Batch option save error:", optBatchError);
+          return { error: `Failed to save question options: ${optBatchError?.message || "Unknown error"}` };
         }
 
         (dbOptions || []).forEach((opt: any) => {
-          savedOptions.push({
+          const list = insertedOptionsMap.get(opt.question_id) || [];
+          list.push({
             id: opt.id,
             text: opt.option_text,
             isCorrect: opt.is_correct,
             orderIndex: opt.order_index,
           });
+          insertedOptionsMap.set(opt.question_id, list);
         });
       }
 
-      savedQuestions.push({
-        id: dbQ.id,
-        sectionId: resolvedSectionId,
-        questionType: dbQ.question_type,
-        prompt: dbQ.prompt,
-        codeSnippet: dbQ.code_snippet,
-        points: Number(dbQ.points ?? 1),
-        negativePoints: Number(dbQ.negative_points ?? 0),
-        orderIndex: dbQ.order_index,
-        targetDepartment: q.targetDepartment,
-        options: savedOptions,
-      });
+      for (let i = 0; i < questionsToSave.length; i++) {
+        const dbQ = insertedDbQuestions[i];
+        const { q, resolvedSectionId } = questionsToSave[i];
+        savedQuestions.push({
+          id: dbQ.id,
+          sectionId: resolvedSectionId,
+          questionType: dbQ.question_type,
+          prompt: dbQ.prompt,
+          codeSnippet: dbQ.code_snippet,
+          points: Number(dbQ.points ?? 1),
+          negativePoints: Number(dbQ.negative_points ?? 0),
+          orderIndex: dbQ.order_index,
+          targetDepartment: q.targetDepartment,
+          options: insertedOptionsMap.get(dbQ.id) || [],
+        });
+      }
     }
 
     revalidatePath("/");

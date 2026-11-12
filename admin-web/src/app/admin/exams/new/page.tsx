@@ -128,7 +128,7 @@ function ExamAuthoringStudioContent() {
       id: "sec-default-part-b",
       title: "Part B — Department Core Specialization",
       isCommon: false,
-      targetDepartments: [""],
+      targetDepartments: [],
       defaultPoints: 1.0,
       defaultNegativePoints: 0.25,
       orderIndex: 2,

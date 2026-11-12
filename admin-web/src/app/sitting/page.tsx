@@ -1349,7 +1349,8 @@ function CandidateSittingContent() {
     .padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
   const isTimeCritical = secondsRemaining < 300; // < 5 mins
 
-  // Filter questions for active section
+  // Active section and filtered questions
+  const activeSection = (exam?.sections || []).find((s) => s.id === activeSectionId) || (exam?.sections || [])[0];
   const currentSectionQuestions = (exam?.questions || []).filter(
     (q) => q.sectionId === activeSectionId
   );
@@ -2329,10 +2330,15 @@ function CandidateSittingContent() {
 
             {/* Matrix of Questions in Active Section */}
             <div className="pt-2">
-              <span className="text-[10px] font-bold uppercase text-slate-400 block mb-2">
-                Questions in Active Section
-              </span>
-              <div className="grid grid-cols-5 gap-2 max-h-64 overflow-y-auto p-1">
+              <div className="flex items-center justify-between mb-2 pb-1 border-b border-slate-100">
+                <span className="text-[11px] font-bold text-slate-800 truncate max-w-[200px]" title={activeSection?.title}>
+                  {activeSection?.title || "Active Section"}
+                </span>
+                <span className="text-[10px] font-extrabold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200">
+                  {currentSectionQuestions.length} Questions
+                </span>
+              </div>
+              <div className="grid grid-cols-5 gap-2 max-h-[440px] overflow-y-auto p-1 pr-1.5">
                 {currentSectionQuestions.map((q, idx) => {
                   const isCurrent = idx === activeQuestionIndex;
                   const isAnswered = (answers[q.id] || []).length > 0;

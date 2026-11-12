@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import jwt from "jsonwebtoken";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { formatDateTime, formatTime } from "@/lib/date";
+import { shuffleWithSeed } from "@/lib/utils";
 
 interface AuthRequestBody {
   email?: string;
@@ -237,11 +238,17 @@ export async function POST(req: NextRequest) {
 
     if (sectionsError) throw sectionsError;
 
+    const cleanStudentDept = studentDeptCode?.trim()?.toUpperCase() || "";
+
     // Filter: Include if Common Core OR Candidate's Department is explicitly targeted
     const applicableSections = (sections || []).filter((sec: any) => {
       if (sec.is_common) return true;
       if (!sec.target_departments || sec.target_departments.length === 0) return true;
-      return sec.target_departments.includes(studentDeptCode);
+      const validDepts = sec.target_departments
+        .map((d: string) => d?.trim()?.toUpperCase())
+        .filter(Boolean);
+      if (validDepts.length === 0) return true;
+      return cleanStudentDept ? validDepts.includes(cleanStudentDept) : true;
     });
 
     const applicableSectionIds = applicableSections.map((s: any) => s.id);
@@ -265,7 +272,8 @@ export async function POST(req: NextRequest) {
           order_index
         )
       `)
-      .eq("exam_id", exam.id);
+      .eq("exam_id", exam.id)
+      .order("order_index", { ascending: true });
 
     if (applicableSectionIds.length > 0) {
       questionsQuery = questionsQuery.in("section_id", applicableSectionIds);
@@ -293,12 +301,12 @@ export async function POST(req: NextRequest) {
       if (!targetDept || targetDept === "GENERAL" || targetDept === "COMMON") {
         return true;
       }
-      return targetDept === studentDeptCode.toUpperCase();
+      return cleanStudentDept ? targetDept === cleanStudentDept : false;
     });
 
     if (!candidateQuestions || candidateQuestions.length === 0) {
       return NextResponse.json(
-        { error: `No examination questions configured for your department curriculum (${studentDeptCode || "General"}).` },
+        { error: `No examination questions configured for your department curriculum (${cleanStudentDept || "General"}).` },
         { status: 404 }
       );
     }
@@ -473,9 +481,9 @@ export async function POST(req: NextRequest) {
           text: opt.option_text,
         }));
 
-      // Respect Examination Option Shuffling setting
+      // Respect Examination Option Shuffling setting (Deterministic per candidate session)
       if (shouldRandomizeOptions) {
-        opts = [...opts].sort(() => Math.random() - 0.5);
+        opts = shuffleWithSeed(opts, `${session.id}_${q.id}_opts`);
       }
 
       return {
@@ -491,9 +499,26 @@ export async function POST(req: NextRequest) {
       };
     });
 
-    // Optional Question Shuffling per candidate
+    // Deterministic Question Shuffling per candidate:
+    // Shuffle strictly WITHIN each section so Part A questions stay in Part A, Part B in Part B,
+    // and question sequence remains 100% stable across reloads for this session.
+    let finalOrderedQuestions = sanitizedQuestions;
     if (exam.randomize_questions) {
-      sanitizedQuestions.sort(() => Math.random() - 0.5);
+      const questionsBySection = new Map<string, typeof sanitizedQuestions>();
+      sanitizedQuestions.forEach((q) => {
+        const list = questionsBySection.get(q.sectionId) || [];
+        list.push(q);
+        questionsBySection.set(q.sectionId, list);
+      });
+
+      const reassembled: typeof sanitizedQuestions = [];
+      applicableSections.forEach((sec: any) => {
+        const secList = questionsBySection.get(sec.id) || [];
+        const shuffled = shuffleWithSeed(secList, `${session.id}_${sec.id}_qs`);
+        reassembled.push(...shuffled);
+      });
+
+      finalOrderedQuestions = reassembled;
     }
 
     // Authoritative Server-Calculated Time Remaining (Seconds)
@@ -562,7 +587,7 @@ export async function POST(req: NextRequest) {
         strikeAction,
         lockdownPolicy,
         sections: applicableSections,
-        questions: sanitizedQuestions,
+        questions: finalOrderedQuestions,
       },
     });
   } catch (err: any) {
