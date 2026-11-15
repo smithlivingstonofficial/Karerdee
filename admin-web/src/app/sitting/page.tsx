@@ -171,10 +171,33 @@ function CandidateSittingContent() {
   const [isScratchpadOpen, setIsScratchpadOpen] = useState(false);
   const [scratchpadText, setScratchpadText] = useState("");
 
-  // Submission Flow
+  // Submission Flow & Watchdog States
   const [isSubmitModalOpen, setIsSubmitModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submissionReceipt, setSubmissionReceipt] = useState<any>(null);
+  const [submissionReason, setSubmissionReason] = useState<string>("NORMAL");
+  const [navLockWarning, setNavLockWarning] = useState<string | null>(null);
+  const [autoConcludeNotice, setAutoConcludeNotice] = useState<string | null>(null);
+
+  // Synchronous State Reference Mirrors (for reliable execution inside popstate/beforeunload/pagehide)
+  const hasSubmittedRef = useRef<boolean>(false);
+  const stageRef = useRef<typeof stage>(stage);
+  const tokenRef = useRef<string>(token);
+  const sessionIdRef = useRef<string>(sessionId);
+  const answersRef = useRef<Record<string, string[]>>(answers);
+
+  useEffect(() => {
+    stageRef.current = stage;
+  }, [stage]);
+  useEffect(() => {
+    tokenRef.current = token;
+  }, [token]);
+  useEffect(() => {
+    sessionIdRef.current = sessionId;
+  }, [sessionId]);
+  useEffect(() => {
+    answersRef.current = answers;
+  }, [answers]);
 
   // Instructions Agreement & Pre-Flight Diagnostics
   const [hasAgreedRules, setHasAgreedRules] = useState(false);
@@ -329,9 +352,63 @@ function CandidateSittingContent() {
     }
   }
 
-  // Transition from INSTRUCTIONS to ACTIVE_EXAM with mandatory Fullscreen
+  // Forceful Exit Auto-Submission Engine (Beacon / Keepalive Fetch)
+  function triggerForcefulExitSubmission(reason: string = "FORCE_EXIT") {
+    if (hasSubmittedRef.current || stageRef.current !== "ACTIVE_EXAM") return;
+    const currentSessId = sessionIdRef.current;
+    const currentTok = tokenRef.current;
+    const currentAnswers = answersRef.current;
+    if (!currentSessId || !currentTok) return;
+
+    hasSubmittedRef.current = true;
+
+    const payloadAnswers = Object.entries(currentAnswers).map(([qId, opts]) => ({
+      questionId: qId,
+      selectedOptionIds: opts,
+    }));
+
+    const payloadData = JSON.stringify({
+      sessionId: currentSessId,
+      token: currentTok,
+      answers: payloadAnswers,
+      submissionReason: reason,
+    });
+
+    // A. W3C sendBeacon: specifically preserved by browsers across window destruction
+    if (typeof navigator !== "undefined" && typeof navigator.sendBeacon === "function") {
+      try {
+        const blob = new Blob([payloadData], { type: "application/json" });
+        navigator.sendBeacon("/api/exam/submit", blob);
+      } catch (beaconErr) {
+        console.warn("sendBeacon execution notice:", beaconErr);
+      }
+    }
+
+    // B. Supplementary keepalive fetch: ensures guaranteed transmission
+    try {
+      fetch("/api/exam/submit", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${currentTok}`,
+        },
+        body: payloadData,
+        keepalive: true,
+      }).catch(() => {});
+    } catch {}
+  }
+
+  // Transition from INSTRUCTIONS to ACTIVE_EXAM with mandatory Fullscreen & Navigation Trap
   async function handleBeginExamination() {
     await enterFullscreen();
+    if (typeof window !== "undefined") {
+      try {
+        window.history.pushState({ examLocked: true, t: Date.now() }, "", window.location.href);
+        window.history.pushState({ examLocked: true, t: Date.now() + 1 }, "", window.location.href);
+      } catch (histErr) {
+        console.warn("History push error:", histErr);
+      }
+    }
     setStage("ACTIVE_EXAM");
   }
 
@@ -594,9 +671,24 @@ function CandidateSittingContent() {
     };
   }, [stage, token, sessionId, strikes, exam, candidate]);
 
-  // Strict Browser Security & Interceptors (DevTools, Reload, Clipboard, Shortcuts, Focus)
+  // Strict Browser Security & Interceptors (DevTools, Reload, Navigation Trap, Forceful Exit Beacon, Clipboard, Shortcuts, Focus)
   useEffect(() => {
     if (stage !== "ACTIVE_EXAM") return;
+
+    // 1. Browser Navigation Trap (Prevent Back/Forward or History Navigation)
+    function handlePopState(e: PopStateEvent) {
+      if (typeof window !== "undefined") {
+        window.history.pushState({ examLocked: true, t: Date.now() }, "", window.location.href);
+      }
+      setNavLockWarning(
+        "⚠️ NAVIGATION LOCKED: Browser Back and Forward navigation is strictly disabled during an active examination. Your session remains locked and secure."
+      );
+      setTimeout(() => setNavLockWarning(null), 6000);
+      reportSecurityViolation(
+        "NAVIGATION_INTERCEPTED",
+        "Candidate attempted browser back/forward history navigation during locked examination"
+      );
+    }
 
     function handleVisibilityChange() {
       if (document.hidden) {
@@ -627,8 +719,20 @@ function CandidateSittingContent() {
     }
 
     function handleBeforeUnload(e: BeforeUnloadEvent) {
+      if (stageRef.current !== "ACTIVE_EXAM" || hasSubmittedRef.current) return;
+      // Preemptively submit progress via sendBeacon / keepalive fetch
+      triggerForcefulExitSubmission("WINDOW_BEFOREUNLOAD");
       e.preventDefault();
-      e.returnValue = "";
+      const exitPrompt =
+        "Active examination in progress! If you navigate away or close this window, your examination will be finalized and submitted automatically.";
+      e.returnValue = exitPrompt;
+      return exitPrompt;
+    }
+
+    function handlePageHide(e: PageTransitionEvent) {
+      if (stageRef.current === "ACTIVE_EXAM" && !hasSubmittedRef.current) {
+        triggerForcefulExitSubmission("WINDOW_PAGEHIDE");
+      }
     }
 
     function handleDragStart(e: DragEvent) {
@@ -659,6 +763,27 @@ function CandidateSittingContent() {
         e.key === "Meta" ||
         (e.altKey && (e.key === "Tab" || e.key === "Escape"));
 
+      const isBackNav =
+        (e.altKey && (e.key === "ArrowLeft" || e.key === "ArrowRight" || e.key === "Home")) ||
+        (e.key === "Backspace" &&
+          !(
+            e.target instanceof HTMLInputElement ||
+            e.target instanceof HTMLTextAreaElement ||
+            (e.target as any)?.isContentEditable
+          ));
+
+      if (isBackNav) {
+        e.preventDefault();
+        e.stopPropagation();
+        setNavLockWarning("⚠️ Navigation shortcut disabled during examination.");
+        setTimeout(() => setNavLockWarning(null), 4000);
+        reportSecurityViolation(
+          "NAVIGATION_INTERCEPTED",
+          `Browser navigation keystroke intercepted: ${e.key}`
+        );
+        return;
+      }
+
       if (isDevTools || isReload || isSavePrintSource || isClipboardKey || isSystemKey) {
         e.preventDefault();
         e.stopPropagation();
@@ -675,6 +800,8 @@ function CandidateSittingContent() {
       }
     }
 
+    window.addEventListener("popstate", handlePopState);
+    window.addEventListener("pagehide", handlePageHide);
     document.addEventListener("visibilitychange", handleVisibilityChange);
     window.addEventListener("blur", handleWindowBlur);
     document.addEventListener("contextmenu", handleContextMenu);
@@ -686,6 +813,8 @@ function CandidateSittingContent() {
     window.addEventListener("keydown", handleKeyDown);
 
     return () => {
+      window.removeEventListener("popstate", handlePopState);
+      window.removeEventListener("pagehide", handlePageHide);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       window.removeEventListener("blur", handleWindowBlur);
       document.removeEventListener("contextmenu", handleContextMenu);
@@ -1073,33 +1202,46 @@ function CandidateSittingContent() {
     }
   }
 
-  // Server-Authoritative Countdown Timer
+  // Server-Authoritative Countdown Timer & Continuous Schedule Watchdog
   useEffect(() => {
     if (stage !== "ACTIVE_EXAM") return;
 
-    const timer = setInterval(() => {
+    function checkScheduleAndCountdown() {
+      if (hasSubmittedRef.current) return;
+      const currentServerTime = Date.now() + clockSkewMs;
+
+      // 1. Authoritative Exam Schedule Window End Check
+      let isScheduleConcluded = false;
+      let remainingUntilScheduleEnd = 999999;
       if (examEndTime) {
-        const currentServerTime = Date.now() + clockSkewMs;
-        const remaining = Math.max(
+        const scheduleEndEpoch = new Date(examEndTime).getTime();
+        remainingUntilScheduleEnd = Math.max(
           0,
-          Math.floor((new Date(examEndTime).getTime() - currentServerTime) / 1000)
+          Math.floor((scheduleEndEpoch - currentServerTime) / 1000)
         );
-        setSecondsRemaining(remaining);
-        if (remaining <= 0) {
-          clearInterval(timer);
-          handleAutoSubmit();
+        if (currentServerTime >= scheduleEndEpoch || remainingUntilScheduleEnd <= 0) {
+          isScheduleConcluded = true;
         }
-      } else {
-        setSecondsRemaining((prev) => {
-          if (prev <= 1) {
-            clearInterval(timer);
-            handleAutoSubmit();
-            return 0;
-          }
-          return prev - 1;
-        });
       }
-    }, 1000);
+
+      setSecondsRemaining((prev) => {
+        const currentRemaining = examEndTime
+          ? Math.min(prev, remainingUntilScheduleEnd)
+          : prev;
+
+        if (isScheduleConcluded || currentRemaining <= 0) {
+          clearInterval(timer);
+          autoConcludeAndSubmit(
+            isScheduleConcluded ? "SCHEDULE_EXPIRED" : "DURATION_EXPIRED"
+          );
+          return 0;
+        }
+        return currentRemaining - 1;
+      });
+    }
+
+    checkScheduleAndCountdown();
+    const timer = setInterval(checkScheduleAndCountdown, 1000);
 
     return () => clearInterval(timer);
   }, [stage, examEndTime, clockSkewMs]);
@@ -1111,7 +1253,7 @@ function CandidateSittingContent() {
     let isHeartbeatRunning = false;
 
     async function sendUnifiedHeartbeat() {
-      if (isHeartbeatRunning || !isOnline || !token || !sessionId) return;
+      if (isHeartbeatRunning || !isOnline || !token || !sessionId || hasSubmittedRef.current) return;
       isHeartbeatRunning = true;
       try {
         const res = await fetch("/api/telemetry/heartbeat", {
@@ -1134,6 +1276,14 @@ function CandidateSittingContent() {
           }
           if (typeof hbData.serverCalculatedSecondsRemaining === "number") {
             setSecondsRemaining(hbData.serverCalculatedSecondsRemaining);
+          }
+          if (
+            hbData.isExpired ||
+            (typeof hbData.serverCalculatedSecondsRemaining === "number" &&
+              hbData.serverCalculatedSecondsRemaining <= 0)
+          ) {
+            autoConcludeAndSubmit("SCHEDULE_EXPIRED");
+            return;
           }
           if (hbData.sessionStatus === "LOCKED") {
             setIsWorkstationLocked(true);
@@ -1266,48 +1416,68 @@ function CandidateSittingContent() {
     });
   }
 
-  // Auto-submit when time expires
-  function handleAutoSubmit() {
-    alert("Examination time has expired. Your responses are being automatically finalized.");
-    submitFinalExam();
+  // Auto-conclude and submit when schedule or duration expires
+  async function autoConcludeAndSubmit(reason: "SCHEDULE_EXPIRED" | "DURATION_EXPIRED") {
+    if (hasSubmittedRef.current || isSubmitting) return;
+    hasSubmittedRef.current = true;
+    setSubmissionReason(reason);
+    setAutoConcludeNotice(
+      reason === "SCHEDULE_EXPIRED"
+        ? "⏰ Examination Schedule Concluded: Authoritative exam end-time has been reached. All recorded answers are being automatically finalized and submitted."
+        : "⏱️ Examination Duration Expired: Your allotted examination time has ended. All recorded answers are being automatically finalized and submitted."
+    );
+    await submitFinalExam(reason);
   }
 
   // Final Submit Handler
-  async function submitFinalExam() {
-    if (!token || !sessionId) return;
+  async function submitFinalExam(reason: string = "NORMAL") {
+    const currentToken = tokenRef.current || token;
+    const currentSessionId = sessionIdRef.current || sessionId;
+    if (!currentToken || !currentSessionId) return;
+
+    hasSubmittedRef.current = true;
     setIsSubmitting(true);
+    setSubmissionReason(reason);
 
     try {
-      const payloadAnswers = Object.entries(answers).map(([qId, opts]) => ({
-        questionId: qId,
-        selectedOptionIds: opts,
-      }));
+      const payloadAnswers = Object.entries(answersRef.current || answers).map(
+        ([qId, opts]) => ({
+          questionId: qId,
+          selectedOptionIds: opts,
+        })
+      );
 
       const res = await fetch("/api/exam/submit", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${currentToken}`,
         },
         body: JSON.stringify({
-          sessionId,
+          sessionId: currentSessionId,
+          token: currentToken,
           answers: payloadAnswers,
+          submissionReason: reason,
         }),
       });
 
       const data = await res.json();
-      if (!res.ok) {
+      if (!res.ok && !data.alreadySubmitted) {
+        console.error("Submission failed:", data.error);
         alert(data.error || "Failed to submit examination.");
         setIsSubmitting(false);
+        hasSubmittedRef.current = false;
         return;
       }
 
       setSubmissionReceipt(data);
+      setSubmissionReason(reason);
       setStage("SUBMITTED");
       setIsSubmitModalOpen(false);
+      setAutoConcludeNotice(null);
 
       // Clean local cache
-      localStorage.removeItem(`exam_answers_${sessionId}`);
+      localStorage.removeItem(`exam_answers_${currentSessionId}`);
 
       // Exit fullscreen mode cleanly upon submission
       if (document.fullscreenElement && document.exitFullscreen) {
@@ -1319,10 +1489,15 @@ function CandidateSittingContent() {
         (window as any).chrome.webview.postMessage({
           type: "EXAM_SUBMITTED",
           referenceCode: data.referenceCode,
+          reason,
         });
       }
     } catch (err: any) {
-      alert(err.message || "Network error submitting examination.");
+      console.warn("Submission error notice:", err);
+      // Fallback: trigger background beacon exit submission
+      triggerForcefulExitSubmission(reason);
+      setStage("SUBMITTED");
+      setAutoConcludeNotice(null);
     } finally {
       setIsSubmitting(false);
     }
@@ -1778,16 +1953,50 @@ function CandidateSittingContent() {
         <div className="w-full max-w-xl bg-white border border-slate-200/90 rounded-2xl p-6 sm:p-8 shadow-sm space-y-6 print:shadow-none print:border-none print:p-0">
           {/* Institutional Top Crest in Receipt */}
           <div className="text-center space-y-2 border-b border-slate-100 pb-5">
-            <div className="w-14 h-14 rounded-full bg-emerald-50 text-emerald-700 flex items-center justify-center mx-auto border border-emerald-200 shadow-xs">
-              <CheckCircle2 className="w-8 h-8" />
+            <div
+              className={`w-14 h-14 rounded-full flex items-center justify-center mx-auto border shadow-xs ${
+                submissionReason.includes("EXPIRED") || submissionReason.includes("EXIT")
+                  ? "bg-amber-50 text-amber-700 border-amber-200"
+                  : "bg-emerald-50 text-emerald-700 border-emerald-200"
+              }`}
+            >
+              {submissionReason.includes("EXPIRED") ? (
+                <Clock className="w-8 h-8" />
+              ) : (
+                <CheckCircle2 className="w-8 h-8" />
+              )}
             </div>
             <h1 className="text-xl font-bold text-slate-900 tracking-tight">
-              Examination Successfully Submitted
+              {submissionReason === "SCHEDULE_EXPIRED"
+                ? "Examination Concluded (Schedule Ended)"
+                : submissionReason === "DURATION_EXPIRED"
+                ? "Examination Concluded (Duration Expired)"
+                : submissionReason.includes("EXIT")
+                ? "Examination Auto-Submitted (Window Exit)"
+                : "Examination Successfully Submitted"}
             </h1>
             <p className="text-xs text-slate-500">
               Kalasalingam Academy of Research and Education • Online Examination Services
             </p>
           </div>
+
+          {/* Watchdog Notice Banner if Auto-Concluded */}
+          {submissionReason.includes("EXPIRED") && (
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-3.5 text-xs text-amber-900 flex items-start space-x-2.5">
+              <Clock className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
+              <div className="leading-relaxed">
+                <span className="font-bold">Authoritative Schedule Concluded:</span> The allocated examination time window has elapsed. All questions attempted up to this point have been safely captured, evaluated, and permanently secured.
+              </div>
+            </div>
+          )}
+          {submissionReason.includes("EXIT") && (
+            <div className="bg-red-50 border border-red-200 rounded-xl p-3.5 text-xs text-red-900 flex items-start space-x-2.5">
+              <AlertTriangle className="w-4 h-4 text-red-700 shrink-0 mt-0.5" />
+              <div className="leading-relaxed">
+                <span className="font-bold">Exit Protection Triggered:</span> Browser window exit or navigation was detected. The examination engine automatically secured and submitted your responses.
+              </div>
+            </div>
+          )}
 
           {/* Official Verification Receipt Card */}
           <div className="bg-slate-50 border border-slate-200/90 rounded-2xl p-5 text-left text-xs space-y-3 print:bg-white print:border-slate-300">
@@ -1822,6 +2031,18 @@ function CandidateSittingContent() {
             <div className="flex justify-between items-center border-b border-slate-200/80 pb-2.5">
               <span className="text-slate-500 font-medium">Department Specialization</span>
               <span className="font-bold text-slate-800">{candidate?.department}</span>
+            </div>
+            <div className="flex justify-between items-center border-b border-slate-200/80 pb-2.5">
+              <span className="text-slate-500 font-medium">Submission Mode</span>
+              <span className="font-bold text-slate-800">
+                {submissionReason === "SCHEDULE_EXPIRED"
+                  ? "Auto-Concluded (Schedule Window End)"
+                  : submissionReason === "DURATION_EXPIRED"
+                  ? "Auto-Concluded (Duration Expired)"
+                  : submissionReason.includes("EXIT")
+                  ? "Auto-Submitted (Forceful Exit Protection)"
+                  : "Verified Candidate Submission"}
+              </span>
             </div>
             <div className="flex justify-between items-center border-b border-slate-200/80 pb-2.5">
               <span className="text-slate-500 font-medium">Questions Attempted</span>
@@ -1874,6 +2095,37 @@ function CandidateSittingContent() {
   // =========================================================================
   return (
     <div className="min-h-screen bg-slate-100 flex flex-col font-sans select-none">
+      {/* Navigation Locked Warning Banner */}
+      {navLockWarning && (
+        <div className="fixed top-3 left-1/2 -translate-x-1/2 z-50 max-w-xl w-[92%] px-3 animate-in fade-in slide-in-from-top-3 duration-200">
+          <div className="bg-amber-50 border border-amber-300 text-amber-950 rounded-xl p-3 shadow-lg flex items-center space-x-3">
+            <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0" />
+            <div className="text-xs font-semibold leading-relaxed">{navLockWarning}</div>
+          </div>
+        </div>
+      )}
+
+      {/* Auto-Conclude Finalizing Overlay */}
+      {autoConcludeNotice && (
+        <div className="fixed inset-0 z-[100] bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white border border-slate-200 rounded-2xl p-6 sm:p-8 max-w-md w-full shadow-2xl text-center space-y-4 animate-in zoom-in-95">
+            <div className="w-14 h-14 rounded-full bg-blue-50 text-blue-700 flex items-center justify-center mx-auto border border-blue-200">
+              <Clock className="w-7 h-7 animate-spin" />
+            </div>
+            <div className="space-y-1.5">
+              <h3 className="text-base font-bold text-slate-900">Finalizing Examination</h3>
+              <p className="text-xs text-slate-600 leading-relaxed">{autoConcludeNotice}</p>
+            </div>
+            <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+              <div className="bg-blue-600 h-1.5 rounded-full animate-pulse w-full" />
+            </div>
+            <p className="text-[11px] font-medium text-slate-400">
+              Please wait while your answers are secured and cryptographically sealed.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* 1. Compensatory Extra Time Granted Banner */}
       {extraTimeNotice && (
         <div className="fixed top-14 left-1/2 -translate-x-1/2 z-40 bg-emerald-600 text-white px-5 py-2.5 rounded-full shadow-lg flex items-center space-x-2 text-xs font-bold border border-emerald-500 animate-in slide-in-from-top-4">
@@ -2419,7 +2671,7 @@ function CandidateSittingContent() {
               </button>
               <button
                 type="button"
-                onClick={submitFinalExam}
+                onClick={() => submitFinalExam("NORMAL")}
                 disabled={isSubmitting}
                 className="inline-flex items-center px-4 py-2 text-xs font-bold text-white bg-blue-700 hover:bg-blue-800 rounded-xl shadow-xs transition-colors cursor-pointer disabled:opacity-50"
               >

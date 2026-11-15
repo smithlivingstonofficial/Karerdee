@@ -11,19 +11,45 @@ interface AnswerSubmissionItem {
 interface SubmitRequestBody {
   sessionId: string;
   answers: AnswerSubmissionItem[];
+  token?: string;
+  submissionReason?: string;
 }
 
 export async function POST(req: NextRequest) {
   try {
+    let rawBody: any = null;
+    try {
+      rawBody = await req.json();
+    } catch {
+      try {
+        const text = await req.text();
+        rawBody = JSON.parse(text);
+      } catch {
+        return NextResponse.json(
+          { error: "Invalid submission payload format." },
+          { status: 400 }
+        );
+      }
+    }
+
+    const body: SubmitRequestBody = rawBody || {};
+    const { sessionId, answers } = body;
+
     const authHeader = req.headers.get("authorization");
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    let token = "";
+    if (authHeader && authHeader.startsWith("Bearer ")) {
+      token = authHeader.split(" ")[1];
+    } else if (body && typeof body.token === "string" && body.token) {
+      token = body.token;
+    }
+
+    if (!token) {
       return NextResponse.json(
-        { error: "Missing or invalid authorization token." },
+        { error: "Missing or invalid authorization token in header or payload." },
         { status: 401 }
       );
     }
 
-    const token = authHeader.split(" ")[1];
     const jwtSecret =
       process.env.EXAM_JWT_SECRET ||
       "safe_exam_development_jwt_secret_key_minimum_32_characters_long";
@@ -37,9 +63,6 @@ export async function POST(req: NextRequest) {
         { status: 403 }
       );
     }
-
-    const body: SubmitRequestBody = await req.json();
-    const { sessionId, answers } = body;
 
     if (!sessionId || !Array.isArray(answers)) {
       return NextResponse.json(
@@ -62,6 +85,9 @@ export async function POST(req: NextRequest) {
         id,
         exam_id,
         status,
+        submitted_at,
+        auto_score,
+        final_score,
         exam:exams(
           id,
           title,
@@ -78,9 +104,23 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (session.status === "SUBMITTED" || session.status === "DISQUALIFIED") {
+    // Idempotent submission: if already submitted, return verified success
+    if (session.status === "SUBMITTED") {
+      const referenceCode = `KARE-SUB-${sessionId.slice(0, 8).toUpperCase()}`;
+      return NextResponse.json({
+        success: true,
+        sessionId,
+        submittedAt: session.submitted_at || new Date().toISOString(),
+        autoScore: session.auto_score ?? session.final_score ?? 0,
+        referenceCode,
+        message: "Examination session was already finalized and submitted.",
+        alreadySubmitted: true,
+      });
+    }
+
+    if (session.status === "DISQUALIFIED") {
       return NextResponse.json(
-        { error: `Session already ${session.status.toLowerCase()}. Cannot resubmit.` },
+        { error: "Session disqualified. Cannot submit." },
         { status: 400 }
       );
     }
@@ -184,6 +224,35 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // 6. Record Forensic Audit entry if auto-submitted by watchdog / schedule / exit
+    const reason = body.submissionReason || "NORMAL";
+    if (reason === "FORCE_EXIT" || reason === "WINDOW_PAGEHIDE" || reason === "WINDOW_BEFOREUNLOAD") {
+      await supabaseAdmin.from("violation_logs").insert({
+        session_id: sessionId,
+        violation_type: "WINDOW_UNFOCUSED",
+        strike_number: (session as any)?.strikes_count || 1,
+        metadata: {
+          exitTrigger: reason,
+          incident: "FORCEFUL_EXIT_AUTO_SUBMIT",
+          description: "Candidate attempted forceful browser exit or window closure. Examination progress automatically secured, evaluated, and finalized.",
+          answeredQuestionsCount: answers.length,
+          submittedAt,
+        },
+      });
+
+      await supabaseAdmin.from("proctor_actions").insert({
+        session_id: sessionId,
+        action_type: "FORCE_SUBMIT",
+        reason: "Workstation forceful exit watchdog triggered automatic submission.",
+      });
+    } else if (reason === "SCHEDULE_EXPIRED" || reason === "DURATION_EXPIRED") {
+      await supabaseAdmin.from("proctor_actions").insert({
+        session_id: sessionId,
+        action_type: "FORCE_SUBMIT",
+        reason: `Examination concluded automatically due to ${reason === "SCHEDULE_EXPIRED" ? "exam schedule end-time" : "allotted duration expiry"}. Candidate responses secured and finalized.`,
+      });
+    }
+
     const referenceCode = `KARE-SUB-${sessionId.slice(0, 8).toUpperCase()}`;
 
     return NextResponse.json({
@@ -192,6 +261,7 @@ export async function POST(req: NextRequest) {
       submittedAt,
       autoScore: finalScore,
       referenceCode,
+      submissionReason: reason,
       message: "Examination successfully submitted and auto-graded.",
     });
   } catch (err: any) {
