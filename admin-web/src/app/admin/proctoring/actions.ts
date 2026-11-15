@@ -320,5 +320,125 @@ export async function sendProctorAnnouncementAction(sessionId: string, message: 
   }
 }
 
+export async function sendProctorReplyAction(
+  sessionId: string,
+  replyText: string,
+  replyToMessageId?: string
+) {
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return { error: "Unauthorized access" };
+
+    if (!sessionId || !replyText?.trim()) {
+      return { error: "Session ID and reply message are required." };
+    }
+
+    const messageId = `reply_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    const nowIso = new Date().toISOString();
+
+    const payload = {
+      type: "PROCTOR_REPLY",
+      messageId,
+      replyToId: replyToMessageId || null,
+      sender: "PROCTOR",
+      proctorEmail: user.email,
+      proctorName: "Invigilation Desk",
+      message: replyText.trim(),
+      timestamp: nowIso,
+    };
+
+    // 1. Record in proctor_actions for audit log
+    const { error: insertErr } = await supabaseAdmin.from("proctor_actions").insert({
+      session_id: sessionId,
+      proctor_id: user.id,
+      action_type: "WARN",
+      reason: `[Invigilator Reply] ${replyText.trim().slice(0, 180)}`,
+      action_payload: payload,
+    });
+
+    if (insertErr) throw insertErr;
+
+    // 2. Broadcast via Supabase Realtime to candidate session
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    if (supabaseUrl && serviceKey) {
+      fetch(`${supabaseUrl}/realtime/v1/api/broadcast`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${serviceKey}`,
+          apikey: serviceKey,
+        },
+        body: JSON.stringify({
+          messages: [
+            {
+              topic: `exam-session-${sessionId}`,
+              event: "proctor_chat_reply",
+              payload,
+            },
+            {
+              topic: `exam-session-${sessionId}`,
+              event: "proctor_command",
+              payload: {
+                command: "CMD_ANNOUNCE",
+                message: `💬 Invigilator: ${replyText.trim()}`,
+                proctorEmail: user.email,
+                timestamp: nowIso,
+              },
+            },
+          ],
+        }),
+      }).catch((err) => console.warn("Broadcast reply fetch error:", err));
+    }
+
+    revalidatePath("/proctoring");
+    return { success: true, payload };
+  } catch (err: any) {
+    return { error: err.message || "Failed to dispatch reply." };
+  }
+}
+
+export async function markInquiryResolvedAction(actionId: string) {
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return { error: "Unauthorized access" };
+
+    const { data: action, error: fetchErr } = await supabaseAdmin
+      .from("proctor_actions")
+      .select("id, action_payload")
+      .eq("id", actionId)
+      .single();
+
+    if (fetchErr || !action) return { error: "Inquiry record not found." };
+
+    const updatedPayload = {
+      ...(action.action_payload || {}),
+      status: "RESOLVED",
+      resolvedAt: new Date().toISOString(),
+      resolvedBy: user.email,
+    };
+
+    const { error: updateErr } = await supabaseAdmin
+      .from("proctor_actions")
+      .update({ action_payload: updatedPayload })
+      .eq("id", actionId);
+
+    if (updateErr) throw updateErr;
+
+    revalidatePath("/proctoring");
+    return { success: true };
+  } catch (err: any) {
+    return { error: err.message || "Failed to mark inquiry resolved." };
+  }
+}
+
+
 
 

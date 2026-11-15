@@ -1,6 +1,12 @@
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
-import { LiveProctoringClientView, ProctoringSession, ViolationFeedItem } from "./components/LiveProctoringClientView";
+import {
+  LiveProctoringClientView,
+  ProctoringSession,
+  ViolationFeedItem,
+  ExamClassificationItem,
+  CandidateInquiryItem,
+} from "./components/LiveProctoringClientView";
 
 export const dynamic = "force-dynamic";
 
@@ -10,17 +16,26 @@ export default async function LiveProctoringPage() {
 
   let sessions: ProctoringSession[] = [];
   let violations: ViolationFeedItem[] = [];
-  let activeExams: { id: string; title: string; status: string; passcode: string }[] = [];
+  let classifiedExams: ExamClassificationItem[] = [];
+  let inquiries: CandidateInquiryItem[] = [];
 
   try {
-    // 1. Fetch active/scheduled exams
+    // 1. Fetch all exams with schedule and classification details
     const { data: examsData } = await supabaseAdmin
       .from("exams")
-      .select("id, title, status, passcode")
-      .in("status", ["ACTIVE", "SCHEDULED", "DRAFT"])
+      .select("id, title, course_code, status, passcode, start_time, end_time, duration_minutes")
       .order("created_at", { ascending: false });
 
-    activeExams = examsData || [];
+    classifiedExams = (examsData || []).map((e: any) => ({
+      id: e.id,
+      title: e.title,
+      courseCode: e.course_code || null,
+      status: e.status,
+      passcode: e.passcode || "",
+      startTime: e.start_time || null,
+      endTime: e.end_time || null,
+      durationMinutes: e.duration_minutes || 90,
+    }));
 
     // 2. Fetch live exam sessions with student, department, and exam info
     const { data: sessionsData, error: sessError } = await supabaseAdmin
@@ -158,6 +173,65 @@ export default async function LiveProctoringPage() {
         };
       });
     }
+
+    // 5. Fetch Candidate Support Inquiries & Messages
+    const { data: rawInquiries } = await supabaseAdmin
+      .from("proctor_actions")
+      .select(`
+        id,
+        session_id,
+        proctor_id,
+        action_type,
+        reason,
+        action_payload,
+        created_at,
+        session:exam_sessions (
+          id,
+          exam_id,
+          student:students (
+            id,
+            full_name,
+            application_number,
+            department:departments (code)
+          ),
+          exam:exams (
+            id,
+            title
+          )
+        )
+      `)
+      .order("created_at", { ascending: false })
+      .limit(60);
+
+    if (rawInquiries) {
+      inquiries = rawInquiries
+        .filter((a: any) => {
+          const type = a.action_payload?.type;
+          return type === "CANDIDATE_MESSAGE" || type === "PROCTOR_REPLY";
+        })
+        .map((a: any) => {
+          const payload = a.action_payload || {};
+          const sess = a.session || {};
+          const st = sess.student || {};
+          const ex = sess.exam || {};
+          return {
+            id: a.id,
+            sessionId: a.session_id,
+            messageId: payload.messageId || a.id,
+            sender: payload.sender || (payload.type === "PROCTOR_REPLY" ? "PROCTOR" : "CANDIDATE"),
+            category: payload.category || "GENERAL_DOUBT",
+            questionNumber: payload.questionNumber || null,
+            message: payload.message || a.reason || "",
+            candidateName: payload.candidateName || st.full_name || "Candidate",
+            applicationNumber: payload.applicationNumber || st.application_number || "",
+            departmentCode: payload.departmentCode || st.department?.code || "GENERAL",
+            examId: payload.examId || sess.exam_id || "",
+            examTitle: payload.examTitle || ex.title || "Examination",
+            status: payload.status || "UNREAD",
+            createdAt: payload.timestamp || a.created_at,
+          };
+        });
+    }
   } catch (err) {
     console.warn("Live proctoring query exception:", err);
   }
@@ -166,7 +240,8 @@ export default async function LiveProctoringPage() {
     <LiveProctoringClientView
       initialSessions={sessions}
       recentViolations={violations}
-      exams={activeExams}
+      exams={classifiedExams}
+      initialInquiries={inquiries}
     />
   );
 }
