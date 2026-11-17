@@ -626,6 +626,32 @@ export function LiveProctoringClientView({
     }
   };
 
+  const getInitials = (name: string): string => {
+    if (!name) return "??";
+    const clean = name.trim();
+    const parts = clean.split(/\s+/);
+    if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  };
+
+  const avatarColorStyles = [
+    "bg-blue-100 text-blue-700 border-blue-200",
+    "bg-indigo-100 text-indigo-700 border-indigo-200",
+    "bg-emerald-100 text-emerald-700 border-emerald-200",
+    "bg-purple-100 text-purple-700 border-purple-200",
+    "bg-amber-100 text-amber-800 border-amber-200",
+    "bg-teal-100 text-teal-700 border-teal-200",
+  ];
+
+  const getAvatarColor = (name: string): string => {
+    let hash = 0;
+    for (let i = 0; i < name.length; i++) {
+      hash = name.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    const index = Math.abs(hash) % avatarColorStyles.length;
+    return avatarColorStyles[index];
+  };
+
   const pendingLateEntries = scopedSessions.filter((s) => s.isPendingLateEntry && s.status === "LOCKED");
 
   return (
@@ -969,34 +995,17 @@ export function LiveProctoringClientView({
           </div>
 
           {/* Exam Cards Deck */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 pt-1">
-            {/* Card: All Examinations (Consolidated Master View) */}
-            <div
-              className={`text-left p-3.5 rounded-xl border transition-all flex flex-col justify-between space-y-3 relative group bg-blue-50/30 border-blue-600 ring-2 ring-blue-600/20 shadow-xs`}
-            >
-              <div className="flex items-start justify-between">
-                <div>
-                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-blue-700">
-                    Consolidated View
-                  </span>
-                  <h3 className="font-bold text-slate-900 text-xs sm:text-sm mt-0.5">
-                    All Examinations
-                  </h3>
-                </div>
-                <span className="w-6 h-6 rounded-lg flex items-center justify-center text-xs font-bold bg-blue-600 text-white">
-                  <Layers className="w-3.5 h-3.5" />
-                </span>
-              </div>
-
-              <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-600">
-                <span>Total Active Feed</span>
-                <span className="font-mono font-bold text-slate-900 bg-slate-100 px-2 py-0.5 rounded-md">
-                  {sessions.length} Candidates
-                </span>
-              </div>
+          {exams.length === 0 ? (
+            <div className="p-8 text-center text-slate-400 text-xs bg-slate-50 border border-slate-200 rounded-xl">
+              <Layers className="w-6 h-6 mx-auto text-slate-300 mb-1" />
+              <p className="font-semibold text-slate-600">No Examinations Configured</p>
+              <p className="text-[11px] text-slate-400">
+                Scheduled examinations will appear here as cards allowing proctors to enter dedicated monitoring rooms.
+              </p>
             </div>
-
-            {/* Cards for each specific exam (Clicking navigates to dedicated page) */}
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 pt-1">
+              {/* Cards for each specific exam (Clicking navigates to dedicated page) */}
             {exams.map((exam) => {
               const examSessions = sessions.filter((s) => s.examId === exam.id);
               const activeInExam = examSessions.filter((s) => s.status === "IN_PROGRESS").length;
@@ -1096,6 +1105,7 @@ export function LiveProctoringClientView({
               );
             })}
           </div>
+          )}
         </div>
       )}
 
@@ -1173,423 +1183,727 @@ export function LiveProctoringClientView({
         </div>
       )}
 
-      {/* Main Grid: Workstations Table (8 cols) + Realtime Feed (4 cols) */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-        {/* Left Column: Active Candidate Sittings */}
-        <div className="lg:col-span-8 space-y-4">
-          <div className="bg-white border border-slate-200/90 rounded-2xl overflow-hidden shadow-xs">
-            {/* Filter & Search Bar */}
-            <div className="p-4 sm:p-4.5 border-b border-slate-200/90 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div className="flex items-center space-x-2.5">
-                <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-700 flex items-center justify-center border border-blue-100 flex-shrink-0">
-                  <Monitor className="w-4 h-4" />
+      {/* =====================================================================
+          3. MAIN CONTENT: MASTER HUB DISPATCH vs. DEDICATED ROOM WORKSTATIONS
+         ===================================================================== */}
+      {!isDedicatedRoom ? (
+        /* =====================================================================
+           MASTER HUB VIEW: Operations Overview (8 cols) + Campus Integrity Feed (4 cols)
+           (Candidate Workstations table is isolated to dedicated exam rooms)
+           ===================================================================== */
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+          {/* Left Column (8 cols): Institutional Proctoring Operations & Room Dispatch */}
+          <div className="lg:col-span-8 space-y-4">
+            <div className="bg-white border border-slate-200/90 rounded-2xl p-4 sm:p-5 shadow-xs space-y-4">
+              {/* Header */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3.5">
+                <div className="flex items-center space-x-3">
+                  <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-700 flex items-center justify-center border border-blue-100 shadow-2xs flex-shrink-0">
+                    <Building2 className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div className="flex items-center space-x-2">
+                      <h3 className="text-sm sm:text-base font-bold text-slate-900 tracking-tight">
+                        Institutional Proctoring Operations &amp; Room Dispatch
+                      </h3>
+                      <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
+                        Multi-Room Hub
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Candidate workstations, lockdown controls, and student inquiries are isolated into dedicated proctoring rooms for each scheduled paper.
+                    </p>
+                  </div>
                 </div>
-                <div className="flex items-center space-x-2 flex-wrap">
-                  <h3 className="text-sm font-bold text-slate-900 tracking-tight">
-                    Candidate Workstations
-                  </h3>
-                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
-                    {filtered.length} Total
-                  </span>
-                  {isDedicatedRoom && currentExamObj && (
-                    <span className="text-xs text-blue-700 font-bold bg-blue-50 px-2 py-0.5 rounded-md border border-blue-100">
-                      Scoped to {currentExamObj.title}
+              </div>
+
+              {/* 3 Operational Architecture Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div className="p-3.5 rounded-xl bg-slate-50/80 border border-slate-200/80 space-y-1.5 hover:border-blue-200 transition-colors">
+                  <div className="flex items-center space-x-2 text-slate-800 font-bold text-xs">
+                    <Layers className="w-3.5 h-3.5 text-blue-600 flex-shrink-0" />
+                    <span>Distraction-Free Rooms</span>
+                  </div>
+                  <p className="text-[11px] text-slate-500 leading-relaxed">
+                    Select any examination card above to enter its dedicated room and monitor examinees without cross-paper distractions.
+                  </p>
+                </div>
+
+                <div className="p-3.5 rounded-xl bg-slate-50/80 border border-slate-200/80 space-y-1.5 hover:border-indigo-200 transition-colors">
+                  <div className="flex items-center space-x-2 text-slate-800 font-bold text-xs">
+                    <MessageSquare className="w-3.5 h-3.5 text-indigo-600 flex-shrink-0" />
+                    <span>Live Candidate Helpdesk</span>
+                  </div>
+                  <p className="text-[11px] text-slate-500 leading-relaxed">
+                    Resolve question doubts, tech issues, and emergency inquiries in real time ({unreadInquiriesCount} unread across campus).
+                  </p>
+                </div>
+
+                <div className="p-3.5 rounded-xl bg-slate-50/80 border border-slate-200/80 space-y-1.5 hover:border-red-200 transition-colors">
+                  <div className="flex items-center space-x-2 text-slate-800 font-bold text-xs">
+                    <ShieldAlert className="w-3.5 h-3.5 text-red-600 flex-shrink-0" />
+                    <span>Zero-Trust Auto Lock</span>
+                  </div>
+                  <p className="text-[11px] text-slate-500 leading-relaxed">
+                    Hardware binding, focus loss detection, and auto-submission ensure absolute integrity during scheduled sittings.
+                  </p>
+                </div>
+              </div>
+
+              {/* Active Examination Room Dispatch Directory */}
+              <div className="pt-2">
+                <div className="flex items-center justify-between pb-2.5">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center space-x-2">
+                    <Monitor className="w-3.5 h-3.5 text-slate-500" />
+                    <span>Examination Live Rooms Directory</span>
+                    <span className="text-[10px] font-bold text-slate-400 font-normal">
+                      ({exams.length} papers configured)
                     </span>
-                  )}
-                </div>
-              </div>
-
-              <div className="flex items-center space-x-2 flex-wrap gap-y-2">
-                <div className="relative">
-                  <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-                  <input
-                    type="text"
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    placeholder="Search candidate / app no..."
-                    className="pl-9 pr-3 py-1.5 text-xs bg-slate-50 hover:bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 text-slate-900 w-48 sm:w-60 transition-all shadow-2xs"
-                  />
+                  </h4>
                 </div>
 
-                <select
-                  value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value)}
-                  className="px-3 py-1.5 text-xs bg-slate-50 hover:bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 text-slate-700 font-semibold cursor-pointer shadow-2xs transition-all"
-                >
-                  <option value="ALL">All Status</option>
-                  <option value="ACTIVE">Active (In Session)</option>
-                  <option value="WARNING">Warnings (≥ 1 Strike)</option>
-                  <option value="LOCKED">Locked Workstations</option>
-                  <option value="SUBMITTED">Completed Submissions</option>
-                </select>
-              </div>
-            </div>
-
-            {/* Workstations Table */}
-            {filtered.length === 0 ? (
-              <div className="p-12 text-center text-slate-400 text-xs space-y-2">
-                <Monitor className="w-8 h-8 mx-auto text-slate-300" />
-                <p className="font-semibold text-slate-700">
-                  {isDedicatedRoom
-                    ? `No active examinees currently sitting for ${currentExamObj?.title || "this examination"}.`
-                    : "No active examination workstations match the query."}
-                </p>
-                <p className="text-[11px] text-slate-400 max-w-sm mx-auto">
-                  {isDedicatedRoom
-                    ? "Candidate workstations appear here automatically as candidates authenticate and begin their sitting."
-                    : "Select a specific examination card above to focus on that exam paper."}
-                </p>
-                {isDedicatedRoom && (
-                  <Link
-                    href="/admin/proctoring"
-                    className="mt-2 inline-flex items-center px-3 py-1.5 text-xs font-bold text-blue-700 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors"
-                  >
-                    View All Examinations Hub
-                  </Link>
-                )}
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs">
-                  <thead className="bg-slate-50/80 text-slate-500 font-bold uppercase tracking-wider text-[10px] border-b border-slate-200/80">
-                    <tr>
-                      <th className="py-3 px-4">Candidate {!isDedicatedRoom && "& Exam"}</th>
-                      <th className="py-3 px-3">Dept</th>
-                      <th className="py-3 px-3">Workstation &amp; Strikes</th>
-                      <th className="py-3 px-3">Extra Time</th>
-                      <th className="py-3 px-3">Status</th>
-                      <th className="py-3 px-4 text-right">Intervention &amp; Doubt</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 text-slate-700">
-                    {filtered.map((s) => {
-                      const isLocked = s.status === "LOCKED";
-                      const isSubmitted = s.status === "SUBMITTED";
-                      const isLoading = actionLoadingId === s.id || actionLoadingId === s.studentId;
-                      const sessionInquiries = inquiriesBySession.get(s.id) || [];
-                      const hasUnreadInquiry = sessionInquiries.some(
-                        (i) => i.sender === "CANDIDATE" && i.status !== "RESOLVED"
-                      );
+                {exams.length === 0 ? (
+                  <div className="p-8 text-center text-slate-400 text-xs bg-slate-50 border border-slate-200 rounded-xl">
+                    No configured examinations available.
+                  </div>
+                ) : (
+                  <div className="divide-y divide-slate-100 border border-slate-200 rounded-xl overflow-hidden shadow-2xs">
+                    {exams.map((exam) => {
+                      const examSessions = sessions.filter((s) => s.examId === exam.id);
+                      const inSessionCount = examSessions.filter((s) => s.status === "IN_PROGRESS").length;
+                      const struckOutCount = examSessions.filter((s) => s.status === "LOCKED").length;
+                      const submittedExCount = examSessions.filter((s) => s.status === "SUBMITTED").length;
 
                       return (
-                        <tr
-                          key={s.id}
-                          className={`hover:bg-slate-50/70 transition-colors ${
-                            isLocked ? "bg-red-50/30" : s.strikesCount > 0 ? "bg-amber-50/20" : ""
-                          }`}
+                        <div
+                          key={exam.id}
+                          className="p-3.5 sm:p-4 bg-white hover:bg-slate-50/90 transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-3 group"
                         >
-                          <td className="py-3 px-4">
-                            <div className="font-bold text-slate-900">{s.candidateName}</div>
-                            <div className="flex items-center space-x-1.5 mt-0.5">
-                              <span className="font-mono text-[10px] text-blue-700 font-semibold">
-                                {s.applicationNumber}
-                              </span>
-                              <span className="text-[9px] font-bold bg-blue-50 text-blue-700 px-1.5 py-0.2 rounded border border-blue-200 inline-flex items-center">
-                                <Globe className="w-2.5 h-2.5 mr-0.5" />
-                                Online
-                              </span>
+                          <div className="flex items-start sm:items-center space-x-3 min-w-0">
+                            <div className="w-9 h-9 rounded-xl bg-blue-50 group-hover:bg-blue-600 group-hover:text-white text-blue-700 font-mono font-bold text-xs flex items-center justify-center border border-blue-100 transition-colors flex-shrink-0 shadow-2xs">
+                              {exam.courseCode ? exam.courseCode.slice(0, 3) : "EX"}
                             </div>
-                            {!isDedicatedRoom && (
-                              <div className="text-[10px] text-slate-500 truncate max-w-xs mt-0.5 font-medium">
-                                <Link
-                                  href={`/admin/proctoring/${s.examId}`}
-                                  className="text-blue-700 hover:underline"
-                                  title="Open dedicated proctoring room for this exam"
-                                >
-                                  {s.examTitle} &rarr;
-                                </Link>
-                              </div>
-                            )}
-                            <div className="text-[10px] text-slate-400 truncate max-w-xs">{s.email}</div>
-                          </td>
-
-                          <td className="py-3 px-3">
-                            <span className="text-[10px] font-bold bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-md border border-indigo-200/60">
-                              {s.departmentCode}
-                            </span>
-                          </td>
-
-                          <td className="py-3 px-3">
-                            <div className="flex items-center space-x-1.5">
-                              <span
-                                className={`font-mono text-[10px] font-black px-2 py-0.5 rounded-md border ${
-                                  s.strikesCount === 0
-                                    ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                                    : s.strikesCount >= s.maxStrikes
-                                    ? "bg-red-50 text-red-700 border-red-300"
-                                    : "bg-amber-50 text-amber-800 border-amber-300"
-                                }`}
-                              >
-                                Strikes: {s.strikesCount} / {s.maxStrikes}
-                              </span>
-                              {(() => {
-                                const sessionEvidence = scopedViolations.find(
-                                  (v) => v.sessionId === s.id && v.snapshotUrl
-                                );
-                                if (!sessionEvidence) return null;
-                                return (
-                                  <button
-                                    type="button"
-                                    onClick={() => setSelectedEvidence(sessionEvidence)}
-                                    className="inline-flex items-center px-1.5 py-0.5 rounded-md bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 text-[9px] font-bold transition-colors cursor-pointer shadow-2xs"
-                                    title="View forensic webcam snapshot"
-                                  >
-                                    <Camera className="w-2.5 h-2.5 mr-0.5" />
-                                    Photo
-                                  </button>
-                                );
-                              })()}
-                            </div>
-                            <div className="font-mono text-[9px] text-slate-400 mt-1 truncate max-w-[140px]" title={s.hardwareFingerprint}>
-                              HW: {s.hardwareFingerprint}
-                            </div>
-                          </td>
-
-                          <td className="py-3 px-3 whitespace-nowrap">
-                            {s.extraTimeMinutes > 0 ? (
-                              <span className="text-[10px] font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-200">
-                                +{s.extraTimeMinutes} Mins
-                              </span>
-                            ) : (
-                              <span className="text-[10px] text-slate-400 font-medium">None</span>
-                            )}
-                          </td>
-
-                          <td className="py-3 px-3 whitespace-nowrap">
-                            {s.isPendingLateEntry && s.status === "LOCKED" ? (
-                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold border bg-amber-50 text-amber-800 border-amber-300 animate-pulse">
-                                <Clock className="w-3 h-3 mr-1 text-amber-600" />
-                                LATE (+{s.lateEntryDetails?.delayMinutes ?? 15}m)
-                              </span>
-                            ) : (
-                              <span
-                                className={`inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-extrabold tracking-wide border shadow-2xs ${
-                                  s.status === "IN_PROGRESS"
-                                    ? "bg-emerald-50 text-emerald-700 border-emerald-200/90"
-                                    : s.status === "LOCKED"
-                                    ? "bg-red-50 text-red-700 border-red-200/90 animate-pulse"
-                                    : s.status === "SUBMITTED"
-                                    ? "bg-blue-50 text-blue-700 border-blue-200/90"
-                                    : "bg-slate-100 text-slate-700 border-slate-200"
-                                }`}
-                              >
+                            <div className="min-w-0">
+                              <div className="flex items-center space-x-2">
+                                <h5 className="font-bold text-slate-900 text-xs sm:text-sm group-hover:text-blue-700 transition-colors truncate">
+                                  {exam.title}
+                                </h5>
                                 <span
-                                  className={`w-1.5 h-1.5 rounded-full mr-1.5 ${
-                                    s.status === "IN_PROGRESS"
-                                      ? "bg-emerald-600 animate-pulse"
-                                      : s.status === "LOCKED"
-                                      ? "bg-red-600 animate-pulse"
-                                      : s.status === "SUBMITTED"
-                                      ? "bg-blue-600"
-                                      : "bg-slate-400"
+                                  className={`text-[9px] font-bold px-1.5 py-0.2 rounded-full border ${
+                                    exam.status === "ONGOING" || exam.status === "ACTIVE"
+                                      ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                                      : exam.status === "COMPLETED"
+                                      ? "bg-slate-100 text-slate-600 border-slate-200"
+                                      : "bg-blue-50 text-blue-700 border-blue-200"
                                   }`}
-                                />
-                                {s.status === "IN_PROGRESS"
-                                  ? "IN SESSION"
-                                  : s.status}
-                              </span>
-                            )}
-                          </td>
-
-                          <td className="py-3 px-4 text-right whitespace-nowrap">
-                            <div className="inline-flex items-center space-x-1.5">
-                              {/* Open Candidate Chat / Doubt Desk */}
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setSelectedInquirySessionId(s.id);
-                                  setIsHelpdeskOpen(true);
-                                }}
-                                className={`p-1.5 rounded-lg border transition-all cursor-pointer relative shadow-2xs ${
-                                  hasUnreadInquiry
-                                    ? "bg-blue-600 text-white border-blue-700 hover:bg-blue-700"
-                                    : "bg-blue-50 text-blue-700 hover:bg-blue-100 border-blue-200"
-                                }`}
-                                title="Open Candidate Doubt & Chat Thread"
-                              >
-                                <MessageCircle className="w-3.5 h-3.5" />
-                                {hasUnreadInquiry && (
-                                  <span className="w-2 h-2 rounded-full bg-red-500 absolute -top-0.5 -right-0.5 ring-2 ring-white animate-pulse" />
-                                )}
-                              </button>
-
-                              {s.isPendingLateEntry && isLocked && (
-                                <button
-                                  type="button"
-                                  disabled={isLoading}
-                                  onClick={() => handleGrantLateEntry(s.id, s.candidateName)}
-                                  className="px-2 py-1 rounded-md bg-blue-700 text-white hover:bg-blue-800 text-[10px] font-bold transition-colors cursor-pointer shadow-2xs"
-                                  title="Grant Late Entry Exception"
                                 >
-                                  Approve
-                                </button>
-                              )}
-
-                              {/* Lock / Unlock Button */}
-                              {isLocked ? (
-                                <button
-                                  type="button"
-                                  disabled={isLoading}
-                                  onClick={() => handleUnlock(s.id)}
-                                  className="p-1.5 rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 transition-colors cursor-pointer shadow-2xs"
-                                  title="Unlock Workstation"
-                                >
-                                  <Unlock className="w-3.5 h-3.5" />
-                                </button>
-                              ) : (
-                                <button
-                                  type="button"
-                                  disabled={isLoading || isSubmitted}
-                                  onClick={() => handleLock(s.id)}
-                                  className="p-1.5 rounded-lg bg-red-50 text-red-700 hover:bg-red-100 border border-red-200 transition-colors cursor-pointer shadow-2xs disabled:opacity-40"
-                                  title="Freeze Workstation Immediately"
-                                >
-                                  <Lock className="w-3.5 h-3.5" />
-                                </button>
-                              )}
-
-                              {/* Issue Warning to Candidate Screen */}
-                              <button
-                                type="button"
-                                disabled={isLoading || isSubmitted}
-                                onClick={() => setWarningTarget({ sessionId: s.id, candidateName: s.candidateName })}
-                                className="p-1.5 rounded-lg bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200 transition-colors cursor-pointer shadow-2xs disabled:opacity-40"
-                                title="Dispatch Warning to Candidate Screen"
-                              >
-                                <Bell className="w-3.5 h-3.5" />
-                              </button>
-
-                              {/* Add Compensatory Time Button */}
-                              <button
-                                type="button"
-                                disabled={isLoading || isSubmitted}
-                                onClick={() => handleAddExtraTime(s.id, 5)}
-                                className="px-2 py-1 text-[10px] font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg transition-colors cursor-pointer shadow-2xs disabled:opacity-40"
-                                title="Add +5 Minutes Compensatory Time"
-                              >
-                                +5m
-                              </button>
-
-                              {/* Reset Strikes */}
-                              {s.strikesCount > 0 && (
-                                <button
-                                  type="button"
-                                  disabled={isLoading || isSubmitted}
-                                  onClick={() => handleResetStrikes(s.id)}
-                                  className="p-1.5 rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200 transition-colors cursor-pointer shadow-2xs"
-                                  title="Clear Strikes Counter"
-                                >
-                                  <RotateCcw className="w-3.5 h-3.5" />
-                                </button>
-                              )}
-
-                              {/* Rebind Hardware PC */}
-                              <button
-                                type="button"
-                                disabled={isLoading}
-                                onClick={() => handleRebindPC(s.studentId, s.candidateName)}
-                                className="p-1.5 rounded-lg bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200 transition-colors cursor-pointer shadow-2xs"
-                                title="Reset PC Hardware Lock (Release to New Machine)"
-                              >
-                                <Monitor className="w-3.5 h-3.5" />
-                              </button>
+                                  {exam.status}
+                                </span>
+                              </div>
+                              <div className="flex items-center space-x-2 text-[11px] text-slate-500 mt-0.5 flex-wrap">
+                                <span>⏱ {exam.durationMinutes || 90} Mins</span>
+                                <span>•</span>
+                                <span>
+                                  Passcode:{" "}
+                                  <strong className="font-mono text-slate-700">
+                                    {exam.passcode || "None"}
+                                  </strong>
+                                </span>
+                                <span>•</span>
+                                <span>
+                                  <strong>{examSessions.length}</strong> Examinees Sitting
+                                </span>
+                              </div>
                             </div>
-                          </td>
-                        </tr>
+                          </div>
+
+                          <div className="flex items-center space-x-3 justify-between sm:justify-end flex-shrink-0">
+                            <div className="flex items-center space-x-1.5 text-xs">
+                              {inSessionCount > 0 && (
+                                <span className="text-[10px] font-bold bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full border border-emerald-200">
+                                  {inSessionCount} in session
+                                </span>
+                              )}
+                              {struckOutCount > 0 && (
+                                <span className="text-[10px] font-bold bg-red-50 text-red-700 px-2 py-0.5 rounded-full border border-red-200">
+                                  {struckOutCount} locked
+                                </span>
+                              )}
+                              {submittedExCount > 0 && (
+                                <span className="text-[10px] font-bold bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full border border-blue-200">
+                                  {submittedExCount} finalized
+                                </span>
+                              )}
+                            </div>
+
+                            <Link
+                              href={`/admin/proctoring/${exam.id}`}
+                              className="inline-flex items-center space-x-1 px-3 py-1.5 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl transition-all shadow-2xs group-hover:shadow cursor-pointer"
+                            >
+                              <span>Enter Live Room</span>
+                              <ArrowRight className="w-3.5 h-3.5 ml-0.5 group-hover:translate-x-0.5 transition-transform" />
+                            </Link>
+                          </div>
+                        </div>
                       );
                     })}
-                  </tbody>
-                </table>
+                  </div>
+                )}
               </div>
-            )}
+            </div>
           </div>
-        </div>
 
-        {/* Right Column: Live Infraction Feed */}
-        <div className="lg:col-span-4 space-y-4">
-          <div className="bg-white border border-slate-200/90 rounded-2xl p-4 sm:p-5 shadow-xs space-y-3">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <div className="flex items-center space-x-2">
-                <ShieldAlert className="w-4 h-4 text-red-600" />
-                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800">
-                  {isDedicatedRoom ? "Exam Integrity Feed" : "Realtime Integrity Feed"}
-                </h3>
+          {/* Right Column (4 cols): Campus-Wide Realtime Integrity Feed */}
+          <div className="lg:col-span-4 space-y-4">
+            <div className="bg-white border border-slate-200/90 rounded-2xl p-4 sm:p-5 shadow-xs space-y-3">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                <div className="flex items-center space-x-2">
+                  <ShieldAlert className="w-4 h-4 text-red-600" />
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800">
+                    Campus-Wide Integrity Feed
+                  </h3>
+                </div>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-50 text-red-700 border border-red-200">
+                  {scopedViolations.length} Incidents
+                </span>
               </div>
-              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-50 text-red-700 border border-red-200">
-                {scopedViolations.length} Incidents
-              </span>
+
+              {scopedViolations.length === 0 ? (
+                <div className="p-8 text-center text-slate-400 text-xs space-y-1">
+                  <CheckCircle2 className="w-6 h-6 mx-auto text-emerald-500 mb-1" />
+                  <p className="font-bold text-slate-700">Clean Integrity Stream</p>
+                  <p className="text-[11px] text-slate-400">
+                    Zero security infractions registered across campus workstations.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-2 max-h-[500px] overflow-y-auto pr-1">
+                  {scopedViolations.map((v) => {
+                    const sess = sessions.find((s) => s.id === v.sessionId);
+                    const targetExamId = sess?.examId;
+
+                    return (
+                      <div
+                        key={v.id}
+                        className="p-2.5 rounded-xl bg-slate-50/80 border border-slate-200/80 text-xs space-y-1 hover:border-amber-300 transition-colors group"
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="font-bold text-slate-900 truncate max-w-[170px]">
+                            {v.candidateName}
+                          </span>
+                          <span className="text-[9px] font-extrabold px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-800 border border-amber-200">
+                            Strike #{v.strikeNumber}
+                          </span>
+                        </div>
+
+                        <div className="text-[11px] font-semibold text-amber-700 flex items-center space-x-1.5">
+                          <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0 text-amber-600" />
+                          <span className="truncate">{formatViolationType(v.violationType)}</span>
+                        </div>
+
+                        <div className="flex items-center justify-between text-[10px] text-slate-400 pt-0.5">
+                          <span className="font-mono text-slate-500">
+                            {v.departmentCode} • {v.applicationNumber}
+                          </span>
+                          <span suppressHydrationWarning>{formatTime(v.createdAt, true)}</span>
+                        </div>
+
+                        {/* Exam Title & Jump to Dedicated Room */}
+                        <div className="pt-1.5 flex items-center justify-between border-t border-slate-200/60 mt-1 text-[10px]">
+                          <span className="text-slate-600 font-medium truncate max-w-[140px]" title={v.examTitle}>
+                            {v.examTitle}
+                          </span>
+                          {targetExamId && (
+                            <Link
+                              href={`/admin/proctoring/${targetExamId}`}
+                              className="text-[10px] font-bold text-blue-700 hover:text-blue-800 hover:underline inline-flex items-center"
+                            >
+                              <span>Enter Room</span>
+                              <ArrowRight className="w-2.5 h-2.5 ml-0.5" />
+                            </Link>
+                          )}
+                        </div>
+
+                        {v.snapshotUrl && (
+                          <div className="pt-1 flex items-center justify-between border-t border-slate-200/60 mt-1">
+                            <button
+                              type="button"
+                              onClick={() => setSelectedEvidence(v)}
+                              className="inline-flex items-center px-2 py-0.5 rounded-md bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 text-[10px] font-bold transition-colors cursor-pointer shadow-2xs"
+                            >
+                              <Camera className="w-3 h-3 mr-1" />
+                              View Photo
+                            </button>
+                            <span className="text-[9px] text-emerald-700 font-bold bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200">
+                              Photo Captured
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
 
-            {scopedViolations.length === 0 ? (
-              <div className="p-8 text-center text-slate-400 text-xs space-y-1">
-                <CheckCircle2 className="w-6 h-6 mx-auto text-emerald-500 mb-1" />
-                <p className="font-bold text-slate-700">Clean Integrity Stream</p>
-                <p className="text-[11px] text-slate-400">
-                  {isDedicatedRoom
-                    ? "Zero security infractions registered for this examination."
-                    : "Zero security infractions registered across workstations."}
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-2 max-h-[500px] overflow-y-auto pr-1">
-                {scopedViolations.map((v) => (
-                  <div
-                    key={v.id}
-                    className="p-2.5 rounded-xl bg-slate-50/80 border border-slate-200/80 text-xs space-y-1 hover:border-amber-300 transition-colors group"
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="font-bold text-slate-900 truncate max-w-[170px]">
-                        {v.candidateName}
-                      </span>
-                      <span className="text-[9px] font-extrabold px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-800 border border-amber-200">
-                        Strike #{v.strikeNumber}
-                      </span>
-                    </div>
-
-                    <div className="text-[11px] font-semibold text-amber-700 flex items-center space-x-1.5">
-                      <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0 text-amber-600" />
-                      <span className="truncate">{formatViolationType(v.violationType)}</span>
-                    </div>
-
-                    <div className="flex items-center justify-between text-[10px] text-slate-400 pt-0.5">
-                      <span className="font-mono text-slate-500">{v.departmentCode} • {v.applicationNumber}</span>
-                      <span suppressHydrationWarning>{formatTime(v.createdAt, true)}</span>
-                    </div>
-
-                    {v.snapshotUrl && (
-                      <div className="pt-1.5 flex items-center justify-between border-t border-slate-200/60 mt-1">
-                        <button
-                          type="button"
-                          onClick={() => setSelectedEvidence(v)}
-                          className="inline-flex items-center px-2 py-0.5 rounded-md bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 text-[10px] font-bold transition-colors cursor-pointer shadow-2xs"
-                        >
-                          <Camera className="w-3 h-3 mr-1" />
-                          View Photo
-                        </button>
-                        <span className="text-[9px] text-emerald-700 font-bold bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200">
-                          Photo Captured
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Quick Hardware Lockdown Specs */}
-          <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 text-xs space-y-2 text-slate-600">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block">
-              Proctor Lockdown Protocol
-            </span>
-            <p className="text-[11px] leading-relaxed">
-              When a candidate reaches their strike threshold, their workstation renders an unbypassable
-              lockout dialog. Invigilators can review the integrity log, resolve student inquiries, and choose to <strong>Unlock</strong> or
-              rebind hardware if legitimate issues occurred.
-            </p>
+            {/* Quick Hardware Lockdown Specs */}
+            <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 text-xs space-y-2 text-slate-600">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block">
+                Institutional Lockdown Standard
+              </span>
+              <p className="text-[11px] leading-relaxed">
+                Workstations operate under strict anti-tamper controls. Click on any active examination above to monitor live examinee feeds, manage locks, grant extra time, and assist students.
+              </p>
+            </div>
           </div>
         </div>
-      </div>
+      ) : (
+        /* =====================================================================
+           DEDICATED EXAM ROOM VIEW: Upgraded Candidate Workstations (8 cols) + Scoped Feed (4 cols)
+           ===================================================================== */
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+          {/* Left Column (8 cols): Scoped Candidate Workstations with Elevated UI/UX */}
+          <div className="lg:col-span-8 space-y-4">
+            <div className="bg-white border border-slate-200/90 rounded-2xl overflow-hidden shadow-xs">
+              {/* Filter & Search Bar */}
+              <div className="p-4 sm:p-4.5 border-b border-slate-200/90 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-center space-x-2.5">
+                  <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-700 flex items-center justify-center border border-blue-100 flex-shrink-0 shadow-2xs">
+                    <Monitor className="w-4 h-4" />
+                  </div>
+                  <div className="flex items-center space-x-2 flex-wrap">
+                    <h3 className="text-sm font-bold text-slate-900 tracking-tight">
+                      Candidate Workstations
+                    </h3>
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
+                      {filtered.length} Total
+                    </span>
+                    {currentExamObj && (
+                      <span className="text-xs text-blue-700 font-bold bg-blue-50 px-2 py-0.5 rounded-md border border-blue-100">
+                        Scoped to {currentExamObj.title}
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex items-center space-x-2 flex-wrap gap-y-2">
+                  <div className="relative">
+                    <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                    <input
+                      type="text"
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      placeholder="Search candidate, app no, email..."
+                      className="pl-9 pr-7 py-1.5 text-xs bg-slate-50 hover:bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 text-slate-900 w-48 sm:w-60 transition-all shadow-2xs"
+                    />
+                    {searchTerm && (
+                      <button
+                        type="button"
+                        onClick={() => setSearchTerm("")}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 cursor-pointer"
+                        title="Clear search"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+
+                  <select
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value)}
+                    className="px-3 py-1.5 text-xs bg-slate-50 hover:bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 text-slate-700 font-semibold cursor-pointer shadow-2xs transition-all"
+                  >
+                    <option value="ALL">All Status ({scopedSessions.length})</option>
+                    <option value="ACTIVE">In Session ({activeCount})</option>
+                    <option value="WARNING">Warnings / Strikes ({warningCount})</option>
+                    <option value="LOCKED">Locked ({lockedCount})</option>
+                    <option value="SUBMITTED">Submitted ({submittedCount})</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Workstations Table with Modernized UI/UX */}
+              {filtered.length === 0 ? (
+                <div className="p-12 text-center text-slate-400 text-xs space-y-2">
+                  <Monitor className="w-8 h-8 mx-auto text-slate-300" />
+                  <p className="font-semibold text-slate-700">
+                    No active examinees currently match this filter.
+                  </p>
+                  <p className="text-[11px] text-slate-400 max-w-sm mx-auto">
+                    Candidate workstations appear here automatically as candidates authenticate and begin their sitting for this examination paper.
+                  </p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-slate-50/80 text-slate-500 font-bold uppercase tracking-wider text-[10px] border-b border-slate-200/80">
+                      <tr>
+                        <th className="py-3 px-4">Candidate</th>
+                        <th className="py-3 px-3">Dept</th>
+                        <th className="py-3 px-3">Workstation &amp; Strikes</th>
+                        <th className="py-3 px-3">Compensatory Time</th>
+                        <th className="py-3 px-3">Status</th>
+                        <th className="py-3 px-4 text-right">Intervention &amp; Doubt</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 text-slate-700">
+                      {filtered.map((s) => {
+                        const isLocked = s.status === "LOCKED";
+                        const isSubmitted = s.status === "SUBMITTED";
+                        const isLoading = actionLoadingId === s.id || actionLoadingId === s.studentId;
+                        const sessionInquiries = inquiriesBySession.get(s.id) || [];
+                        const hasUnreadInquiry = sessionInquiries.some(
+                          (i) => i.sender === "CANDIDATE" && i.status !== "RESOLVED"
+                        );
+
+                        return (
+                          <tr
+                            key={s.id}
+                            className={`hover:bg-slate-50/80 transition-colors ${
+                              isLocked ? "bg-red-50/30" : s.strikesCount > 0 ? "bg-amber-50/20" : ""
+                            }`}
+                          >
+                            {/* Candidate Column: Avatar + Full Name + App ID + Email + Online Indicator */}
+                            <td className="py-3.5 px-4">
+                              <div className="flex items-center space-x-3">
+                                <div
+                                  className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold text-xs border shadow-2xs flex-shrink-0 ${getAvatarColor(
+                                    s.candidateName
+                                  )}`}
+                                >
+                                  {getInitials(s.candidateName)}
+                                </div>
+
+                                <div className="min-w-0">
+                                  <div className="flex items-center space-x-2">
+                                    <span className="font-bold text-slate-900 text-xs sm:text-sm tracking-tight truncate">
+                                      {s.candidateName}
+                                    </span>
+                                    <span className="text-[9px] font-bold bg-emerald-50 text-emerald-700 px-1.5 py-0.2 rounded border border-emerald-200 inline-flex items-center flex-shrink-0">
+                                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse mr-1" />
+                                      Online
+                                    </span>
+                                  </div>
+
+                                  <div className="flex items-center space-x-2 mt-0.5">
+                                    <span className="font-mono text-[10px] text-blue-700 font-bold bg-blue-50/80 px-1.5 py-0.2 rounded border border-blue-100">
+                                      {s.applicationNumber}
+                                    </span>
+                                    <span className="text-[10px] text-slate-400 truncate max-w-[170px]" title={s.email}>
+                                      {s.email}
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+                            </td>
+
+                            {/* Dept Column */}
+                            <td className="py-3.5 px-3">
+                              <span className="text-[10px] font-bold bg-slate-100 text-slate-700 px-2 py-0.5 rounded-md border border-slate-200 font-mono">
+                                {s.departmentCode}
+                              </span>
+                            </td>
+
+                            {/* Workstation & Strikes Column */}
+                            <td className="py-3.5 px-3">
+                              <div className="flex items-center space-x-1.5">
+                                <span
+                                  className={`font-mono text-[10px] font-black px-2 py-0.5 rounded-md border inline-flex items-center ${
+                                    s.strikesCount === 0
+                                      ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                                      : s.strikesCount >= s.maxStrikes
+                                      ? "bg-red-50 text-red-700 border-red-300"
+                                      : "bg-amber-50 text-amber-800 border-amber-300"
+                                  }`}
+                                >
+                                  {s.strikesCount === 0 ? (
+                                    <>
+                                      <Check className="w-2.5 h-2.5 mr-1 text-emerald-600" />
+                                      <span>0 / {s.maxStrikes} Clean</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <AlertTriangle className="w-2.5 h-2.5 mr-1 text-amber-600" />
+                                      <span>{s.strikesCount} / {s.maxStrikes} Strikes</span>
+                                    </>
+                                  )}
+                                </span>
+
+                                {/* Forensic photo evidence button */}
+                                {(() => {
+                                  const sessionEvidence = scopedViolations.find(
+                                    (v) => v.sessionId === s.id && v.snapshotUrl
+                                  );
+                                  if (!sessionEvidence) return null;
+                                  return (
+                                    <button
+                                      type="button"
+                                      onClick={() => setSelectedEvidence(sessionEvidence)}
+                                      className="inline-flex items-center px-1.5 py-0.5 rounded-md bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 text-[9px] font-bold transition-colors cursor-pointer shadow-2xs"
+                                      title="View forensic webcam snapshot"
+                                    >
+                                      <Camera className="w-2.5 h-2.5 mr-0.5" />
+                                      Photo
+                                    </button>
+                                  );
+                                })()}
+                              </div>
+                              <div
+                                className="font-mono text-[9px] text-slate-400 mt-1 truncate max-w-[140px]"
+                                title={s.hardwareFingerprint}
+                              >
+                                HW: {s.hardwareFingerprint}
+                              </div>
+                            </td>
+
+                            {/* Compensatory Time Column */}
+                            <td className="py-3.5 px-3 whitespace-nowrap">
+                              {s.extraTimeMinutes > 0 ? (
+                                <span className="inline-flex items-center space-x-1 text-[10px] font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-200">
+                                  <Clock className="w-2.5 h-2.5 text-blue-600" />
+                                  <span>+{s.extraTimeMinutes} Mins</span>
+                                </span>
+                              ) : (
+                                <span className="text-[10px] text-slate-400 font-medium">Standard</span>
+                              )}
+                            </td>
+
+                            {/* Status Column */}
+                            <td className="py-3.5 px-3 whitespace-nowrap">
+                              {s.isPendingLateEntry && s.status === "LOCKED" ? (
+                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold border bg-amber-50 text-amber-800 border-amber-300 animate-pulse">
+                                  <Clock className="w-3 h-3 mr-1 text-amber-600" />
+                                  LATE (+{s.lateEntryDetails?.delayMinutes ?? 15}m)
+                                </span>
+                              ) : (
+                                <span
+                                  className={`inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-extrabold tracking-wide border shadow-2xs ${
+                                    s.status === "IN_PROGRESS"
+                                      ? "bg-emerald-50 text-emerald-700 border-emerald-200/90"
+                                      : s.status === "LOCKED"
+                                      ? "bg-red-50 text-red-700 border-red-200/90 animate-pulse"
+                                      : s.status === "SUBMITTED"
+                                      ? "bg-blue-50 text-blue-700 border-blue-200/90"
+                                      : "bg-slate-100 text-slate-700 border-slate-200"
+                                  }`}
+                                >
+                                  <span
+                                    className={`w-1.5 h-1.5 rounded-full mr-1.5 ${
+                                      s.status === "IN_PROGRESS"
+                                        ? "bg-emerald-600 animate-pulse"
+                                        : s.status === "LOCKED"
+                                        ? "bg-red-600 animate-pulse"
+                                        : s.status === "SUBMITTED"
+                                        ? "bg-blue-600"
+                                        : "bg-slate-400"
+                                    }`}
+                                  />
+                                  {s.status === "IN_PROGRESS"
+                                    ? "IN SESSION"
+                                    : s.status}
+                                </span>
+                              )}
+                            </td>
+
+                            {/* Invigilator Action Suite */}
+                            <td className="py-3.5 px-4 text-right whitespace-nowrap">
+                              <div className="inline-flex items-center space-x-1.5">
+                                {/* Open Candidate Chat / Doubt Desk */}
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setSelectedInquirySessionId(s.id);
+                                    setIsHelpdeskOpen(true);
+                                  }}
+                                  className={`p-1.5 rounded-lg border transition-all cursor-pointer relative shadow-2xs ${
+                                    hasUnreadInquiry
+                                      ? "bg-blue-600 text-white border-blue-700 hover:bg-blue-700 ring-2 ring-blue-400/40"
+                                      : "bg-blue-50 text-blue-700 hover:bg-blue-100 border-blue-200"
+                                  }`}
+                                  title={hasUnreadInquiry ? "Candidate has unread inquiry/doubt!" : "Open Candidate Doubt & Chat Thread"}
+                                >
+                                  <MessageCircle className="w-3.5 h-3.5" />
+                                  {hasUnreadInquiry && (
+                                    <span className="w-2 h-2 rounded-full bg-red-500 absolute -top-0.5 -right-0.5 ring-2 ring-white animate-pulse" />
+                                  )}
+                                </button>
+
+                                {s.isPendingLateEntry && isLocked && (
+                                  <button
+                                    type="button"
+                                    disabled={isLoading}
+                                    onClick={() => handleGrantLateEntry(s.id, s.candidateName)}
+                                    className="px-2 py-1 rounded-md bg-blue-700 text-white hover:bg-blue-800 text-[10px] font-bold transition-colors cursor-pointer shadow-2xs"
+                                    title="Grant Late Entry Exception"
+                                  >
+                                    Approve
+                                  </button>
+                                )}
+
+                                {/* Lock / Unlock Button */}
+                                {isLocked ? (
+                                  <button
+                                    type="button"
+                                    disabled={isLoading}
+                                    onClick={() => handleUnlock(s.id)}
+                                    className="p-1.5 rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 transition-colors cursor-pointer shadow-2xs"
+                                    title="Unlock Workstation"
+                                  >
+                                    <Unlock className="w-3.5 h-3.5" />
+                                  </button>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    disabled={isLoading || isSubmitted}
+                                    onClick={() => handleLock(s.id)}
+                                    className="p-1.5 rounded-lg bg-red-50 text-red-700 hover:bg-red-100 border border-red-200 transition-colors cursor-pointer shadow-2xs disabled:opacity-40"
+                                    title="Freeze Workstation Immediately"
+                                  >
+                                    <Lock className="w-3.5 h-3.5" />
+                                  </button>
+                                )}
+
+                                {/* Issue Warning to Candidate Screen */}
+                                <button
+                                  type="button"
+                                  disabled={isLoading || isSubmitted}
+                                  onClick={() => setWarningTarget({ sessionId: s.id, candidateName: s.candidateName })}
+                                  className="p-1.5 rounded-lg bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200 transition-colors cursor-pointer shadow-2xs disabled:opacity-40"
+                                  title="Dispatch Warning to Candidate Screen"
+                                >
+                                  <Bell className="w-3.5 h-3.5" />
+                                </button>
+
+                                {/* Add Compensatory Time Button */}
+                                <button
+                                  type="button"
+                                  disabled={isLoading || isSubmitted}
+                                  onClick={() => handleAddExtraTime(s.id, 5)}
+                                  className="px-2 py-1 text-[10px] font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg transition-colors cursor-pointer shadow-2xs disabled:opacity-40"
+                                  title="Add +5 Minutes Compensatory Time"
+                                >
+                                  +5m
+                                </button>
+
+                                {/* Reset Strikes */}
+                                {s.strikesCount > 0 && (
+                                  <button
+                                    type="button"
+                                    disabled={isLoading || isSubmitted}
+                                    onClick={() => handleResetStrikes(s.id)}
+                                    className="p-1.5 rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200 transition-colors cursor-pointer shadow-2xs"
+                                    title="Clear Strikes Counter"
+                                  >
+                                    <RotateCcw className="w-3.5 h-3.5" />
+                                  </button>
+                                )}
+
+                                {/* Rebind Hardware PC */}
+                                <button
+                                  type="button"
+                                  disabled={isLoading}
+                                  onClick={() => handleRebindPC(s.studentId, s.candidateName)}
+                                  className="p-1.5 rounded-lg bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200 transition-colors cursor-pointer shadow-2xs"
+                                  title="Reset PC Hardware Lock (Release to New Machine)"
+                                >
+                                  <Monitor className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Right Column: Live Infraction Feed (Scoped to this exam) */}
+          <div className="lg:col-span-4 space-y-4">
+            <div className="bg-white border border-slate-200/90 rounded-2xl p-4 sm:p-5 shadow-xs space-y-3">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                <div className="flex items-center space-x-2">
+                  <ShieldAlert className="w-4 h-4 text-red-600" />
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800">
+                    Exam Integrity Feed
+                  </h3>
+                </div>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-50 text-red-700 border border-red-200">
+                  {scopedViolations.length} Incidents
+                </span>
+              </div>
+
+              {scopedViolations.length === 0 ? (
+                <div className="p-8 text-center text-slate-400 text-xs space-y-1">
+                  <CheckCircle2 className="w-6 h-6 mx-auto text-emerald-500 mb-1" />
+                  <p className="font-bold text-slate-700">Clean Integrity Stream</p>
+                  <p className="text-[11px] text-slate-400">
+                    Zero security infractions registered for this examination.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-2 max-h-[500px] overflow-y-auto pr-1">
+                  {scopedViolations.map((v) => (
+                    <div
+                      key={v.id}
+                      className="p-2.5 rounded-xl bg-slate-50/80 border border-slate-200/80 text-xs space-y-1 hover:border-amber-300 transition-colors group"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-slate-900 truncate max-w-[170px]">
+                          {v.candidateName}
+                        </span>
+                        <span className="text-[9px] font-extrabold px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-800 border border-amber-200">
+                          Strike #{v.strikeNumber}
+                        </span>
+                      </div>
+
+                      <div className="text-[11px] font-semibold text-amber-700 flex items-center space-x-1.5">
+                        <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0 text-amber-600" />
+                        <span className="truncate">{formatViolationType(v.violationType)}</span>
+                      </div>
+
+                      <div className="flex items-center justify-between text-[10px] text-slate-400 pt-0.5">
+                        <span className="font-mono text-slate-500">{v.departmentCode} • {v.applicationNumber}</span>
+                        <span suppressHydrationWarning>{formatTime(v.createdAt, true)}</span>
+                      </div>
+
+                      {v.snapshotUrl && (
+                        <div className="pt-1.5 flex items-center justify-between border-t border-slate-200/60 mt-1">
+                          <button
+                            type="button"
+                            onClick={() => setSelectedEvidence(v)}
+                            className="inline-flex items-center px-2 py-0.5 rounded-md bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 text-[10px] font-bold transition-colors cursor-pointer shadow-2xs"
+                          >
+                            <Camera className="w-3 h-3 mr-1" />
+                            View Photo
+                          </button>
+                          <span className="text-[9px] text-emerald-700 font-bold bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200">
+                            Photo Captured
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Quick Hardware Lockdown Specs */}
+            <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 text-xs space-y-2 text-slate-600">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block">
+                Proctor Lockdown Protocol
+              </span>
+              <p className="text-[11px] leading-relaxed">
+                When a candidate reaches their strike threshold, their workstation renders an unbypassable
+                lockout dialog. Invigilators can review the integrity log, resolve student inquiries, and choose to <strong>Unlock</strong> or
+                rebind hardware if legitimate issues occurred.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* =====================================================================
           3. CANDIDATE HELPDESK & DOUBT ASSISTANCE DRAWER / MODAL
