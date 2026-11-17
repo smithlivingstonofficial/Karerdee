@@ -86,7 +86,7 @@ export async function getExamAuthoringContextAction(): Promise<{
         question_type: q.question_type || "MCQ_SINGLE",
         prompt: q.prompt || "",
         code_snippet: q.code_snippet || null,
-        points: Number(q.default_points ?? 1),
+        points: 1, // Standardized 1 mark
         negative_points: Number(q.default_negative_points ?? 0),
         difficulty: q.difficulty || "MEDIUM",
         options: (q.options || [])
@@ -312,7 +312,7 @@ export async function saveExamAction(payload: SaveExamPayload) {
           title: sec.title.trim() || "Untitled Section",
           is_common: sec.isCommon,
           target_departments: sec.targetDepartments || [],
-          default_points: sec.defaultPoints || 1,
+          default_points: 1, // Standardized 1 mark
           default_negative_points: payload.exam.enableNegativeMarking ? sec.defaultNegativePoints : 0,
           order_index: sec.orderIndex || 1,
           config: sectionConfig,
@@ -410,7 +410,7 @@ export async function saveExamAction(payload: SaveExamPayload) {
           question_type: q.questionType || "MCQ_SINGLE",
           prompt: q.prompt.trim(),
           code_snippet: q.codeSnippet?.trim() || null,
-          points: q.points || 1,
+          points: 1, // Standardized 1 mark
           negative_points: payload.exam.enableNegativeMarking ? q.negativePoints : 0,
           rubric_criteria: sectionIsCommonMap.get(resolvedSectionId)
             ? null

@@ -496,8 +496,8 @@ export async function POST(req: NextRequest) {
         questionType: q.question_type,
         prompt: q.prompt,
         codeSnippet: q.code_snippet,
-        points: q.points,
-        negativePoints: exam.enable_negative_marking ? (q.negative_points || 0) : 0,
+        points: 1, // Standardized 1 mark
+        negativePoints: exam.enable_negative_marking ? (q.negative_points || 0.25) : 0,
         orderIndex: q.order_index,
         options: opts,
       };

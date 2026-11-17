@@ -179,7 +179,7 @@ export function QuestionModal({
       questionType,
       prompt: prompt.trim(),
       codeSnippet: showCodeSnippet && codeSnippet.trim() ? codeSnippet.trim() : null,
-      defaultPoints: Number(defaultPoints) || 1.0,
+      defaultPoints: 1.0,
       defaultNegativePoints: Number(defaultNegativePoints) || 0.0,
       options,
     };
@@ -377,20 +377,16 @@ export function QuestionModal({
             )}
           </div>
 
-          {/* Points & Negative Points */}
+          {/* Scoring & Penalty */}
           <div className="grid grid-cols-2 gap-4 p-3 bg-slate-50 rounded-xl border border-slate-200">
             <div>
               <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
-                Default Points
+                Question Marks
               </label>
-              <input
-                type="number"
-                step="0.5"
-                min="0.5"
-                value={defaultPoints}
-                onChange={(e) => setDefaultPoints(parseFloat(e.target.value) || 1)}
-                className="w-full px-3 py-1.5 text-xs bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-700"
-              />
+              <div className="flex items-center space-x-2 px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-900 text-xs font-bold">
+                <span className="text-blue-700">1.0 Mark</span>
+                <span className="text-[10px] text-slate-400 font-normal">(Standardized)</span>
+              </div>
             </div>
             <div>
               <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">

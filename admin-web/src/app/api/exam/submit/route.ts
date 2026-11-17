@@ -170,11 +170,11 @@ export async function POST(req: NextRequest) {
             selectedIds.every((id: string) => correctOptIds.has(id));
 
           if (isAllCorrect) {
-            awardedMarks = Number(q.points) || 1;
+            awardedMarks = 1; // Standardized: Exactly 1 mark per correct question
           } else {
             // Deduct negative points if applicable
             if (isNegativeMarking) {
-              awardedMarks = -(Number(q.negative_points) || 0);
+              awardedMarks = -(Number(q.negative_points) || 0.25);
             }
           }
           isEvaluated = true;

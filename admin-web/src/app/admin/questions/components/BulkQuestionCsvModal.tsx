@@ -93,7 +93,7 @@ export function BulkQuestionCsvModal({
       const optionC = clean(values[8]);
       const optionD = clean(values[9]);
       const correctAnswers = clean(values[10]).toUpperCase() || "A";
-      const points = parseFloat(clean(values[11])) || 1.0;
+      const points = 1.0; // Standardized: Exactly 1 mark per question
       const negativePoints = parseFloat(clean(values[12])) || 0.0;
 
       // Validate Department Code

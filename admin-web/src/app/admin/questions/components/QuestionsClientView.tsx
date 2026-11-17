@@ -394,8 +394,8 @@ export function QuestionsClientView({
                   </div>
 
                   <div className="flex items-center space-x-1.5 self-end sm:self-center">
-                    <span className="text-xs font-bold text-slate-700 bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-200 shadow-2xs">
-                      +{q.default_points} pts {q.default_negative_points > 0 && `(-${q.default_negative_points})`}
+                    <span className="text-xs font-bold text-blue-700 bg-blue-50 px-2.5 py-1 rounded-lg border border-blue-200 shadow-2xs">
+                      1 Mark {q.default_negative_points > 0 && `(-${q.default_negative_points})`}
                     </span>
                     <button
                       type="button"

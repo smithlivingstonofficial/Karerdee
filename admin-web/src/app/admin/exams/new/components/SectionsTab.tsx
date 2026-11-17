@@ -431,19 +431,9 @@ export function SectionsTab({
                   Marks / Penalty
                 </label>
                 <div className="flex items-center space-x-1">
-                  <input
-                    type="number"
-                    step="0.25"
-                    min="0.25"
-                    value={activeSection.defaultPoints ?? 1.0}
-                    onChange={(e) =>
-                      updateActiveSection({
-                        defaultPoints: parseFloat(e.target.value) || 1.0,
-                      })
-                    }
-                    className="w-full px-1.5 py-1 text-xs font-bold bg-white border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:ring-1 focus:ring-blue-600 text-center"
-                    title="Positive Marks"
-                  />
+                  <div className="w-full px-1.5 py-1 text-xs font-bold bg-white border border-slate-200 rounded-lg text-blue-700 text-center shadow-2xs" title="Standardized: 1 Mark per question">
+                    1.0 Mark
+                  </div>
 
                   {enableNegativeMarking && (
                     <input
@@ -462,7 +452,7 @@ export function SectionsTab({
                   )}
                 </div>
                 <p className="text-[9px] text-slate-400 leading-tight">
-                  {enableNegativeMarking ? "Marks | Penalty deduct" : "Default question points"}
+                  {enableNegativeMarking ? "1 Mark (Fixed) | Penalty deduct" : "Standardized 1 Mark / Q"}
                 </p>
               </div>
             </div>

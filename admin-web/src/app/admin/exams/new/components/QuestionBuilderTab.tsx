@@ -112,7 +112,7 @@ export function QuestionBuilderTab({
       targetDepartment: !isPartCommon ? effectiveDeptTrack : null,
       questionType: type,
       prompt: "",
-      points: activeSection.defaultPoints ?? 1.0,
+      points: 1.0, // Standardized 1 mark
       negativePoints: activeSection.defaultNegativePoints ?? 0.25,
       orderIndex: sectionQuestions.length + 1,
       options: [
@@ -586,22 +586,13 @@ export function QuestionBuilderTab({
                   )}
                 </div>
 
-                {/* Score & Negative Penalty Inputs */}
+                {/* Scoring Weight & Negative Penalty */}
                 <div className="flex items-center space-x-3 self-end sm:self-center">
                   <div className="flex items-center space-x-1.5">
                     <span className="text-xs text-slate-500 font-semibold">Marks:</span>
-                    <input
-                      type="number"
-                      step="0.25"
-                      min="0.25"
-                      value={q.points}
-                      onChange={(e) =>
-                        updateQuestion(q.id, {
-                          points: parseFloat(e.target.value) || 1.0,
-                        })
-                      }
-                      className="w-14 px-1.5 py-1 text-xs font-bold text-slate-900 bg-slate-50 border border-slate-200 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-600 text-center"
-                    />
+                    <span className="px-2 py-0.5 text-xs font-bold text-blue-700 bg-blue-50 border border-blue-200 rounded-md">
+                      1 Mark
+                    </span>
                   </div>
 
                   {enableNegativeMarking && (

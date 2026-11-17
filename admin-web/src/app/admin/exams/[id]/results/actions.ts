@@ -81,6 +81,7 @@ export interface ExamGradebookData {
     enableNegativeMarking: boolean;
     passingScorePercentage: number;
     totalPossiblePoints: number;
+    totalBankQuestions?: number;
   };
   metrics: {
     totalEnrolled: number;
@@ -377,12 +378,9 @@ export async function getExamGradebookAction(examId: string): Promise<{
         return targetDept === studentDeptCode;
       });
 
-      // Max score and total questions strictly for this candidate's allocation
-      const candidateMaxScore = allocatedQuestions.reduce(
-        (acc, q) => acc + (Number(q.points) || 1),
-        0
-      );
+      // STANDARDIZED: Exactly 1 Mark per Question. Total Marks = Total Questions.
       const candidateTotalQuestions = allocatedQuestions.length;
+      const candidateMaxScore = candidateTotalQuestions; // Total Mark = Total Questions
 
       const questionBreakdown: CandidateQuestionResult[] = [];
       let attemptedCount = 0;
@@ -417,13 +415,13 @@ export async function getExamGradebookAction(examId: string): Promise<{
             selectedIds.every((id) => correctOptIds.includes(id));
           if (isExactMatch) {
             isCorrect = true;
-            awardedPoints = Number(q.points) || 1;
+            awardedPoints = 1; // Exactly 1 mark per correct question
           } else {
             isCorrect = false;
-            awardedPoints = isNegativeMarking ? -(Number(q.negative_points) || 0) : 0;
+            awardedPoints = isNegativeMarking ? -(Number(q.negative_points) || 0.25) : 0;
           }
         } else if (typeof sub?.awarded_points === "number") {
-          awardedPoints = sub.awarded_points;
+          awardedPoints = sub.awarded_points > 0 ? 1 : (isNegativeMarking && sub.awarded_points < 0 ? sub.awarded_points : 0);
           isCorrect = awardedPoints > 0;
         }
 
@@ -449,8 +447,8 @@ export async function getExamGradebookAction(examId: string): Promise<{
           sectionTitle,
           prompt: q.prompt,
           questionType: q.question_type,
-          points: Number(q.points) || 1,
-          negativePoints: Number(q.negative_points) || 0,
+          points: 1, // Standardized 1 mark
+          negativePoints: isNegativeMarking ? (Number(q.negative_points) || 0.25) : 0,
           selectedOptionIds: selectedIds,
           selectedOptionTexts: selectedTexts,
           correctOptionIds: correctOptIds,
@@ -470,10 +468,10 @@ export async function getExamGradebookAction(examId: string): Promise<{
       let calculatedScore = 0;
       if (typeof sess?.final_score === "number") {
         calculatedScore = sess.final_score;
-      } else if (typeof sess?.auto_score === "number" && sess.auto_score > 0) {
-        calculatedScore = sess.auto_score;
-      } else if (earnedScore > 0) {
+      } else if (userSubmissions.length > 0) {
         calculatedScore = earnedScore;
+      } else if (typeof sess?.auto_score === "number") {
+        calculatedScore = sess.auto_score;
       } else {
         calculatedScore = 0;
       }
@@ -628,7 +626,7 @@ export async function getExamGradebookAction(examId: string): Promise<{
         sectionTitle: sectionTitleMap.get(q.section_id) || "Section",
         prompt: q.prompt,
         orderIndex: q.order_index,
-        points: Number(q.points) || 1,
+        points: 1, // Standardized 1 mark per question
         totalAttempts: stat.attempts,
         correctAttempts: stat.correct,
         incorrectAttempts: stat.incorrect,
@@ -637,6 +635,12 @@ export async function getExamGradebookAction(examId: string): Promise<{
         difficultyRating,
       };
     });
+
+    // Paper marks per examinee: Total Marks = Total Questions
+    const standardPaperTotalMarks =
+      candidatesList.length > 0 && candidatesList[0].totalQuestions > 0
+        ? candidatesList[0].totalQuestions
+        : dbQuestions?.length || 0;
 
     return {
       data: {
@@ -651,7 +655,8 @@ export async function getExamGradebookAction(examId: string): Promise<{
           maxStrikes: exam.max_strikes || 3,
           enableNegativeMarking: Boolean(exam.enable_negative_marking),
           passingScorePercentage,
-          totalPossiblePoints,
+          totalPossiblePoints: standardPaperTotalMarks,
+          totalBankQuestions: dbQuestions?.length || 0,
         },
         metrics: {
           totalEnrolled: eligibleStudents.length,

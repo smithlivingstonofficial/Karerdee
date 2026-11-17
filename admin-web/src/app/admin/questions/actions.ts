@@ -50,7 +50,7 @@ export async function createQuestionAction(data: QuestionInput) {
         question_type: data.questionType || "MCQ_SINGLE",
         prompt: data.prompt.trim(),
         code_snippet: data.codeSnippet?.trim() || null,
-        default_points: data.defaultPoints || 1.0,
+        default_points: 1.0, // Standardized 1 mark
         default_negative_points: data.defaultNegativePoints || 0.0,
       })
       .select("id")
@@ -112,7 +112,7 @@ export async function updateQuestionAction(
         question_type: data.questionType || "MCQ_SINGLE",
         prompt: data.prompt.trim(),
         code_snippet: data.codeSnippet?.trim() || null,
-        default_points: data.defaultPoints || 1.0,
+        default_points: 1.0, // Standardized 1 mark
         default_negative_points: data.defaultNegativePoints || 0.0,
       })
       .eq("id", questionId);
@@ -242,7 +242,7 @@ export async function bulkImportQuestionsAction(rows: BulkQuestionCsvRow[]) {
           question_type: qType,
           prompt: r.prompt.trim(),
           code_snippet: r.codeSnippet?.trim() || null,
-          default_points: Number(r.points) || 1.0,
+          default_points: 1.0, // Standardized 1 mark
           default_negative_points: Number(r.negativePoints) || 0.0,
         })
         .select("id")

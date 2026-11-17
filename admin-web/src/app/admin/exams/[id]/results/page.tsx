@@ -147,8 +147,8 @@ export default function ExamResultsGradebookPage() {
       "Department Code",
       "Department Name",
       "Status",
-      "Score",
-      "Max Score",
+      "Score (Marks)",
+      "Total Marks",
       "Percentage",
       "Result",
       "Questions Attempted",
@@ -306,15 +306,24 @@ export default function ExamResultsGradebookPage() {
                   {exam.status}
                 </span>
               </div>
-              <div className="flex items-center space-x-2 text-[11px] text-slate-500 mt-0.5">
-                <span>Passing: {exam.passingScorePercentage}%</span>
+              <div className="flex items-center space-x-2 text-[11px] text-slate-500 mt-0.5 flex-wrap">
+                <span className="font-semibold text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
+                  Standardized: 1 Mark / Question
+                </span>
                 <span>•</span>
-                <span>Total Marks: {exam.totalPossiblePoints} pts ({questionAnalytics.length} Questions)</span>
+                <span>
+                  <strong>Total Marks = Total Questions:</strong> {exam.totalPossiblePoints} Marks
+                  {exam.totalBankQuestions && exam.totalBankQuestions > exam.totalPossiblePoints && (
+                    <span className="text-slate-400 font-normal"> ({exam.totalBankQuestions} Bank MCQs)</span>
+                  )}
+                </span>
+                <span>•</span>
+                <span>Passing: {exam.passingScorePercentage}%</span>
                 <span>•</span>
                 <span>
                   Negative Marking:{" "}
                   <strong className={exam.enableNegativeMarking ? "text-red-600" : "text-slate-600"}>
-                    {exam.enableNegativeMarking ? "Active" : "None"}
+                    {exam.enableNegativeMarking ? "Active (-0.25 Mark)" : "Disabled (0 Mark)"}
                   </strong>
                 </span>
               </div>
@@ -397,7 +406,7 @@ export default function ExamResultsGradebookPage() {
               <span className="text-2xl font-black text-slate-900 tracking-tight">
                 {metrics.averageScore}
               </span>
-              <span className="text-xs text-slate-400">/ {exam.totalPossiblePoints} pts</span>
+              <span className="text-xs text-slate-400">/ {exam.totalPossiblePoints} Marks</span>
             </div>
           </div>
 
@@ -415,7 +424,7 @@ export default function ExamResultsGradebookPage() {
               <span className="text-2xl font-black text-amber-700 tracking-tight">
                 {metrics.highestScore}
               </span>
-              <span className="text-xs text-slate-400">pts (Med: {metrics.medianScore})</span>
+              <span className="text-xs text-slate-400">Marks (Med: {metrics.medianScore})</span>
             </div>
           </div>
         </div>
@@ -698,7 +707,7 @@ export default function ExamResultsGradebookPage() {
                             <span className="font-extrabold text-slate-900 font-mono text-sm">
                               {c.score}
                             </span>
-                            <span className="text-slate-400 text-[10px]">/ {c.maxScore}</span>
+                            <span className="text-slate-400 text-[10px]">/ {c.maxScore} Marks</span>
                             <span
                               className={`text-[10px] font-bold px-1.5 py-0.2 rounded ${
                                 isPassed
@@ -819,7 +828,7 @@ export default function ExamResultsGradebookPage() {
                   <th className="py-3 px-3 sm:px-4 w-12 text-center">#</th>
                   <th className="py-3 px-3 sm:px-4">Section / Curriculum</th>
                   <th className="py-3 px-3 sm:px-4">Question Prompt</th>
-                  <th className="py-3 px-3 sm:px-4 text-center">Pts</th>
+                  <th className="py-3 px-3 sm:px-4 text-center">Marks</th>
                   <th className="py-3 px-3 sm:px-4 text-center">Correct</th>
                   <th className="py-3 px-3 sm:px-4 text-center">Incorrect</th>
                   <th className="py-3 px-3 sm:px-4 text-center">Skipped</th>
@@ -847,7 +856,7 @@ export default function ExamResultsGradebookPage() {
                     </td>
 
                     <td className="py-3 px-3 sm:px-4 text-center font-mono font-bold text-slate-700">
-                      +{q.points}
+                      1 Mark
                     </td>
 
                     <td className="py-3 px-3 sm:px-4 text-center font-bold text-emerald-700">
@@ -990,7 +999,7 @@ export default function ExamResultsGradebookPage() {
                   <span>•</span>
                   <span>Department: {inspectCandidate.departmentName} ({inspectCandidate.departmentCode})</span>
                   <span>•</span>
-                  <span>Score: {inspectCandidate.score} / {inspectCandidate.maxScore} pts</span>
+                  <span>Score: {inspectCandidate.score} / {inspectCandidate.maxScore} Marks (1 Mark / Q)</span>
                 </div>
               </div>
 
@@ -1056,16 +1065,16 @@ export default function ExamResultsGradebookPage() {
                         {q.isCorrect ? (
                           <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-900 border border-emerald-300">
                             <Check className="w-3 h-3 mr-0.5" />
-                            Correct (+{q.points} pt)
+                            Correct (+1 Mark)
                           </span>
                         ) : q.isAttempted ? (
                           <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-red-100 text-red-900 border border-red-300">
                             <X className="w-3 h-3 mr-0.5" />
-                            Incorrect ({q.awardedPoints} pt)
+                            Incorrect ({q.awardedPoints} Mark)
                           </span>
                         ) : (
                           <span className="text-[10px] font-bold bg-slate-100 text-slate-600 px-2 py-0.5 rounded">
-                            Unattempted (0 pt)
+                            Unattempted (0 Mark)
                           </span>
                         )}
                       </div>

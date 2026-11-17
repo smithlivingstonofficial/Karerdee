@@ -1901,9 +1901,9 @@ function CandidateSittingContent() {
                     <strong>Real-Time Persistence:</strong> Every answer you select is immediately preserved locally and synchronized to the examination servers every 15 seconds.
                   </li>
                   <li>
-                    <strong>Marking Policy:</strong>{" "}
+                    <strong>Marking Policy:</strong> Standardized <strong>1 Mark per question</strong> (Total Marks = Total Questions).{" "}
                     {exam?.enableNegativeMarking
-                      ? "Negative marking is ENABLED for this examination."
+                      ? "Negative marking is ENABLED (-0.25 Mark deduction for incorrect attempts)."
                       : "Negative marking is DISABLED (no deduction for incorrect attempts)."}
                   </li>
                   <li>
@@ -2538,12 +2538,12 @@ function CandidateSittingContent() {
                   </div>
 
                   <div className="flex items-center space-x-2">
-                    <span className="text-[11px] font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded">
-                      +{activeQuestion.points} pt
+                    <span className="text-[11px] font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
+                      1 Mark
                     </span>
                     {exam?.enableNegativeMarking && (
                       <span className="text-[11px] font-bold text-red-700 bg-red-50 px-2 py-0.5 rounded border border-red-200">
-                        -{activeQuestion.negativePoints} pt
+                        -{activeQuestion.negativePoints || 0.25} Mark
                       </span>
                     )}
                     {exam?.enableQuestionFlagging !== false && (

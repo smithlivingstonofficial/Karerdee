@@ -165,7 +165,7 @@ export function QuestionBankDrawer({
       questionType: q.question_type,
       prompt: q.prompt,
       codeSnippet: q.code_snippet || undefined,
-      points: q.points || 1.0,
+      points: 1.0, // Standardized 1 mark
       negativePoints: q.negative_points || 0.0,
       orderIndex: existingQuestions.length + idx + 1,
       sourceQuestionId: q.id,
@@ -374,8 +374,8 @@ export function QuestionBankDrawer({
                           {q.question_type === "MCQ_SINGLE" ? "Single Choice" : "Multi Choice"}
                         </span>
 
-                        <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                          {q.points} pt{q.points === 1 ? "" : "s"}
+                        <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                          1 Mark
                         </span>
 
                         {isAlreadyInExam && (

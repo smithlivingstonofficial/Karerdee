@@ -222,7 +222,7 @@ export function CsvUploadDrawer({
             optionC: optC || "Option C",
             optionD: optD || "Option D",
             correctOption: (correctStr || "A").toUpperCase(),
-            points: parseFloat(ptsStr) || 1.0,
+            points: 1.0, // Standardized 1 mark
             negativePoints: parseFloat(negStr) || 0.25,
           });
         }

@@ -136,9 +136,9 @@ async function autoFinalizeSession(sessionId: string, examId: string, isNegative
             selectedIds.every((id: string) => correctOptIds.has(id));
 
           if (isAllCorrect) {
-            awardedMarks = Number(q.points) || 1;
+            awardedMarks = 1; // Standardized: Exactly 1 mark per question
           } else if (isNegativeMarking) {
-            awardedMarks = -(Number(q.negative_points) || 0);
+            awardedMarks = -(Number(q.negative_points) || 0.25);
           }
           totalScore += awardedMarks;
         }
