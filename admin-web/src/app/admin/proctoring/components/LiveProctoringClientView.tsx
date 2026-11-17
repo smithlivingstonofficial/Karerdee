@@ -54,6 +54,8 @@ import {
   Tag,
   ChevronRight,
   UserCheck,
+  ArrowLeft,
+  ArrowRight,
 } from "lucide-react";
 
 export interface ProctoringSession {
@@ -138,6 +140,7 @@ interface LiveProctoringClientViewProps {
   recentViolations: ViolationFeedItem[];
   exams: ExamClassificationItem[];
   initialInquiries?: CandidateInquiryItem[];
+  focusedExamId?: string;
 }
 
 export function LiveProctoringClientView({
@@ -145,14 +148,17 @@ export function LiveProctoringClientView({
   recentViolations: initialViolations,
   exams,
   initialInquiries = [],
+  focusedExamId,
 }: LiveProctoringClientViewProps) {
   const router = useRouter();
+  const isDedicatedRoom = Boolean(focusedExamId && focusedExamId !== "ALL");
+
   const [sessions, setSessions] = useState<ProctoringSession[]>(initialSessions);
   const [violations, setViolations] = useState<ViolationFeedItem[]>(initialViolations);
   const [inquiries, setInquiries] = useState<CandidateInquiryItem[]>(initialInquiries);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
-  const [selectedExamId, setSelectedExamId] = useState<string>("ALL");
+  const [selectedExamId, setSelectedExamId] = useState<string>(focusedExamId || "ALL");
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [notice, setNotice] = useState<{ type: "success" | "error"; text: string } | null>(null);
@@ -183,6 +189,12 @@ export function LiveProctoringClientView({
       setInquiries(initialInquiries);
     }
   }, [initialInquiries]);
+
+  useEffect(() => {
+    if (focusedExamId) {
+      setSelectedExamId(focusedExamId);
+    }
+  }, [focusedExamId]);
 
   // Periodic background telemetry refresh every 5 seconds
   useEffect(() => {
@@ -217,6 +229,11 @@ export function LiveProctoringClientView({
           createdAt: payload.timestamp || new Date().toISOString(),
         };
 
+        // If in dedicated room mode, only notify if inquiry belongs to this exam
+        if (isDedicatedRoom && focusedExamId && newInquiry.examId && newInquiry.examId !== focusedExamId) {
+          return;
+        }
+
         setInquiries((prev) => [newInquiry, ...prev]);
         setNotice({
           type: "success",
@@ -228,7 +245,7 @@ export function LiveProctoringClientView({
     return () => {
       supabaseClient.removeChannel(channel);
     };
-  }, []);
+  }, [isDedicatedRoom, focusedExamId]);
 
   function handleManualRefresh() {
     setIsRefreshing(true);
@@ -243,9 +260,21 @@ export function LiveProctoringClientView({
     setTimeout(() => setCopiedPasscodeId(null), 2500);
   }
 
-  // Filter sessions
+  // Selected Exam Object
+  const currentExamObj = useMemo(() => {
+    const activeId = focusedExamId || selectedExamId;
+    return exams.find((e) => e.id === activeId) || null;
+  }, [exams, focusedExamId, selectedExamId]);
+
+  // Context-aware metrics & sessions filter
+  const scopedSessions = useMemo(() => {
+    const activeId = focusedExamId || selectedExamId;
+    return activeId === "ALL" ? sessions : sessions.filter((s) => s.examId === activeId);
+  }, [sessions, focusedExamId, selectedExamId]);
+
+  // Filter sessions by search and status
   const filtered = useMemo(() => {
-    return sessions.filter((s) => {
+    return scopedSessions.filter((s) => {
       const matchesSearch =
         s.candidateName.toLowerCase().includes(searchTerm.toLowerCase()) ||
         s.applicationNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -260,16 +289,28 @@ export function LiveProctoringClientView({
         (statusFilter === "LOCKED" && s.status === "LOCKED") ||
         (statusFilter === "SUBMITTED" && s.status === "SUBMITTED");
 
-      const matchesExam = selectedExamId === "ALL" || s.examId === selectedExamId;
-
-      return matchesSearch && matchesStatus && matchesExam;
+      return matchesSearch && matchesStatus;
     });
-  }, [sessions, searchTerm, statusFilter, selectedExamId]);
+  }, [scopedSessions, searchTerm, statusFilter]);
 
-  // Context-aware metrics
-  const scopedSessions = useMemo(() => {
-    return selectedExamId === "ALL" ? sessions : sessions.filter((s) => s.examId === selectedExamId);
-  }, [sessions, selectedExamId]);
+  // Filter violations to selected exam
+  const scopedViolations = useMemo(() => {
+    const activeId = focusedExamId || selectedExamId;
+    if (activeId === "ALL") return violations;
+    return violations.filter((v) => {
+      const sess = sessions.find((s) => s.id === v.sessionId);
+      if (sess) return sess.examId === activeId;
+      if (currentExamObj) return v.examTitle.toLowerCase() === currentExamObj.title.toLowerCase();
+      return false;
+    });
+  }, [violations, focusedExamId, selectedExamId, sessions, currentExamObj]);
+
+  // Filter inquiries to selected exam
+  const scopedInquiries = useMemo(() => {
+    const activeId = focusedExamId || selectedExamId;
+    if (activeId === "ALL") return inquiries;
+    return inquiries.filter((inq) => inq.examId === activeId);
+  }, [inquiries, focusedExamId, selectedExamId]);
 
   const activeCount = scopedSessions.filter((s) => s.status === "IN_PROGRESS").length;
   const warningCount = scopedSessions.filter((s) => s.strikesCount > 0 && s.status === "IN_PROGRESS").length;
@@ -278,19 +319,19 @@ export function LiveProctoringClientView({
 
   // Unread inquiries count
   const unreadInquiriesCount = useMemo(() => {
-    return inquiries.filter((inq) => inq.sender === "CANDIDATE" && inq.status !== "RESOLVED").length;
-  }, [inquiries]);
+    return scopedInquiries.filter((inq) => inq.sender === "CANDIDATE" && inq.status !== "RESOLVED").length;
+  }, [scopedInquiries]);
 
   // Inquiries grouped by session
   const inquiriesBySession = useMemo(() => {
     const map = new Map<string, CandidateInquiryItem[]>();
-    for (const inq of inquiries) {
+    for (const inq of scopedInquiries) {
       const list = map.get(inq.sessionId) || [];
       list.push(inq);
       map.set(inq.sessionId, list);
     }
     return map;
-  }, [inquiries]);
+  }, [scopedInquiries]);
 
   // Selected session inquiry thread
   const selectedThreadInquiries = useMemo(() => {
@@ -587,12 +628,62 @@ export function LiveProctoringClientView({
 
   const pendingLateEntries = scopedSessions.filter((s) => s.isPendingLateEntry && s.status === "LOCKED");
 
-  // Selected Exam Object
-  const currentExamObj = exams.find((e) => e.id === selectedExamId);
-
   return (
     <div className="space-y-4 max-w-7xl mx-auto pb-12 w-full">
-      {/* 1. Combined Executive Command Center & Proctoring Telemetry Deck */}
+      {/* Dedicated Room Top Navigation & Breadcrumb Bar */}
+      {isDedicatedRoom && currentExamObj && (
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white border border-slate-200/90 rounded-2xl p-3.5 sm:p-4 shadow-xs">
+          <div className="flex items-center space-x-3 min-w-0">
+            <Link
+              href="/admin/proctoring"
+              className="inline-flex items-center space-x-1.5 px-3 py-1.5 text-xs font-bold text-slate-700 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl transition-all cursor-pointer group flex-shrink-0"
+              title="Return to Master Proctoring Overview"
+            >
+              <ArrowLeft className="w-3.5 h-3.5 mr-0.5 text-slate-500 group-hover:-translate-x-0.5 transition-transform" />
+              <span>All Examinations</span>
+            </Link>
+
+            <div className="h-4 w-px bg-slate-200 hidden sm:block flex-shrink-0" />
+
+            <div className="flex items-center space-x-2 text-xs min-w-0">
+              <span className="text-slate-400 hidden md:inline">Focused Proctoring Room:</span>
+              <span className="font-bold text-slate-900 truncate">{currentExamObj.title}</span>
+              {currentExamObj.courseCode && (
+                <span className="text-[10px] font-mono font-bold bg-blue-50 text-blue-700 px-1.5 py-0.2 rounded border border-blue-100 flex-shrink-0">
+                  {currentExamObj.courseCode}
+                </span>
+              )}
+            </div>
+          </div>
+
+          <div className="flex items-center space-x-2 flex-shrink-0">
+            <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider hidden lg:inline">
+              Switch Room:
+            </label>
+            <select
+              value={currentExamObj.id}
+              onChange={(e) => {
+                const val = e.target.value;
+                if (val === "ALL") {
+                  router.push("/admin/proctoring");
+                } else {
+                  router.push(`/admin/proctoring/${val}`);
+                }
+              }}
+              className="px-2.5 py-1.5 text-xs font-bold text-slate-700 bg-slate-50 hover:bg-white border border-slate-200 rounded-xl cursor-pointer shadow-2xs transition-all focus:outline-none focus:ring-1 focus:ring-blue-600"
+            >
+              <option value="ALL">← All Examinations Hub</option>
+              {exams.map((ex) => (
+                <option key={ex.id} value={ex.id}>
+                  {ex.courseCode ? `[${ex.courseCode}] ` : ""}{ex.title} ({ex.status})
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+      )}
+
+      {/* 1. Executive Command Center & Proctoring Telemetry Deck */}
       <div className="bg-white border border-slate-200/90 rounded-2xl shadow-xs overflow-hidden">
         {/* Top Header Row */}
         <div className="px-4 py-3 sm:px-5 sm:py-3.5 flex flex-col md:flex-row md:items-center justify-between gap-3 bg-gradient-to-r from-white via-slate-50/30 to-blue-50/20">
@@ -610,18 +701,72 @@ export function LiveProctoringClientView({
             <div className="min-w-0">
               <div className="flex items-center space-x-2 flex-wrap">
                 <h1 className="text-sm sm:text-base font-bold text-slate-900 tracking-tight">
-                  Live Proctoring &amp; Invigilation Deck
+                  {isDedicatedRoom && currentExamObj ? (
+                    <>
+                      <span>{currentExamObj.title}</span>
+                      <span className="text-slate-400 font-normal ml-1.5 text-xs sm:text-sm">
+                        • Live Proctoring Room
+                      </span>
+                    </>
+                  ) : (
+                    "Live Proctoring & Invigilation Deck"
+                  )}
                 </h1>
+
                 <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-50 text-emerald-700 border border-emerald-200/80">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 mr-1.5 animate-pulse" />
                   Live Telemetry
                 </span>
-                {selectedExamId !== "ALL" && currentExamObj && (
-                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-800 border border-blue-200">
-                    Scoped: {currentExamObj.title}
-                  </span>
+
+                {isDedicatedRoom && currentExamObj && (
+                  <>
+                    {currentExamObj.courseCode && (
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-800 border border-blue-200 font-mono">
+                        {currentExamObj.courseCode}
+                      </span>
+                    )}
+
+                    <span
+                      className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold border ${
+                        currentExamObj.status === "ACTIVE" || currentExamObj.status === "ONGOING"
+                          ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                          : currentExamObj.status === "COMPLETED"
+                          ? "bg-slate-100 text-slate-600 border-slate-200"
+                          : "bg-blue-50 text-blue-700 border-blue-200"
+                      }`}
+                    >
+                      {currentExamObj.status}
+                    </span>
+
+                    {currentExamObj.passcode && (
+                      <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                        <KeyRound className="w-3 h-3 text-amber-600" />
+                        <span>Passcode: {currentExamObj.passcode}</span>
+                        <button
+                          type="button"
+                          onClick={() => handleCopyPasscode(currentExamObj.id, currentExamObj.passcode)}
+                          className="p-0.5 hover:bg-amber-100 rounded text-amber-700 transition-colors cursor-pointer"
+                          title="Copy Passcode"
+                        >
+                          {copiedPasscodeId === currentExamObj.id ? (
+                            <CheckCheck className="w-3 h-3 text-emerald-600" />
+                          ) : (
+                            <Copy className="w-3 h-3" />
+                          )}
+                        </button>
+                      </span>
+                    )}
+                  </>
                 )}
               </div>
+
+              {isDedicatedRoom && currentExamObj && (
+                <div className="text-[11px] text-slate-500 mt-0.5 flex items-center space-x-2">
+                  <span>⏱️ Duration: {currentExamObj.durationMinutes || 90} Minutes</span>
+                  <span>•</span>
+                  <span>Dedicated distraction-free room for this exam paper</span>
+                </div>
+              )}
             </div>
           </div>
 
@@ -632,8 +777,8 @@ export function LiveProctoringClientView({
               type="button"
               onClick={() => {
                 setIsHelpdeskOpen(true);
-                if (!selectedInquirySessionId && inquiries.length > 0) {
-                  setSelectedInquirySessionId(inquiries[0].sessionId);
+                if (!selectedInquirySessionId && scopedInquiries.length > 0) {
+                  setSelectedInquirySessionId(scopedInquiries[0].sessionId);
                 }
               }}
               className="inline-flex items-center space-x-1.5 px-3 py-1.5 text-xs font-bold text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 hover:border-slate-300 rounded-lg shadow-2xs transition-all cursor-pointer relative"
@@ -696,7 +841,7 @@ export function LiveProctoringClientView({
                 {activeCount}
               </span>
               <span className="text-xs text-slate-400">
-                examinees sitting {selectedExamId !== "ALL" ? "in this exam" : "overall"}
+                examinees sitting {isDedicatedRoom ? "in this exam" : "overall"}
               </span>
             </div>
           </div>
@@ -797,188 +942,162 @@ export function LiveProctoringClientView({
       )}
 
       {/* =====================================================================
-          2. EXAM CLASSIFICATION SELECTOR DECK (Scope by Examination Paper)
+          2. EXAM CLASSIFICATION DECK (Master Hub Navigation - shown when NOT in dedicated room)
          ===================================================================== */}
-      <div className="bg-white border border-slate-200/90 rounded-2xl p-4 sm:p-5 shadow-xs space-y-3">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
-          <div className="flex items-center space-x-2.5">
-            <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-700 flex items-center justify-center border border-blue-100 flex-shrink-0">
-              <Layers className="w-4 h-4" />
-            </div>
-            <div>
-              <h2 className="text-sm font-bold text-slate-900 tracking-tight">
-                Examination Classification Deck
-              </h2>
-              <p className="text-[11px] text-slate-500">
-                Select an examination paper to scope workstations, telemetry, and live candidate doubts.
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center space-x-2">
-            <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200">
-              {exams.length} Configured Examinations
-            </span>
-            {selectedExamId !== "ALL" && (
-              <button
-                type="button"
-                onClick={() => setSelectedExamId("ALL")}
-                className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-lg text-xs font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 transition-colors cursor-pointer"
-              >
-                <RotateCcw className="w-3 h-3 mr-0.5" />
-                <span>Show All Exams</span>
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* Exam Cards Deck */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 pt-1">
-          {/* Card: All Examinations (Master View) */}
-          <button
-            type="button"
-            onClick={() => setSelectedExamId("ALL")}
-            className={`text-left p-3.5 rounded-xl border transition-all cursor-pointer flex flex-col justify-between space-y-3 relative group ${
-              selectedExamId === "ALL"
-                ? "bg-blue-50/40 border-blue-600 ring-2 ring-blue-600/20 shadow-xs"
-                : "bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50/60"
-            }`}
-          >
-            <div className="flex items-start justify-between">
+      {!isDedicatedRoom && (
+        <div className="bg-white border border-slate-200/90 rounded-2xl p-4 sm:p-5 shadow-xs space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
+            <div className="flex items-center space-x-2.5">
+              <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-700 flex items-center justify-center border border-blue-100 flex-shrink-0">
+                <Layers className="w-4 h-4" />
+              </div>
               <div>
-                <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 group-hover:text-blue-700 transition-colors">
-                  Consolidated View
+                <h2 className="text-sm font-bold text-slate-900 tracking-tight">
+                  Examination Classification Deck
+                </h2>
+                <p className="text-[11px] text-slate-500">
+                  Select an examination paper to enter its dedicated, distraction-free live proctoring room.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 border border-slate-200">
+                {exams.length} Configured Examinations
+              </span>
+            </div>
+          </div>
+
+          {/* Exam Cards Deck */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 pt-1">
+            {/* Card: All Examinations (Consolidated Master View) */}
+            <div
+              className={`text-left p-3.5 rounded-xl border transition-all flex flex-col justify-between space-y-3 relative group bg-blue-50/30 border-blue-600 ring-2 ring-blue-600/20 shadow-xs`}
+            >
+              <div className="flex items-start justify-between">
+                <div>
+                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-blue-700">
+                    Consolidated View
+                  </span>
+                  <h3 className="font-bold text-slate-900 text-xs sm:text-sm mt-0.5">
+                    All Examinations
+                  </h3>
+                </div>
+                <span className="w-6 h-6 rounded-lg flex items-center justify-center text-xs font-bold bg-blue-600 text-white">
+                  <Layers className="w-3.5 h-3.5" />
                 </span>
-                <h3 className="font-bold text-slate-900 text-xs sm:text-sm mt-0.5">
-                  All Examinations
-                </h3>
               </div>
-              <span
-                className={`w-6 h-6 rounded-lg flex items-center justify-center text-xs font-bold ${
-                  selectedExamId === "ALL"
-                    ? "bg-blue-600 text-white"
-                    : "bg-slate-100 text-slate-500 group-hover:bg-slate-200"
-                }`}
-              >
-                {selectedExamId === "ALL" ? <Check className="w-3.5 h-3.5" /> : <Layers className="w-3.5 h-3.5" />}
-              </span>
+
+              <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-600">
+                <span>Total Active Feed</span>
+                <span className="font-mono font-bold text-slate-900 bg-slate-100 px-2 py-0.5 rounded-md">
+                  {sessions.length} Candidates
+                </span>
+              </div>
             </div>
 
-            <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-600">
-              <span>Total Examinees</span>
-              <span className="font-mono font-bold text-slate-900 bg-slate-100 px-2 py-0.5 rounded-md">
-                {sessions.length} Candidates
-              </span>
-            </div>
-          </button>
+            {/* Cards for each specific exam (Clicking navigates to dedicated page) */}
+            {exams.map((exam) => {
+              const examSessions = sessions.filter((s) => s.examId === exam.id);
+              const activeInExam = examSessions.filter((s) => s.status === "IN_PROGRESS").length;
+              const lockedInExam = examSessions.filter((s) => s.status === "LOCKED").length;
 
-          {/* Cards for each specific exam */}
-          {exams.map((exam) => {
-            const isSelected = selectedExamId === exam.id;
-            const examSessions = sessions.filter((s) => s.examId === exam.id);
-            const activeInExam = examSessions.filter((s) => s.status === "IN_PROGRESS").length;
-            const lockedInExam = examSessions.filter((s) => s.status === "LOCKED").length;
-
-            return (
-              <div
-                key={exam.id}
-                onClick={() => setSelectedExamId(exam.id)}
-                className={`text-left p-3.5 rounded-xl border transition-all cursor-pointer flex flex-col justify-between space-y-2.5 relative group ${
-                  isSelected
-                    ? "bg-blue-50/40 border-blue-600 ring-2 ring-blue-600/20 shadow-xs"
-                    : "bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50/60"
-                }`}
-              >
-                {/* Top Row: Title & Status */}
-                <div className="flex items-start justify-between gap-1.5">
-                  <div className="min-w-0">
-                    <div className="flex items-center space-x-1.5">
-                      <span className="text-[10px] font-extrabold uppercase font-mono text-blue-700 bg-blue-50 px-1.5 py-0.2 rounded border border-blue-100">
-                        {exam.courseCode || "EXAM"}
-                      </span>
-                      <span
-                        className={`text-[9px] font-bold px-1.5 py-0.2 rounded-full border ${
-                          exam.status === "ONGOING"
-                            ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                            : exam.status === "COMPLETED"
-                            ? "bg-slate-100 text-slate-600 border-slate-200"
-                            : "bg-blue-50 text-blue-700 border-blue-200"
-                        }`}
+              return (
+                <div
+                  key={exam.id}
+                  onClick={() => router.push(`/admin/proctoring/${exam.id}`)}
+                  className="text-left p-3.5 rounded-xl border border-slate-200 hover:border-blue-500 hover:shadow-md bg-white hover:bg-blue-50/10 transition-all cursor-pointer flex flex-col justify-between space-y-2.5 relative group"
+                >
+                  {/* Top Row: Title & Status */}
+                  <div className="flex items-start justify-between gap-1.5">
+                    <div className="min-w-0">
+                      <div className="flex items-center space-x-1.5">
+                        <span className="text-[10px] font-extrabold uppercase font-mono text-blue-700 bg-blue-50 px-1.5 py-0.2 rounded border border-blue-100">
+                          {exam.courseCode || "EXAM"}
+                        </span>
+                        <span
+                          className={`text-[9px] font-bold px-1.5 py-0.2 rounded-full border ${
+                            exam.status === "ONGOING" || exam.status === "ACTIVE"
+                              ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                              : exam.status === "COMPLETED"
+                              ? "bg-slate-100 text-slate-600 border-slate-200"
+                              : "bg-blue-50 text-blue-700 border-blue-200"
+                          }`}
+                        >
+                          {exam.status}
+                        </span>
+                      </div>
+                      <h3
+                        className="font-bold text-slate-900 text-xs sm:text-sm mt-1 truncate group-hover:text-blue-700 transition-colors"
+                        title={exam.title}
                       >
-                        {exam.status}
-                      </span>
+                        {exam.title}
+                      </h3>
                     </div>
-                    <h3 className="font-bold text-slate-900 text-xs sm:text-sm mt-1 truncate" title={exam.title}>
-                      {exam.title}
-                    </h3>
-                  </div>
 
-                  <span
-                    className={`w-6 h-6 rounded-lg flex items-center justify-center text-xs font-bold flex-shrink-0 ${
-                      isSelected
-                        ? "bg-blue-600 text-white"
-                        : "bg-slate-100 text-slate-500 group-hover:bg-slate-200"
-                    }`}
-                  >
-                    {isSelected ? <Check className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
-                  </span>
-                </div>
-
-                {/* Middle: Passcode & Duration */}
-                <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1">
-                  <div className="flex items-center space-x-1">
-                    <KeyRound className="w-3 h-3 text-slate-400" />
-                    <span className="font-mono font-bold text-slate-700">
-                      {exam.passcode || "None"}
+                    <span className="w-6 h-6 rounded-lg flex items-center justify-center text-xs font-bold flex-shrink-0 bg-slate-100 text-slate-500 group-hover:bg-blue-600 group-hover:text-white transition-colors">
+                      <ArrowRight className="w-3.5 h-3.5" />
                     </span>
-                    {exam.passcode && (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleCopyPasscode(exam.id, exam.passcode);
-                        }}
-                        className="p-1 hover:bg-slate-200 text-slate-400 hover:text-slate-700 rounded transition-colors cursor-pointer"
-                        title="Copy Exam Passcode"
-                      >
-                        {copiedPasscodeId === exam.id ? (
-                          <CheckCheck className="w-3 h-3 text-emerald-600" />
-                        ) : (
-                          <Copy className="w-3 h-3" />
-                        )}
-                      </button>
-                    )}
                   </div>
 
-                  <span className="text-[10px] text-slate-500 font-medium">
-                    {exam.durationMinutes || 90} Mins
-                  </span>
-                </div>
+                  {/* Middle: Passcode & Duration */}
+                  <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1">
+                    <div className="flex items-center space-x-1">
+                      <KeyRound className="w-3 h-3 text-slate-400" />
+                      <span className="font-mono font-bold text-slate-700">
+                        {exam.passcode || "None"}
+                      </span>
+                      {exam.passcode && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleCopyPasscode(exam.id, exam.passcode);
+                          }}
+                          className="p-1 hover:bg-slate-200 text-slate-400 hover:text-slate-700 rounded transition-colors cursor-pointer"
+                          title="Copy Exam Passcode"
+                        >
+                          {copiedPasscodeId === exam.id ? (
+                            <CheckCheck className="w-3 h-3 text-emerald-600" />
+                          ) : (
+                            <Copy className="w-3 h-3" />
+                          )}
+                        </button>
+                      )}
+                    </div>
 
-                {/* Bottom Row: Candidate Counts */}
-                <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px]">
-                  <div className="flex items-center space-x-1.5">
-                    <span className="font-bold text-slate-900">{examSessions.length} sitting</span>
-                    {activeInExam > 0 && (
-                      <span className="text-[10px] font-extrabold bg-emerald-50 text-emerald-700 px-1.5 py-0.2 rounded">
-                        {activeInExam} active
-                      </span>
-                    )}
-                    {lockedInExam > 0 && (
-                      <span className="text-[10px] font-extrabold bg-red-50 text-red-700 px-1.5 py-0.2 rounded">
-                        {lockedInExam} locked
-                      </span>
-                    )}
+                    <span className="text-[10px] text-slate-500 font-medium">
+                      {exam.durationMinutes || 90} Mins
+                    </span>
                   </div>
-                  <span className="text-[10px] font-bold text-blue-700 group-hover:underline">
-                    {isSelected ? "Active Focus" : "Select"}
-                  </span>
+
+                  {/* Bottom Row: Candidate Counts & Action Link */}
+                  <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px]">
+                    <div className="flex items-center space-x-1.5">
+                      <span className="font-bold text-slate-900">{examSessions.length} sitting</span>
+                      {activeInExam > 0 && (
+                        <span className="text-[10px] font-extrabold bg-emerald-50 text-emerald-700 px-1.5 py-0.2 rounded">
+                          {activeInExam} active
+                        </span>
+                      )}
+                      {lockedInExam > 0 && (
+                        <span className="text-[10px] font-extrabold bg-red-50 text-red-700 px-1.5 py-0.2 rounded">
+                          {lockedInExam} locked
+                        </span>
+                      )}
+                    </div>
+
+                    <span className="inline-flex items-center text-xs font-bold text-blue-700 group-hover:text-blue-800">
+                      <span>Enter Room</span>
+                      <ArrowRight className="w-3.5 h-3.5 ml-1 group-hover:translate-x-0.5 transition-transform" />
+                    </span>
+                  </div>
                 </div>
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* High-Priority Late Entry Exception Review */}
       {pendingLateEntries.length > 0 && (
@@ -1065,16 +1184,16 @@ export function LiveProctoringClientView({
                 <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-700 flex items-center justify-center border border-blue-100 flex-shrink-0">
                   <Monitor className="w-4 h-4" />
                 </div>
-                <div className="flex items-center space-x-2">
+                <div className="flex items-center space-x-2 flex-wrap">
                   <h3 className="text-sm font-bold text-slate-900 tracking-tight">
                     Candidate Workstations
                   </h3>
                   <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
                     {filtered.length} Total
                   </span>
-                  {selectedExamId !== "ALL" && currentExamObj && (
-                    <span className="text-xs text-slate-500 font-medium">
-                      in {currentExamObj.title}
+                  {isDedicatedRoom && currentExamObj && (
+                    <span className="text-xs text-blue-700 font-bold bg-blue-50 px-2 py-0.5 rounded-md border border-blue-100">
+                      Scoped to {currentExamObj.title}
                     </span>
                   )}
                 </div>
@@ -1110,18 +1229,23 @@ export function LiveProctoringClientView({
             {filtered.length === 0 ? (
               <div className="p-12 text-center text-slate-400 text-xs space-y-2">
                 <Monitor className="w-8 h-8 mx-auto text-slate-300" />
-                <p className="font-semibold text-slate-700">No active examination workstations match the query.</p>
-                <p className="text-[11px] text-slate-400">
-                  Workstations appear here automatically when candidates launch the examination portal.
+                <p className="font-semibold text-slate-700">
+                  {isDedicatedRoom
+                    ? `No active examinees currently sitting for ${currentExamObj?.title || "this examination"}.`
+                    : "No active examination workstations match the query."}
                 </p>
-                {selectedExamId !== "ALL" && (
-                  <button
-                    type="button"
-                    onClick={() => setSelectedExamId("ALL")}
+                <p className="text-[11px] text-slate-400 max-w-sm mx-auto">
+                  {isDedicatedRoom
+                    ? "Candidate workstations appear here automatically as candidates authenticate and begin their sitting."
+                    : "Select a specific examination card above to focus on that exam paper."}
+                </p>
+                {isDedicatedRoom && (
+                  <Link
+                    href="/admin/proctoring"
                     className="mt-2 inline-flex items-center px-3 py-1.5 text-xs font-bold text-blue-700 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors"
                   >
-                    View All Examinations
-                  </button>
+                    View All Examinations Hub
+                  </Link>
                 )}
               </div>
             ) : (
@@ -1129,7 +1253,7 @@ export function LiveProctoringClientView({
                 <table className="w-full text-left text-xs">
                   <thead className="bg-slate-50/80 text-slate-500 font-bold uppercase tracking-wider text-[10px] border-b border-slate-200/80">
                     <tr>
-                      <th className="py-3 px-4">Candidate &amp; Exam</th>
+                      <th className="py-3 px-4">Candidate {!isDedicatedRoom && "& Exam"}</th>
                       <th className="py-3 px-3">Dept</th>
                       <th className="py-3 px-3">Workstation &amp; Strikes</th>
                       <th className="py-3 px-3">Extra Time</th>
@@ -1165,9 +1289,17 @@ export function LiveProctoringClientView({
                                 Online
                               </span>
                             </div>
-                            <div className="text-[10px] text-slate-500 truncate max-w-xs mt-0.5 font-medium">
-                              {s.examTitle}
-                            </div>
+                            {!isDedicatedRoom && (
+                              <div className="text-[10px] text-slate-500 truncate max-w-xs mt-0.5 font-medium">
+                                <Link
+                                  href={`/admin/proctoring/${s.examId}`}
+                                  className="text-blue-700 hover:underline"
+                                  title="Open dedicated proctoring room for this exam"
+                                >
+                                  {s.examTitle} &rarr;
+                                </Link>
+                              </div>
+                            )}
                             <div className="text-[10px] text-slate-400 truncate max-w-xs">{s.email}</div>
                           </td>
 
@@ -1191,7 +1323,7 @@ export function LiveProctoringClientView({
                                 Strikes: {s.strikesCount} / {s.maxStrikes}
                               </span>
                               {(() => {
-                                const sessionEvidence = violations.find(
+                                const sessionEvidence = scopedViolations.find(
                                   (v) => v.sessionId === s.id && v.snapshotUrl
                                 );
                                 if (!sessionEvidence) return null;
@@ -1380,23 +1512,27 @@ export function LiveProctoringClientView({
               <div className="flex items-center space-x-2">
                 <ShieldAlert className="w-4 h-4 text-red-600" />
                 <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800">
-                  Realtime Integrity Feed
+                  {isDedicatedRoom ? "Exam Integrity Feed" : "Realtime Integrity Feed"}
                 </h3>
               </div>
               <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-50 text-red-700 border border-red-200">
-                {violations.length} Incidents
+                {scopedViolations.length} Incidents
               </span>
             </div>
 
-            {violations.length === 0 ? (
+            {scopedViolations.length === 0 ? (
               <div className="p-8 text-center text-slate-400 text-xs space-y-1">
                 <CheckCircle2 className="w-6 h-6 mx-auto text-emerald-500 mb-1" />
                 <p className="font-bold text-slate-700">Clean Integrity Stream</p>
-                <p className="text-[11px] text-slate-400">Zero security infractions registered.</p>
+                <p className="text-[11px] text-slate-400">
+                  {isDedicatedRoom
+                    ? "Zero security infractions registered for this examination."
+                    : "Zero security infractions registered across workstations."}
+                </p>
               </div>
             ) : (
               <div className="space-y-2 max-h-[500px] overflow-y-auto pr-1">
-                {violations.map((v) => (
+                {scopedViolations.map((v) => (
                   <div
                     key={v.id}
                     className="p-2.5 rounded-xl bg-slate-50/80 border border-slate-200/80 text-xs space-y-1 hover:border-amber-300 transition-colors group"
@@ -1475,6 +1611,11 @@ export function LiveProctoringClientView({
                     <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-800 border border-blue-200">
                       Realtime Messaging
                     </span>
+                    {isDedicatedRoom && currentExamObj && (
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200">
+                        {currentExamObj.title}
+                      </span>
+                    )}
                   </div>
                   <p className="text-[11px] text-slate-500">
                     Review and reply to candidate question clarifications, tech issues, and doubt requests in real time.
@@ -1523,7 +1664,7 @@ export function LiveProctoringClientView({
                         {tab === "UNRESOLVED"
                           ? `Unresolved (${unreadInquiriesCount})`
                           : tab === "ALL"
-                          ? `All (${inquiries.length})`
+                          ? `All (${scopedInquiries.length})`
                           : "Resolved"}
                       </button>
                     ))}
