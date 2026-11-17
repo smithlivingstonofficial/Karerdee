@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import jwt from "jsonwebtoken";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { formatDateTime } from "@/lib/date";
+import { reconcileExamStatuses } from "@/lib/exam-reconciliation";
 
 interface HeartbeatRequestBody {
   sessionId: string;
@@ -86,6 +87,7 @@ export async function POST(req: NextRequest) {
       remainingSeconds = Math.max(0, Math.floor((endTime.getTime() - serverEpochMs) / 1000));
       if (serverEpochMs > endTime.getTime() + 60 * 1000) {
         isExpired = true;
+        reconcileExamStatuses(session.exam_id).catch(() => {});
       }
     }
 

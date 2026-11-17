@@ -2,6 +2,7 @@
 
 import jwt from "jsonwebtoken";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { reconcileExamStatuses } from "@/lib/exam-reconciliation";
 
 export interface CandidateLookupResult {
   success: boolean;
@@ -79,7 +80,9 @@ export async function lookupCandidateExam(
     const departmentCode = dept?.code || "GEN";
     const departmentName = dept?.name || "General Curriculum";
 
-    // 3. Find eligible examination (ACTIVE or SCHEDULED)
+    // 3. Reconcile statuses against IST clock & Find eligible examination (ACTIVE or SCHEDULED)
+    await reconcileExamStatuses();
+
     const { data: exams, error: examError } = await supabaseAdmin
       .from("exams")
       .select("id, title, course_code, duration_minutes, passcode, status, start_time, end_time")

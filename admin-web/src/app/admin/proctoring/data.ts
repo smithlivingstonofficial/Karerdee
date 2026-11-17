@@ -1,4 +1,5 @@
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { reconcileExamStatuses } from "@/lib/exam-reconciliation";
 import {
   ProctoringSession,
   ViolationFeedItem,
@@ -22,6 +23,9 @@ export async function getProctoringData(targetExamId?: string): Promise<Proctori
   let currentExam: ExamClassificationItem | null = null;
 
   try {
+    // 0. Auto-conclude expired exams and auto-finalize lingering sessions against IST clock
+    await reconcileExamStatuses(targetExamId);
+
     // 1. Fetch all exams with schedule and classification details
     const { data: examsData } = await supabaseAdmin
       .from("exams")

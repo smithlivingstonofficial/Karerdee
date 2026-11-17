@@ -11,7 +11,8 @@ import {
 } from "../actions";
 import { ExamStatus } from "@/types/database.types";
 import { HallTicketsPrintView } from "./components/HallTicketsPrintView";
-import { formatDate } from "@/lib/date";
+import { formatDate, formatTime, formatDateTime, formatServerIST } from "@/lib/date";
+import { computeExamTimingDetails } from "@/lib/exam-reconciliation";
 import {
   ArrowLeft,
   Printer,
@@ -210,6 +211,8 @@ export default function ExamDetailsPage() {
     (q) => q.section_id === commonSection?.id
   ).length;
 
+  const timing = computeExamTimingDetails(exam);
+
   return (
     <div className="space-y-4 pb-12 w-full">
       {/* 1. Sleek Minimal Breadcrumb & Navigation */}
@@ -311,6 +314,13 @@ export default function ExamDetailsPage() {
               <Square className="w-3.5 h-3.5 mr-1.5 fill-current" />
               <span>Conclude Sitting</span>
             </button>
+          )}
+
+          {exam.status === "COMPLETED" && (
+            <span className="inline-flex items-center px-3.5 py-2 text-xs font-bold text-slate-700 bg-slate-100 rounded-xl border border-slate-200 shadow-2xs">
+              <CheckCircle2 className="w-3.5 h-3.5 mr-1.5 text-emerald-600" />
+              <span>Sitting Concluded</span>
+            </span>
           )}
 
           <Link
@@ -570,6 +580,38 @@ export default function ExamDetailsPage() {
               <div className="flex items-center justify-between py-1.5">
                 <span className="text-slate-500 font-medium">Exam Duration</span>
                 <span className="font-bold text-slate-900">{exam.duration_minutes || 90} Mins</span>
+              </div>
+
+              {exam.start_time && (
+                <div className="flex items-center justify-between py-1.5">
+                  <span className="text-slate-500 font-medium">Scheduled Start (IST)</span>
+                  <span className="font-bold text-slate-800" suppressHydrationWarning>
+                    {formatDateTime(timing.startTime, false, true)}
+                  </span>
+                </div>
+              )}
+
+              {exam.end_time && (
+                <div className="flex items-center justify-between py-1.5">
+                  <span className="text-slate-500 font-medium">Scheduled End (IST)</span>
+                  <span className="font-bold text-slate-800" suppressHydrationWarning>
+                    {formatDateTime(timing.endTime, false, true)}
+                  </span>
+                </div>
+              )}
+
+              <div className="flex items-center justify-between py-1.5">
+                <span className="text-slate-500 font-medium">Late Entry Grace Window</span>
+                <span className="font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                  {timing.lateEntryGraceMinutes} Mins
+                </span>
+              </div>
+
+              <div className="flex items-center justify-between py-1.5">
+                <span className="text-slate-500 font-medium">Auto-Conclude Cutoff (IST)</span>
+                <span className="font-mono font-bold text-slate-800 text-[11px]" suppressHydrationWarning>
+                  {formatDateTime(timing.autoConcludeDeadline, false, true)}
+                </span>
               </div>
 
               <div className="flex items-center justify-between py-1.5">

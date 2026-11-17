@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { reconcileExamStatuses } from "@/lib/exam-reconciliation";
 import {
   AdminDashboardClientView,
   DashboardExamItem,
@@ -21,6 +22,9 @@ export default async function AdminDashboardPage() {
   let userEmail = "admin@kalasalingam.ac.in";
 
   try {
+    // 0. Auto-conclude expired exams and auto-finalize lingering sessions against IST clock
+    await reconcileExamStatuses();
+
     const supabase = await createClient();
     const { data: authData } = await supabase.auth.getUser();
     if (authData?.user?.email) {

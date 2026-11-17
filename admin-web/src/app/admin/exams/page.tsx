@@ -11,6 +11,7 @@ import {
   ExamSummaryItem,
 } from "./actions";
 import { ExamStatus } from "@/types/database.types";
+import { formatDate, formatTime, formatDateTime, formatServerIST } from "@/lib/date";
 import {
   PlusCircle,
   Search,
@@ -51,19 +52,34 @@ export default function ExaminationsDirectoryPage() {
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [toastMsg, setToastMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [currentIST, setCurrentIST] = useState<string>("");
 
   // Load exams
-  async function loadExams() {
-    setIsLoading(true);
+  async function loadExams(isBackground = false) {
+    if (!isBackground) setIsLoading(true);
     const res = await getExamsAction();
     if (res.exams) {
       setExams(res.exams);
     }
-    setIsLoading(false);
+    if (!isBackground) setIsLoading(false);
   }
 
   useEffect(() => {
     loadExams();
+    setCurrentIST(formatServerIST());
+
+    const istTimer = setInterval(() => {
+      setCurrentIST(formatServerIST());
+    }, 1000);
+
+    const reconcileTimer = setInterval(() => {
+      loadExams(true);
+    }, 15000);
+
+    return () => {
+      clearInterval(istTimer);
+      clearInterval(reconcileTimer);
+    };
   }, []);
 
   function showToast(text: string, type: "success" | "error" = "success") {
@@ -170,6 +186,13 @@ export default function ExaminationsDirectoryPage() {
                 </h1>
                 <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-blue-50 text-blue-700 border border-blue-200/80">
                   PhD Registry
+                </span>
+                <span
+                  className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200 font-mono"
+                  title="Authoritative Indian Standard Time (IST) Synchronized with Server Clock"
+                >
+                  <Clock className="w-3 h-3 mr-1 text-slate-500" />
+                  <span suppressHydrationWarning>{currentIST || formatServerIST()}</span>
                 </span>
               </div>
             </div>
@@ -508,6 +531,22 @@ export default function ExaminationsDirectoryPage() {
                       <Layers className="w-3.5 h-3.5 text-slate-400" />
                       <span>{exam.totalSections} Sections</span>
                     </div>
+
+                    {/* Scheduled Window in IST */}
+                    {exam.startTime && (
+                      <div className="flex items-center space-x-1.5 font-medium text-slate-600" title="Scheduled Examination Window in Indian Standard Time (IST)">
+                        <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                        <span suppressHydrationWarning>
+                          {formatDateTime(exam.startTime, false, false)}
+                          {exam.endTime ? ` – ${formatTime(exam.endTime, false, true)}` : ""}
+                        </span>
+                        {exam.lateEntryGraceMinutes ? (
+                          <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-1.5 py-0.2 rounded border border-amber-200">
+                            +{exam.lateEntryGraceMinutes}m Grace
+                          </span>
+                        ) : null}
+                      </div>
+                    )}
 
                     {/* Passcode Voucher Token */}
                     <button

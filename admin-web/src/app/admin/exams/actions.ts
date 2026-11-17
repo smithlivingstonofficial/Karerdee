@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { revalidatePath } from "next/cache";
 import { ExamStatus } from "@/types/database.types";
+import { reconcileExamStatuses, computeExamTimingDetails } from "@/lib/exam-reconciliation";
 
 export interface ExamSummaryItem {
   id: string;
@@ -22,6 +23,9 @@ export interface ExamSummaryItem {
   totalSections: number;
   targetDepartments: string[];
   calculatorMode: string;
+  lateEntryGraceMinutes?: number;
+  autoConcludeDeadline?: string;
+  isConcluded?: boolean;
 }
 
 export async function getExamsAction(): Promise<{
@@ -29,6 +33,9 @@ export async function getExamsAction(): Promise<{
   error?: string;
 }> {
   try {
+    // 0. Deterministically reconcile all exam statuses against IST server clock & grace period
+    await reconcileExamStatuses();
+
     const { data: examsData, error: examsErr } = await supabaseAdmin
       .from("exams")
       .select(`
@@ -73,6 +80,8 @@ export async function getExamsAction(): Promise<{
         }
       });
 
+      const timing = computeExamTimingDetails(e);
+
       return {
         id: e.id,
         title: e.title,
@@ -90,6 +99,9 @@ export async function getExamsAction(): Promise<{
         totalSections: (e.sections || []).length,
         targetDepartments: Array.from(allDepts),
         calculatorMode: config.calculator_mode || "NONE",
+        lateEntryGraceMinutes: timing.lateEntryGraceMinutes,
+        autoConcludeDeadline: timing.autoConcludeDeadline.toISOString(),
+        isConcluded: timing.isConcluded,
       };
     });
 
@@ -317,6 +329,9 @@ export async function getExamDetailsWithRosterAction(examId: string): Promise<{
   error?: string;
 }> {
   try {
+    // 0. Reconcile exam status against IST clock & grace period
+    await reconcileExamStatuses(examId);
+
     // 1. Fetch Exam
     const { data: exam, error: examErr } = await supabaseAdmin
       .from("exams")

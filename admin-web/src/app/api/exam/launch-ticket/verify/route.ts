@@ -3,6 +3,7 @@ import jwt from "jsonwebtoken";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { formatDateTime } from "@/lib/date";
 import { shuffleWithSeed } from "@/lib/utils";
+import { reconcileExamStatuses } from "@/lib/exam-reconciliation";
 
 interface VerifyRequestBody {
   ticket: string;
@@ -86,6 +87,9 @@ export async function POST(req: NextRequest) {
 
     // 2a. Check if Exam is already concluded
     if (exam.status === "COMPLETED" || exam.status === "ARCHIVED" || serverEpochMs > endTime.getTime()) {
+      if (exam.status !== "COMPLETED" && exam.status !== "ARCHIVED") {
+        await reconcileExamStatuses(exam.id);
+      }
       return NextResponse.json(
         {
           error: `This examination has concluded. The scheduled exam window ended at ${formatDateTime(endTime, false, true)}. Access is strictly closed.`,
