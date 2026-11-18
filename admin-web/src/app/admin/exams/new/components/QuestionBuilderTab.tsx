@@ -19,6 +19,13 @@ import {
   Globe,
   Tag,
   FileSpreadsheet,
+  ShieldCheck,
+  Upload,
+  ArrowRight,
+  AlertCircle,
+  PlusCircle,
+  Check,
+  Lock,
 } from "lucide-react";
 
 interface QuestionBuilderTabProps {
@@ -98,6 +105,18 @@ export function QuestionBuilderTab({
   const remainingSlots = Math.max(0, targetQuota - currentQuotaCount);
   const isQuotaComplete = currentQuotaCount === targetQuota;
   const isQuotaExceeded = currentQuotaCount > targetQuota;
+
+  // Track completion statistics across all Part B departments
+  const completedTracksCount = useMemo(() => {
+    if (isPartCommon || sectionDepts.length === 0) return 0;
+    return sectionDepts.filter((deptCode) => getDeptQuestionsCount(deptCode) >= targetQuota).length;
+  }, [isPartCommon, sectionDepts, questions, targetQuota]);
+
+  const totalTracksCount = sectionDepts.length;
+  const allTracksCompleted = totalTracksCount > 0 && completedTracksCount === totalTracksCount;
+  const tracksProgressPercent = totalTracksCount > 0
+    ? Math.round((completedTracksCount / totalTracksCount) * 100)
+    : 0;
 
   function addQuestion(type: "MCQ_SINGLE" | "MCQ_MULTIPLE") {
     if (!activeSection) return;
@@ -240,7 +259,6 @@ export function QuestionBuilderTab({
     const slotsLeft = Math.max(0, targetQuota - currentQuotaCount);
     if (slotsLeft <= 0) return;
 
-    // Ensure all imported questions carry the active department context and never exceed quota
     const contextualized = imported.slice(0, slotsLeft).map((q) => ({
       ...q,
       targetDepartment: !isPartCommon ? effectiveDeptTrack : null,
@@ -252,7 +270,6 @@ export function QuestionBuilderTab({
     const slotsLeft = Math.max(0, targetQuota - currentQuotaCount);
     if (slotsLeft <= 0) return;
 
-    // Ensure all imported questions carry the active department context and never exceed quota
     const contextualized = imported.slice(0, slotsLeft).map((q) => ({
       ...q,
       targetDepartment: !isPartCommon ? effectiveDeptTrack : null,
@@ -263,11 +280,11 @@ export function QuestionBuilderTab({
   const optionLetters = ["A", "B", "C", "D", "E", "F"];
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       {/* 1. Top Section Selector & Action Ribbon */}
-      <div className="bg-white border border-slate-200/90 rounded-2xl p-3.5 sm:p-4 shadow-xs space-y-3">
+      <div className="bg-white border border-slate-200/90 rounded-2xl p-4 sm:p-5 shadow-xs space-y-4">
         {/* Tier 1: Main Section Tabs & Primary Actions */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3.5">
           {/* Segmented Section Switcher */}
           <div className="inline-flex items-center p-1 bg-slate-100/80 rounded-xl border border-slate-200/80 space-x-1 overflow-x-auto">
             {sections.map((sec, idx) => {
@@ -283,7 +300,7 @@ export function QuestionBuilderTab({
                   key={sec.id}
                   type="button"
                   onClick={() => setActiveSectionId(sec.id)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center space-x-2 ${
+                  className={`px-3.5 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center space-x-2.5 ${
                     isSelected
                       ? isCommon
                         ? "bg-white text-blue-900 border border-blue-200 shadow-2xs ring-1 ring-blue-500/10"
@@ -292,7 +309,7 @@ export function QuestionBuilderTab({
                   }`}
                 >
                   <span
-                    className={`w-4 h-4 rounded text-[10px] font-black flex items-center justify-center ${
+                    className={`w-5 h-5 rounded-md text-[10px] font-black flex items-center justify-center ${
                       isSelected
                         ? isCommon
                           ? "bg-blue-100 text-blue-700"
@@ -306,7 +323,7 @@ export function QuestionBuilderTab({
                     {isCommon ? "Part A (Common Core)" : "Part B (Department Tracks)"}
                   </span>
                   <span
-                    className={`px-1.5 py-0.2 rounded-md text-[10px] font-extrabold border ${
+                    className={`px-2 py-0.5 rounded-md text-[10px] font-extrabold border ${
                       isSelected
                         ? isCommon
                           ? "bg-blue-50 text-blue-700 border-blue-200"
@@ -322,13 +339,13 @@ export function QuestionBuilderTab({
           </div>
 
           {/* Action Buttons: Import + Create (Clean single plus icons) */}
-          <div className="flex items-center space-x-2 self-start sm:self-center flex-shrink-0">
+          <div className="flex items-center space-x-2 self-start sm:self-center flex-shrink-0 flex-wrap gap-y-1.5">
             <button
               type="button"
               onClick={() => setIsBankDrawerOpen(true)}
               disabled={remainingSlots <= 0}
               title={remainingSlots <= 0 ? "Target question limit reached for this part" : `Import from bank (${remainingSlots} slots remaining)`}
-              className="inline-flex items-center px-3 py-1.5 text-xs font-bold text-blue-700 bg-blue-50 border border-blue-200/90 hover:bg-blue-100 rounded-lg shadow-2xs transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+              className="inline-flex items-center px-3.5 py-2 text-xs font-bold text-blue-700 bg-blue-50 border border-blue-200/90 hover:bg-blue-100 rounded-xl shadow-2xs transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
             >
               <BookOpen className="w-3.5 h-3.5 mr-1.5" />
               <span>Import Bank ({remainingSlots} left)</span>
@@ -338,7 +355,7 @@ export function QuestionBuilderTab({
               onClick={() => setIsCsvDrawerOpen(true)}
               disabled={remainingSlots <= 0}
               title={remainingSlots <= 0 ? "Target question limit reached for this part" : `Upload spreadsheet / CSV (${remainingSlots} slots remaining)`}
-              className="inline-flex items-center px-3 py-1.5 text-xs font-bold text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 hover:border-slate-300 rounded-lg shadow-2xs transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+              className="inline-flex items-center px-3.5 py-2 text-xs font-bold text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 hover:border-slate-300 rounded-xl shadow-2xs transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
             >
               <FileSpreadsheet className="w-3.5 h-3.5 mr-1.5 text-emerald-600" />
               <span>Upload CSV</span>
@@ -348,7 +365,7 @@ export function QuestionBuilderTab({
               onClick={() => addQuestion("MCQ_SINGLE")}
               disabled={remainingSlots <= 0}
               title={remainingSlots <= 0 ? "Target question limit reached for this part" : "Add single choice MCQ"}
-              className="inline-flex items-center px-3 py-1.5 text-xs font-bold text-white bg-blue-700 hover:bg-blue-800 rounded-lg shadow-2xs transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+              className="inline-flex items-center px-3.5 py-2 text-xs font-bold text-white bg-blue-700 hover:bg-blue-800 rounded-xl shadow-2xs transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
             >
               <Plus className="w-3.5 h-3.5 mr-1" />
               Single Choice
@@ -358,7 +375,7 @@ export function QuestionBuilderTab({
               onClick={() => addQuestion("MCQ_MULTIPLE")}
               disabled={remainingSlots <= 0}
               title={remainingSlots <= 0 ? "Target question limit reached for this part" : "Add multi select MCQ"}
-              className="inline-flex items-center px-3 py-1.5 text-xs font-bold text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 rounded-lg shadow-2xs transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+              className="inline-flex items-center px-3.5 py-2 text-xs font-bold text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 rounded-xl shadow-2xs transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
             >
               <Plus className="w-3.5 h-3.5 mr-1" />
               Multi Select
@@ -367,81 +384,107 @@ export function QuestionBuilderTab({
         </div>
 
         {/* Tier 2: Streamlined Track Selector & Integrated Quota Status */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-2.5 pt-0.5">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 pt-0.5">
           {/* Left: Department Tracks (Part B) or Scope (Part A) */}
-          <div className="flex items-center space-x-2 flex-wrap">
+          <div className="flex-1 min-w-0 space-y-2">
             {isPartCommon ? (
               <div className="flex items-center space-x-2 text-xs text-slate-600">
-                <div className="w-5 h-5 rounded-md bg-blue-50 text-blue-700 flex items-center justify-center border border-blue-200/80">
-                  <Globe className="w-3 h-3" />
+                <div className="w-6 h-6 rounded-lg bg-blue-50 text-blue-700 flex items-center justify-center border border-blue-200/80">
+                  <Globe className="w-3.5 h-3.5 text-blue-700" />
                 </div>
-                <span className="font-semibold text-slate-800">General Core Syllabus</span>
+                <span className="font-bold text-slate-800">General Core Syllabus</span>
                 <span className="text-slate-300">•</span>
-                <span className="text-[11px] text-slate-500">Delivered to all registered candidates</span>
+                <span className="text-[11px] text-slate-500">Delivered universally to all registered examination candidates</span>
               </div>
             ) : (
-              <div className="flex items-center space-x-1.5 flex-wrap">
-                <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 flex items-center mr-1">
-                  <Building2 className="w-3.5 h-3.5 mr-1 text-purple-600" />
-                  Tracks:
-                </span>
+              <div className="space-y-2">
+                {/* Track Matrix Progress Bar */}
+                <div className="flex items-center justify-between text-xs pr-2">
+                  <div className="flex items-center space-x-2">
+                    <Building2 className="w-4 h-4 text-purple-700" />
+                    <span className="font-extrabold text-slate-900 text-xs">
+                      Specialization Tracks Matrix ({sectionDepts.length} Departments)
+                    </span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <span className="text-[11px] font-bold text-slate-500">
+                      {completedTracksCount} of {totalTracksCount} Complete
+                    </span>
+                    <span
+                      className={`px-2 py-0.5 rounded-full text-[10px] font-black border ${
+                        allTracksCompleted
+                          ? "bg-emerald-100 text-emerald-800 border-emerald-300"
+                          : "bg-amber-100 text-amber-800 border-amber-300"
+                      }`}
+                    >
+                      {allTracksCompleted ? "All Tracks Ready ✓" : `${totalTracksCount - completedTracksCount} Pending`}
+                    </span>
+                  </div>
+                </div>
 
+                {/* Chips Grid */}
                 {sectionDepts.length === 0 ? (
                   <span className="text-xs text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200 font-medium">
                     No departments selected in Part B. Go to Tab 02 to assign departments.
                   </span>
                 ) : (
-                  sectionDepts.map((deptCode) => {
-                    const isSelected = effectiveDeptTrack === deptCode;
-                    const deptCount = getDeptQuestionsCount(deptCode);
-                    const isDeptComplete = deptCount >= targetQuota;
-                    return (
-                      <button
-                        key={deptCode}
-                        type="button"
-                        onClick={() => setSelectedDeptTrack(deptCode)}
-                        className={`px-2.5 py-1 rounded-lg text-xs font-bold border transition-all cursor-pointer flex items-center space-x-1.5 ${
-                          isSelected
-                            ? "bg-purple-100 text-purple-950 border-purple-300 shadow-2xs ring-1 ring-purple-400/20"
-                            : "bg-slate-50 text-slate-600 border-slate-200 hover:bg-white hover:border-slate-300"
-                        }`}
-                      >
-                        <span>{deptCode} Track</span>
-                        <span
-                          className={`px-1.5 py-0.2 rounded-full text-[10px] font-extrabold ${
+                  <div className="flex items-center space-x-1.5 flex-wrap gap-y-1.5">
+                    {sectionDepts.map((deptCode) => {
+                      const isSelected = effectiveDeptTrack === deptCode;
+                      const deptCount = getDeptQuestionsCount(deptCode);
+                      const isDeptComplete = deptCount >= targetQuota;
+                      const dName = departments.find((d) => d.code === deptCode)?.name;
+                      return (
+                        <button
+                          key={deptCode}
+                          type="button"
+                          onClick={() => setSelectedDeptTrack(deptCode)}
+                          title={dName ? `${deptCode} — ${dName}` : `${deptCode} Specialization Track`}
+                          className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer flex items-center space-x-1.5 shadow-2xs ${
                             isSelected
-                              ? isDeptComplete
-                                ? "bg-emerald-600 text-white"
-                                : "bg-purple-700 text-white"
+                              ? "bg-purple-700 text-white border-purple-800 ring-2 ring-purple-500/30"
                               : isDeptComplete
-                              ? "bg-emerald-100 text-emerald-800"
-                              : "bg-slate-200 text-slate-600"
+                              ? "bg-emerald-50/80 text-emerald-950 border-emerald-200 hover:bg-emerald-100 hover:border-emerald-300"
+                              : "bg-amber-50/70 text-amber-950 border-amber-300 hover:bg-amber-100"
                           }`}
                         >
-                          {deptCount} / {targetQuota}
-                        </span>
-                      </button>
-                    );
-                  })
+                          <span>{deptCode} Track</span>
+                          <span
+                            className={`px-2 py-0.2 rounded-full text-[10px] font-black ${
+                              isSelected
+                                ? isDeptComplete
+                                  ? "bg-emerald-500 text-white"
+                                  : "bg-purple-900 text-purple-100"
+                                : isDeptComplete
+                                ? "bg-emerald-200/90 text-emerald-950"
+                                : "bg-amber-200/90 text-amber-950"
+                            }`}
+                          >
+                            {isDeptComplete ? `${deptCount}/${targetQuota} ✓` : `${deptCount}/${targetQuota}`}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
                 )}
               </div>
             )}
           </div>
 
           {/* Right: Integrated Quota Progress Meter */}
-          <div className="flex items-center space-x-3 bg-slate-50/90 border border-slate-200/80 rounded-xl px-3 py-1.5 self-start md:self-auto">
-            <div className="text-left md:text-right">
+          <div className="flex items-center space-x-3 bg-slate-50 border border-slate-200/90 rounded-2xl px-4 py-2.5 self-start lg:self-center flex-shrink-0 shadow-2xs">
+            <div className="text-left sm:text-right">
               <div className="flex items-center space-x-1.5">
-                <span className="text-[11px] font-bold text-slate-700">
+                <span className="text-[11px] font-bold text-slate-600">
                   {isPartCommon ? "Part A Quota:" : `${effectiveDeptTrack || "Dept"} Track:`}
                 </span>
-                <span className="text-xs font-black text-slate-900">
+                <span className="text-xs font-black text-slate-900 font-mono">
                   {currentQuotaCount} / {targetQuota} Qs
                 </span>
               </div>
-              <span className="text-[9px] text-slate-400 block leading-none">
+              <span className="text-[10px] text-slate-500 font-medium block leading-none mt-0.5">
                 {isQuotaComplete
-                  ? "Target quota fulfilled ✓"
+                  ? "Quota fulfilled (100%) ✓"
                   : isQuotaExceeded
                   ? `+${currentQuotaCount - targetQuota} over target`
                   : `${remainingSlots} questions remaining`}
@@ -449,7 +492,7 @@ export function QuestionBuilderTab({
             </div>
 
             {/* Mini Progress Bar */}
-            <div className="w-20 sm:w-28 bg-slate-200 h-2 rounded-full overflow-hidden">
+            <div className="w-20 sm:w-28 bg-slate-200/80 h-2 rounded-full overflow-hidden">
               <div
                 className={`h-full transition-all duration-300 rounded-full ${
                   isQuotaComplete
@@ -466,7 +509,7 @@ export function QuestionBuilderTab({
 
             {/* Status Badge */}
             <span
-              className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full border ${
+              className={`text-[10px] font-black px-2.5 py-0.5 rounded-full border ${
                 isQuotaComplete
                   ? "bg-emerald-100 text-emerald-800 border-emerald-300"
                   : isQuotaExceeded
@@ -486,7 +529,7 @@ export function QuestionBuilderTab({
               <button
                 type="button"
                 onClick={trimToQuota}
-                className="px-2 py-0.5 text-[10px] font-bold text-amber-900 bg-amber-100 hover:bg-amber-200 border border-amber-300 rounded-md transition-all cursor-pointer shadow-2xs"
+                className="px-2.5 py-1 text-[10px] font-bold text-amber-900 bg-amber-100 hover:bg-amber-200 border border-amber-300 rounded-lg transition-all cursor-pointer shadow-2xs"
                 title={`Trim excess questions to fit target limit (${targetQuota})`}
               >
                 Trim to {targetQuota} Qs
@@ -498,64 +541,130 @@ export function QuestionBuilderTab({
 
       {/* 3. Questions List */}
       {sectionQuestions.length === 0 ? (
-        <div className="bg-white border border-slate-200/90 rounded-2xl p-10 text-center shadow-xs space-y-3">
-          <div className="w-12 h-12 rounded-xl bg-blue-50 text-blue-700 flex items-center justify-center mx-auto border border-blue-100 shadow-xs">
-            <ListOrdered className="w-6 h-6" />
+        <div className="bg-gradient-to-b from-white via-slate-50/50 to-slate-50/80 border border-slate-200/90 rounded-3xl p-8 sm:p-12 text-center shadow-xs space-y-6">
+          <div className="relative mx-auto w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-50 to-indigo-100/60 border border-blue-200 text-blue-700 flex items-center justify-center shadow-xs">
+            <BookOpen className="w-8 h-8 text-blue-700" />
+            <span className="absolute -top-1 -right-1 flex h-4 w-4">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-4 w-4 bg-blue-600 text-white text-[9px] font-black items-center justify-center">!</span>
+            </span>
           </div>
-          <div>
-            <h3 className="text-sm font-bold text-slate-900">
+
+          <div className="max-w-md mx-auto space-y-1.5">
+            <div className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full text-[11px] font-extrabold bg-purple-50 text-purple-700 border border-purple-200 mb-1 shadow-2xs">
+              <Building2 className="w-3.5 h-3.5 text-purple-600" />
+              <span>{isPartCommon ? "Common Core Curriculum" : `${effectiveDeptTrack} Specialization Track`}</span>
+            </div>
+            <h3 className="text-lg font-black text-slate-900 tracking-tight">
               {isPartCommon
-                ? "No Questions in Part A (Common Core)"
-                : `No Questions in ${effectiveDeptTrack || "this Department"} Track`}
+                ? "Part A (Common Core) Ready for Questions"
+                : `${effectiveDeptTrack} Track is Ready for Content`}
             </h3>
-            <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto leading-relaxed">
+            <p className="text-xs text-slate-600 leading-relaxed">
               {isPartCommon
-                ? "Add general research questions interactively or import them from the Master Question Bank."
-                : `Add specialization questions strictly for ${effectiveDeptTrack} candidates, or import from the ${effectiveDeptTrack} Question Bank.`}
+                ? "This section is delivered universally to all candidates. Populate 20 research aptitude questions from the repository or author custom items."
+                : `This track is allocated strictly to ${effectiveDeptName || effectiveDeptTrack} examinees. ${targetQuota} specialization questions are required to complete this track's quota.`}
             </p>
           </div>
 
-          <div className="pt-2 flex flex-wrap justify-center gap-2">
-            <button
-              type="button"
+          {/* 3 Interactive Pathway Action Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 max-w-3xl mx-auto text-left">
+            {/* Pathway 1: Question Bank Importer (Recommended) */}
+            <div
               onClick={() => setIsBankDrawerOpen(true)}
-              className="inline-flex items-center px-3.5 py-1.5 text-xs font-bold text-blue-700 bg-blue-50 border border-blue-200 hover:bg-blue-100 rounded-lg shadow-2xs transition-all cursor-pointer"
+              className="group bg-white hover:bg-blue-50/40 border-2 border-blue-200 hover:border-blue-600 rounded-2xl p-4 shadow-2xs hover:shadow-md transition-all cursor-pointer flex flex-col justify-between"
             >
-              <BookOpen className="w-3.5 h-3.5 mr-1.5" />
-              {isPartCommon
-                ? "Import General Core Questions"
-                : `Import ${effectiveDeptTrack} Questions`}
-            </button>
-            <button
-              type="button"
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="w-8 h-8 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center group-hover:scale-105 transition-transform">
+                    <BookOpen className="w-4 h-4" />
+                  </div>
+                  <span className="px-2 py-0.5 rounded-full text-[9px] font-extrabold uppercase tracking-wider bg-blue-100 text-blue-800">
+                    Recommended
+                  </span>
+                </div>
+                <h4 className="text-xs font-black text-slate-900 group-hover:text-blue-900">
+                  {isPartCommon ? "Import Common Bank" : `Import ${effectiveDeptTrack} Bank`}
+                </h4>
+                <p className="text-[11px] text-slate-500 leading-normal">
+                  {isPartCommon
+                    ? "Select from verified aptitude & quantitative research methodology questions."
+                    : `Instant 1-click import from 30 peer-reviewed ${effectiveDeptTrack} repository questions.`}
+                </p>
+              </div>
+              <div className="pt-3 mt-2 border-t border-slate-100 flex items-center text-xs font-bold text-blue-700 group-hover:text-blue-800">
+                <span>Open Repository</span>
+                <ArrowRight className="w-3.5 h-3.5 ml-1 group-hover:translate-x-1 transition-transform" />
+              </div>
+            </div>
+
+            {/* Pathway 2: Bulk CSV Ingestion */}
+            <div
               onClick={() => setIsCsvDrawerOpen(true)}
-              className="inline-flex items-center px-3.5 py-1.5 text-xs font-bold text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 hover:border-slate-300 rounded-lg shadow-2xs transition-all cursor-pointer"
+              className="group bg-white hover:bg-emerald-50/40 border border-slate-200 hover:border-emerald-500 rounded-2xl p-4 shadow-2xs hover:shadow-md transition-all cursor-pointer flex flex-col justify-between"
             >
-              <FileSpreadsheet className="w-3.5 h-3.5 mr-1.5 text-emerald-600" />
-              Upload Spreadsheet (.csv)
-            </button>
-            <button
-              type="button"
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-800 flex items-center justify-center group-hover:scale-105 transition-transform">
+                    <FileSpreadsheet className="w-4 h-4" />
+                  </div>
+                  <span className="px-2 py-0.5 rounded-full text-[9px] font-extrabold uppercase tracking-wider bg-slate-100 text-slate-600">
+                    Spreadsheet
+                  </span>
+                </div>
+                <h4 className="text-xs font-black text-slate-900 group-hover:text-emerald-900">
+                  Upload .CSV Sheet
+                </h4>
+                <p className="text-[11px] text-slate-500 leading-normal">
+                  Ingest formatted question sheets with answer keys and distractor options.
+                </p>
+              </div>
+              <div className="pt-3 mt-2 border-t border-slate-100 flex items-center text-xs font-bold text-emerald-700 group-hover:text-emerald-800">
+                <span>Upload CSV</span>
+                <Upload className="w-3.5 h-3.5 ml-1" />
+              </div>
+            </div>
+
+            {/* Pathway 3: Interactive Single Choice MCQ */}
+            <div
               onClick={() => addQuestion("MCQ_SINGLE")}
-              className="inline-flex items-center px-3.5 py-1.5 text-xs font-bold text-white bg-blue-700 hover:bg-blue-800 rounded-lg shadow-2xs transition-all cursor-pointer"
+              className="group bg-white hover:bg-slate-50 border border-slate-200 hover:border-slate-400 rounded-2xl p-4 shadow-2xs hover:shadow-md transition-all cursor-pointer flex flex-col justify-between"
             >
-              <Plus className="w-3.5 h-3.5 mr-1" />
-              Add Single Choice MCQ
-            </button>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="w-8 h-8 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center group-hover:scale-105 transition-transform">
+                    <PlusCircle className="w-4 h-4" />
+                  </div>
+                  <span className="px-2 py-0.5 rounded-full text-[9px] font-extrabold uppercase tracking-wider bg-slate-100 text-slate-600">
+                    Interactive
+                  </span>
+                </div>
+                <h4 className="text-xs font-black text-slate-900 group-hover:text-slate-950">
+                  Author Custom MCQ
+                </h4>
+                <p className="text-[11px] text-slate-500 leading-normal">
+                  Build custom single-choice or multi-select questions with code snippets and options.
+                </p>
+              </div>
+              <div className="pt-3 mt-2 border-t border-slate-100 flex items-center text-xs font-bold text-slate-700 group-hover:text-slate-900">
+                <span>Create Manually</span>
+                <Plus className="w-3.5 h-3.5 ml-1" />
+              </div>
+            </div>
           </div>
         </div>
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-3.5">
           {sectionQuestions.map((q, idx) => (
             <div
               key={q.id}
-              className="bg-white border border-slate-200/90 rounded-2xl p-4 sm:p-5 shadow-xs hover:border-slate-300 transition-all space-y-4"
+              className="bg-white border border-slate-200/90 rounded-2xl p-5 shadow-xs hover:border-slate-300 transition-all space-y-4"
             >
               {/* Question Header */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 border-b border-slate-100 pb-3">
-                <div className="flex items-center space-x-2.5">
-                  <span className="w-6 h-6 rounded-md bg-blue-50 text-blue-700 font-extrabold text-[11px] flex items-center justify-center border border-blue-200/80">
-                    Q{idx + 1}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3.5">
+                <div className="flex items-center space-x-2.5 flex-wrap gap-y-1.5">
+                  <span className="w-7 h-7 rounded-xl bg-gradient-to-br from-blue-50 to-indigo-100 text-blue-900 font-black text-xs flex items-center justify-center border border-blue-200 shadow-2xs font-mono">
+                    Q{(idx + 1).toString().padStart(2, "0")}
                   </span>
 
                   {/* Question Type Selector */}
@@ -566,7 +675,7 @@ export function QuestionBuilderTab({
                         questionType: e.target.value as "MCQ_SINGLE" | "MCQ_MULTIPLE",
                       })
                     }
-                    className="text-xs font-bold bg-slate-50 text-slate-800 border border-slate-200 rounded-lg px-2.5 py-1 focus:outline-none focus:ring-1 focus:ring-blue-600 cursor-pointer"
+                    className="text-xs font-bold bg-slate-50 text-slate-800 border border-slate-200 rounded-xl px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-600 cursor-pointer shadow-2xs"
                   >
                     <option value="MCQ_SINGLE">Single Choice (Radio)</option>
                     <option value="MCQ_MULTIPLE">Multiple Choice (Checkboxes)</option>
@@ -574,29 +683,33 @@ export function QuestionBuilderTab({
 
                   {/* Target Department Badge */}
                   {q.targetDepartment ? (
-                    <span className="text-[10px] font-extrabold px-2 py-0.2 rounded-full bg-purple-50 text-purple-700 border border-purple-200">
-                      Dept: {q.targetDepartment}
+                    <span className="text-[10px] font-black px-2.5 py-1 rounded-lg bg-purple-50 text-purple-800 border border-purple-200 flex items-center space-x-1 shadow-2xs">
+                      <Building2 className="w-3 h-3 text-purple-600 mr-1" />
+                      {q.targetDepartment} Track
                     </span>
                   ) : (
-                    <span className="text-[10px] font-extrabold px-2 py-0.2 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
-                      Common Core
+                    <span className="text-[10px] font-black px-2.5 py-1 rounded-lg bg-blue-50 text-blue-800 border border-blue-200 flex items-center space-x-1 shadow-2xs">
+                      <Globe className="w-3 h-3 text-blue-600 mr-1" />
+                      General Core
                     </span>
                   )}
 
                   {/* Source Bank Origin */}
                   {q.sourceQuestionId && (
-                    <span className="text-[10px] font-medium text-slate-400">
-                      • from bank
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 border border-slate-200 flex items-center space-x-1">
+                      <BookOpen className="w-2.5 h-2.5 text-slate-400 mr-1" />
+                      <span>From Bank</span>
                     </span>
                   )}
                 </div>
 
                 {/* Scoring Weight & Negative Penalty */}
                 <div className="flex items-center space-x-3 self-end sm:self-center">
-                  <div className="flex items-center space-x-1.5">
+                  <div className="flex items-center space-x-1.5" title="Institutional Policy: 1 mark per question (Deterministic scoring)">
                     <span className="text-xs text-slate-500 font-semibold">Marks:</span>
-                    <span className="px-2 py-0.5 text-xs font-bold text-blue-700 bg-blue-50 border border-blue-200 rounded-md">
-                      1 Mark
+                    <span className="px-2.5 py-1 text-xs font-black text-blue-800 bg-blue-50 border border-blue-200 rounded-lg flex items-center space-x-1 shadow-2xs">
+                      <Lock className="w-3 h-3 text-blue-600 mr-1" />
+                      1.0 Mark
                     </span>
                   </div>
 
@@ -613,16 +726,16 @@ export function QuestionBuilderTab({
                             negativePoints: parseFloat(e.target.value) || 0.0,
                           })
                         }
-                        className="w-14 px-1.5 py-1 text-xs font-bold text-amber-900 bg-amber-50 border border-amber-200 rounded-md focus:outline-none focus:ring-1 focus:ring-amber-600 text-center"
+                        className="w-16 px-2 py-1 text-xs font-bold text-amber-900 bg-amber-50 border border-amber-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-amber-600 text-center shadow-2xs"
                       />
                     </div>
                   )}
 
-                  <div className="flex items-center space-x-0.5 pl-2 border-l border-slate-200">
+                  <div className="flex items-center space-x-1 pl-2 border-l border-slate-200">
                     <button
                       type="button"
                       onClick={() => duplicateQuestion(q)}
-                      className="p-1 rounded text-slate-400 hover:text-slate-800 hover:bg-slate-100 transition-colors cursor-pointer"
+                      className="p-1.5 rounded-lg text-slate-400 hover:text-blue-700 hover:bg-blue-50 border border-transparent hover:border-blue-200 transition-colors cursor-pointer"
                       title="Duplicate Question"
                     >
                       <Copy className="w-3.5 h-3.5" />
@@ -630,7 +743,7 @@ export function QuestionBuilderTab({
                     <button
                       type="button"
                       onClick={() => removeQuestion(q.id)}
-                      className="p-1 rounded text-slate-400 hover:text-red-700 hover:bg-red-50 transition-colors cursor-pointer"
+                      className="p-1.5 rounded-lg text-slate-400 hover:text-red-700 hover:bg-red-50 border border-transparent hover:border-red-200 transition-colors cursor-pointer"
                       title="Delete Question"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
@@ -640,7 +753,7 @@ export function QuestionBuilderTab({
               </div>
 
               {/* Prompt Textarea */}
-              <div className="space-y-1">
+              <div className="space-y-1.5">
                 <label className="block text-xs font-bold text-slate-700">
                   Question Prompt <span className="text-red-500">*</span>
                 </label>
@@ -649,7 +762,7 @@ export function QuestionBuilderTab({
                   value={q.prompt}
                   onChange={(e) => updateQuestion(q.id, { prompt: e.target.value })}
                   placeholder="Enter the question prompt here..."
-                  className="w-full px-3 py-1.5 text-xs sm:text-sm bg-slate-50/50 border border-slate-200 rounded-xl text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:bg-white transition-all font-medium leading-relaxed"
+                  className="w-full px-3.5 py-2 text-xs sm:text-sm bg-slate-50/60 border border-slate-200 rounded-xl text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-700 focus:bg-white transition-all font-medium leading-relaxed shadow-2xs"
                 />
               </div>
 
@@ -662,7 +775,7 @@ export function QuestionBuilderTab({
                       codeSnippet: q.codeSnippet !== undefined ? undefined : "",
                     })
                   }
-                  className="text-xs font-bold text-blue-700 hover:text-blue-800 flex items-center space-x-1 cursor-pointer mb-1.5"
+                  className="text-xs font-bold text-blue-700 hover:text-blue-800 flex items-center space-x-1.5 cursor-pointer mb-1.5"
                 >
                   <Code2 className="w-3.5 h-3.5" />
                   <span>
@@ -678,16 +791,16 @@ export function QuestionBuilderTab({
                     value={q.codeSnippet}
                     onChange={(e) => updateQuestion(q.id, { codeSnippet: e.target.value })}
                     placeholder="// Optional code snippet rendered in monospace for candidates..."
-                    className="w-full font-mono text-xs px-3 py-2 bg-slate-900 text-slate-100 rounded-xl border border-slate-800 focus:outline-none focus:ring-1 focus:ring-blue-500 leading-relaxed"
+                    className="w-full font-mono text-xs px-3.5 py-2.5 bg-slate-900 text-slate-100 rounded-xl border border-slate-800 focus:outline-none focus:ring-1 focus:ring-blue-500 leading-relaxed shadow-xs"
                   />
                 )}
               </div>
 
               {/* Options Section */}
-              <div className="space-y-2 pt-1">
+              <div className="space-y-2.5 pt-1">
                 <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                    Options &amp; Correct Key (Click option badge to set correct)
+                  <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">
+                    Options &amp; Correct Answer Key (Click option badge to set correct)
                   </span>
                   {q.options.length < 6 && (
                     <button
@@ -700,13 +813,13 @@ export function QuestionBuilderTab({
                   )}
                 </div>
 
-                <div className="space-y-1.5">
+                <div className="space-y-2">
                   {q.options.map((opt, optIdx) => (
                     <div
                       key={opt.id}
-                      className={`flex items-center space-x-2.5 p-2 rounded-xl border transition-all ${
+                      className={`flex items-center space-x-3 p-2.5 rounded-xl border transition-all ${
                         opt.isCorrect
-                          ? "bg-emerald-50/70 border-emerald-300 ring-1 ring-emerald-500/20"
+                          ? "bg-emerald-50/70 border-emerald-300 ring-1 ring-emerald-500/20 shadow-2xs"
                           : "bg-slate-50/60 border-slate-200 hover:border-slate-300"
                       }`}
                     >
@@ -714,12 +827,12 @@ export function QuestionBuilderTab({
                       <button
                         type="button"
                         onClick={() => toggleCorrectOption(q.id, opt.id)}
-                        className={`w-7 h-7 rounded-lg flex items-center justify-center font-extrabold text-xs border transition-all cursor-pointer ${
+                        className={`w-7 h-7 rounded-lg flex items-center justify-center font-black text-xs border transition-all cursor-pointer ${
                           opt.isCorrect
                             ? "bg-emerald-600 text-white border-emerald-600 shadow-2xs"
                             : "bg-white text-slate-700 border-slate-300 hover:border-slate-400"
                         }`}
-                        title={opt.isCorrect ? "Correct Option" : "Click to set as correct"}
+                        title={opt.isCorrect ? "Correct Option Key" : "Click to set as correct answer key"}
                       >
                         {optionLetters[optIdx] || optIdx + 1}
                       </button>
@@ -735,9 +848,9 @@ export function QuestionBuilderTab({
 
                       {/* Correct Badge */}
                       {opt.isCorrect && (
-                        <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100/90 px-2 py-0.5 rounded-full flex items-center border border-emerald-300 flex-shrink-0">
-                          <CheckCircle2 className="w-3 h-3 mr-1" />
-                          Correct
+                        <span className="text-[10px] font-black text-emerald-800 bg-emerald-100/90 px-2.5 py-1 rounded-md flex items-center border border-emerald-300 flex-shrink-0 shadow-2xs">
+                          <CheckCircle2 className="w-3.5 h-3.5 mr-1 text-emerald-700" />
+                          Correct Key
                         </span>
                       )}
 
