@@ -22,6 +22,7 @@ interface CsvUploadDrawerProps {
   targetSectionTitle: string;
   targetSectionId: string;
   targetDepartment?: string | null;
+  targetLanguage?: "EN" | "TA";
   targetLimit: number;
   currentCount: number;
   existingQuestionsCount: number;
@@ -49,6 +50,7 @@ export function CsvUploadDrawer({
   targetSectionTitle,
   targetSectionId,
   targetDepartment = null,
+  targetLanguage,
   targetLimit,
   currentCount,
   existingQuestionsCount,
@@ -60,26 +62,24 @@ export function CsvUploadDrawer({
 
   const availableSlots = Math.max(0, targetLimit - currentCount);
 
-  // 1. Download Sample CSV Template
+  // 1. Download Sample CSV Template (Standard 7 Required Columns)
   function downloadSampleCsv() {
     const headers = [
-      "Question Type",
-      "Prompt",
+      "Department Code",
+      "Question Prompt",
       "Option A",
       "Option B",
       "Option C",
       "Option D",
       "Correct Option",
-      "Points",
-      "Negative Points",
     ].join(",");
 
     const rows = [
       headers,
-      `"MCQ_SINGLE","Which research design is best suited to determine cause-and-effect relationships?","Experimental Research","Correlational Study","Observational Survey","Case Study","A",1.0,0.25`,
-      `"MCQ_MULTIPLE","Select ALL characteristics of an authentic empirical hypothesis:","It must be testable","It must be unfalsifiable","It must be grounded in literature","It predicts an expected outcome","A,C,D",1.0,0.25`,
-      `"MCQ_SINGLE","In modern operating systems, which scheduling algorithm guarantees zero starvation?","Round Robin","First-Come First-Served","Priority Scheduling without Aging","Shortest Job First","A",1.0,0.25`,
-      `"MCQ_SINGLE","Which network layer protocol provides reliable, connection-oriented data transfer?","TCP","UDP","IP","ICMP","A",1.0,0.25`,
+      `"GENERAL","Which research design is best suited to determine cause-and-effect relationships?","Experimental Research","Correlational Study","Observational Survey","Case Study","A"`,
+      `"GENERAL_T","அறிவியல் ஆராய்ச்சியில் 'கருதுகோள்' (Hypothesis) என்பது யாது?","முன்கூட்டியே கணிக்கப்பட்ட சோதனைக்குரிய கூற்று","மாற்ற முடியாத பொதுவான விதி","ஆய்வு நூலின் இறுதி முடிவுரை","தத்துவார்த்தக் கருத்து","A"`,
+      `"AERO","The critical Mach number of an airfoil is the freestream Mach number at which:","Sonic conditions first appear on the airfoil","The flow is supersonic everywhere","Shock waves detach completely","Lift coefficient reaches zero","A"`,
+      `"TAM","தொல்காப்பியத்தில் காணப்படும் மொத்த அதிகாரங்களின் எண்ணிக்கை எத்தனை?","3","4","5","6","A"`,
     ].join("\n");
 
     const blob = new Blob([rows], { type: "text/csv;charset=utf-8;" });
@@ -119,7 +119,7 @@ export function CsvUploadDrawer({
     return values;
   }
 
-  // 3. Handle File Upload
+  // 3. Handle File Upload with Dynamic Header Mapping
   function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
     setParseError(null);
     setParsedRows([]);
@@ -142,87 +142,114 @@ export function CsvUploadDrawer({
           return;
         }
 
+        const rawHeaders = parseCsvLine(lines[0]);
+        const cleanHeader = (h: string) => h.toLowerCase().replace(/[^a-z0-9]/g, "");
+        const headers = rawHeaders.map(cleanHeader);
+
+        const findIndex = (aliases: string[]) => {
+          return headers.findIndex((h) => aliases.some((a) => h === a || h.includes(a)));
+        };
+
+        let deptIdx = findIndex(["departmentcode", "deptcode", "department", "dept", "scope"]);
+        let promptIdx = findIndex(["questionprompt", "prompt", "question", "questiontext", "text"]);
+        let optAIdx = findIndex(["optiona", "opta"]);
+        let optBIdx = findIndex(["optionb", "optb"]);
+        let optCIdx = findIndex(["optionc", "optc"]);
+        let optDIdx = findIndex(["optiond", "optd"]);
+        let correctIdx = findIndex(["correctoption", "correctanswer", "correctkey", "correct", "answer", "key", "answerkey"]);
+        let typeIdx = findIndex(["questiontype", "type", "qtype"]);
+        let negIdx = findIndex(["negativepoints", "negativemarks", "penalty"]);
+
+        // Positional fallbacks
+        if (promptIdx === -1 && rawHeaders.length >= 7) {
+          // Standard 7 required columns:
+          // 0: Dept, 1: Prompt, 2: Opt A, 3: Opt B, 4: Opt C, 5: Opt D, 6: Correct Key
+          deptIdx = 0;
+          promptIdx = 1;
+          optAIdx = 2;
+          optBIdx = 3;
+          optCIdx = 4;
+          optDIdx = 5;
+          correctIdx = 6;
+        } else if (promptIdx === -1 && rawHeaders.length >= 9) {
+          // Legacy format (Type, Prompt, OptA-D, Correct, Pts, Neg)
+          typeIdx = 0;
+          promptIdx = 1;
+          optAIdx = 2;
+          optBIdx = 3;
+          optCIdx = 4;
+          optDIdx = 5;
+          correctIdx = 6;
+          deptIdx = -1;
+        }
+
         const dataRows = lines.slice(1);
         const parsed: ParsedRow[] = [];
+        const clean = (val: string | undefined) => (val || "").replace(/^"|"$/g, "").trim();
 
         for (let i = 0; i < dataRows.length; i++) {
           const cols = parseCsvLine(dataRows[i]);
-          if (cols.length < 7) {
+          if (cols.length < 5) {
             continue;
           }
 
-          // Support either full template or standard template
-          let rawDeptCode: string | null = null;
-          let qTypeStr = cols[0];
-          let prompt = cols[1];
-          let optA = cols[2];
-          let optB = cols[3];
-          let optC = cols[4];
-          let optD = cols[5];
-          let correctStr = cols[6];
-          let ptsStr = cols[7] || "1.0";
-          let negStr = cols[8] || "0.25";
+          let rawDept = deptIdx !== -1 ? clean(cols[deptIdx]).toUpperCase() : (targetDepartment || "GENERAL");
+          if (rawDept === "TAMIL") rawDept = "TAM";
 
-          // Fallback if user used legacy 12-column format
-          if (cols.length >= 10 && (cols[0].toLowerCase().includes("part") || cols[1]?.toUpperCase() === "TRUE" || cols[1]?.toUpperCase() === "FALSE")) {
-            qTypeStr = cols[3];
-            prompt = cols[4];
-            optA = cols[5];
-            optB = cols[6];
-            optC = cols[7];
-            optD = cols[8];
-            correctStr = cols[9];
-            ptsStr = cols[10] || "1.0";
-            negStr = cols[11] || "0.25";
-          } else if (cols.length >= 11 && (cols[3]?.toUpperCase() === "MCQ_SINGLE" || cols[3]?.toUpperCase() === "MCQ_MULTIPLE")) {
-            rawDeptCode = cols[0]?.replace(/^"|"$/g, "").trim().toUpperCase() || null;
-            qTypeStr = cols[3];
-            prompt = cols[4];
-            optA = cols[6];
-            optB = cols[7];
-            optC = cols[8];
-            optD = cols[9];
-            correctStr = cols[10];
-            ptsStr = cols[11] || "1.0";
-            negStr = cols[12] || "0.25";
-          }
+          const prompt = clean(cols[promptIdx !== -1 ? promptIdx : 1]);
+          const optA = clean(cols[optAIdx !== -1 ? optAIdx : 2]);
+          const optB = clean(cols[optBIdx !== -1 ? optBIdx : 3]);
+          const optC = clean(cols[optCIdx !== -1 ? optCIdx : 4]);
+          const optD = clean(cols[optDIdx !== -1 ? optDIdx : 5]);
+          const correctStr = clean(cols[correctIdx !== -1 ? correctIdx : 6]);
+
+          const qTypeStr = typeIdx !== -1 ? clean(cols[typeIdx]) : "MCQ_SINGLE";
+          const negStr = negIdx !== -1 ? clean(cols[negIdx]) : "0.0";
 
           // Strict Department Code Validation against target section / department track
           let isDeptMismatch = false;
           let mismatchReason = "";
 
-          if (rawDeptCode) {
-            const isCommonCode = rawDeptCode === "GENERAL" || rawDeptCode === "COMMON";
-            if (!targetDepartment) {
-              if (!isCommonCode) {
-                isDeptMismatch = true;
-                mismatchReason = `Section is Common Core (GENERAL), but question belongs to '${rawDeptCode}'.`;
-              }
-            } else {
-              const expectedDept = targetDepartment.trim().toUpperCase();
-              if (isCommonCode) {
-                isDeptMismatch = true;
-                mismatchReason = `Track is strictly for '${expectedDept}' questions, but question is marked as '${rawDeptCode}'.`;
-              } else if (rawDeptCode !== expectedDept) {
-                isDeptMismatch = true;
-                mismatchReason = `Department mismatch: question is tagged '${rawDeptCode}', but track is strictly '${expectedDept}'.`;
-              }
+          const isCommonCode =
+            rawDept === "GENERAL" ||
+            rawDept === "COMMON" ||
+            rawDept === "GENERAL_T" ||
+            rawDept === "GENERAL_TAMIL" ||
+            rawDept === "GENERAL_TA";
+
+          if (!targetDepartment) {
+            // Target is Common Core (Part A)
+            if (!isCommonCode) {
+              isDeptMismatch = true;
+              mismatchReason = `Section is Common Core (GENERAL), but question is marked '${rawDept}'.`;
+            }
+          } else {
+            // Target is a specific department track (e.g. AERO, TAM, MCA)
+            let expectedDept = targetDepartment.trim().toUpperCase();
+            if (expectedDept === "TAMIL") expectedDept = "TAM";
+
+            if (isCommonCode) {
+              isDeptMismatch = true;
+              mismatchReason = `Track is strictly for '${expectedDept}', but question is designated '${rawDept}'.`;
+            } else if (rawDept !== expectedDept) {
+              isDeptMismatch = true;
+              mismatchReason = `Department mismatch: question is tagged '${rawDept}', but track is strictly '${expectedDept}'.`;
             }
           }
 
           parsed.push({
-            departmentCode: rawDeptCode || (targetDepartment ? targetDepartment : "GENERAL"),
+            departmentCode: rawDept,
             isDeptMismatch,
             mismatchReason,
             questionType: qTypeStr?.toUpperCase() === "MCQ_MULTIPLE" ? "MCQ_MULTIPLE" : "MCQ_SINGLE",
             prompt: prompt || `Imported Question ${i + 1}`,
-            optionA: optA || "Option A",
-            optionB: optB || "Option B",
-            optionC: optC || "Option C",
-            optionD: optD || "Option D",
+            optionA: optA || "",
+            optionB: optB || "",
+            optionC: optC || "",
+            optionD: optD || "",
             correctOption: (correctStr || "A").toUpperCase(),
             points: 1.0, // Standardized 1 mark
-            negativePoints: parseFloat(negStr) || 0.25,
+            negativePoints: parseFloat(negStr) || 0.0,
           });
         }
 
@@ -271,10 +298,22 @@ export function CsvUploadDrawer({
         options[0].isCorrect = true;
       }
 
+      const isTamilRow =
+        row.departmentCode === "GENERAL_T" ||
+        row.departmentCode === "GENERAL_TAMIL" ||
+        row.departmentCode === "GENERAL_TA" ||
+        row.departmentCode === "COMMON_TAMIL" ||
+        row.departmentCode === "TAM" ||
+        row.departmentCode === "TAMIL" ||
+        /[\u0B80-\u0BFF]/.test(row.prompt);
+
+      const resolvedCommonLang = targetLanguage || (isTamilRow ? "TA" : "EN");
+
       return {
         id: `q-csv-${Date.now()}-${idx}`,
         sectionId: targetSectionId,
         targetDepartment: targetDepartment || null,
+        commonLanguage: !targetDepartment ? resolvedCommonLang : undefined,
         questionType: row.questionType,
         prompt: row.prompt,
         points: 1.0, // Standardized 1 mark
@@ -408,7 +447,8 @@ export function CsvUploadDrawer({
         {/* 3. Sub-bar: Instructions & Download Sample */}
         <div className="px-6 py-3 border-b border-slate-200 bg-white flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
           <div className="text-xs text-slate-600 flex items-center space-x-2">
-            <span>Standard columns: Question Type, Prompt, Options A-D, Answer Key, Points</span>
+            <span className="font-semibold text-slate-800">Required format (7 columns):</span>
+            <span className="font-mono text-[11px] text-slate-600">Department Code, Question Prompt, Option A, Option B, Option C, Option D, Correct Option</span>
           </div>
 
           <button

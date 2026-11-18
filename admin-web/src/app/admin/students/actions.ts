@@ -274,10 +274,21 @@ export async function bulkImportStudentsAction(
       return { error: "No student records provided." };
     }
 
-    // 1. Fetch all departments to map code -> UUID
-    const { data: departments } = await supabaseAdmin.from("departments").select("id, code");
+    // 1. Fetch all departments to map code/name -> UUID
+    const { data: departments } = await supabaseAdmin.from("departments").select("id, code, name");
     const deptMap = new Map<string, string>();
-    (departments || []).forEach((d) => deptMap.set(d.code.toUpperCase().trim(), d.id));
+    (departments || []).forEach((d) => {
+      if (d.code) deptMap.set(d.code.toUpperCase().trim(), d.id);
+      if (d.name) deptMap.set(d.name.toUpperCase().trim(), d.id);
+    });
+
+    // Department alias normalizations
+    const tamId = deptMap.get("TAM") || deptMap.get("TAMIL");
+    if (tamId) {
+      deptMap.set("TAMIL", tamId);
+      deptMap.set("TAM", tamId);
+      deptMap.set("DEPARTMENT OF TAMIL", tamId);
+    }
 
     // 2. Auto-create any missing departments detected in CSV
     for (const r of rows) {
@@ -302,12 +313,16 @@ export async function bulkImportStudentsAction(
     // Fetch existing candidates to preserve UUIDs and prevent conflict collisions
     const { data: existingStudents } = await supabaseAdmin
       .from("students")
-      .select("id, roll_number, application_number, email");
+      .select("id, roll_number, application_number, email, auth_user_id");
 
     const studentByEmail = new Map<string, string>();
     const studentByRoll = new Map<string, string>();
+    const studentAuthByEmail = new Map<string, string>();
     (existingStudents || []).forEach((s: any) => {
-      if (s.email) studentByEmail.set(s.email.toLowerCase().trim(), s.id);
+      if (s.email) {
+        studentByEmail.set(s.email.toLowerCase().trim(), s.id);
+        if (s.auth_user_id) studentAuthByEmail.set(s.email.toLowerCase().trim(), s.auth_user_id);
+      }
       if (s.roll_number) studentByRoll.set(s.roll_number.toUpperCase().trim(), s.id);
       if (s.application_number) studentByRoll.set(s.application_number.toUpperCase().trim(), s.id);
     });
@@ -325,39 +340,51 @@ export async function bulkImportStudentsAction(
       }
       const existingId = studentByRoll.get(appNum) || studentByEmail.get(studentEmail);
 
-      let authUserId: string | null = null;
+      let authUserId: string | null = studentAuthByEmail.get(studentEmail) || null;
 
       try {
-        const { data: newAuth, error: authErr } = await supabaseAdmin.auth.admin.createUser({
-          email: studentEmail,
-          password: appNum,
-          email_confirm: true,
-          user_metadata: {
-            full_name: r.fullName.trim(),
-            application_number: appNum,
-            role: "student",
-          },
-        });
+        if (!authUserId) {
+          const { data: newAuth, error: authErr } = await supabaseAdmin.auth.admin.createUser({
+            email: studentEmail,
+            password: appNum,
+            email_confirm: true,
+            user_metadata: {
+              full_name: r.fullName.trim(),
+              application_number: appNum,
+              role: "student",
+            },
+          });
 
-        if (!authErr && newAuth?.user) {
-          authUserId = newAuth.user.id;
-        } else {
-          // If already exists, attempt to update password to match application number
-          const { data: userSearch } = await supabaseAdmin.auth.admin.listUsers();
-          const found = userSearch?.users?.find(
-            (u) => u.email?.toLowerCase() === studentEmail
-          );
-          if (found) {
-            authUserId = found.id;
-            await supabaseAdmin.auth.admin.updateUserById(found.id, {
-              password: appNum,
-              user_metadata: {
-                full_name: r.fullName.trim(),
-                application_number: appNum,
-                role: "student",
-              },
-            });
+          if (!authErr && newAuth?.user) {
+            authUserId = newAuth.user.id;
+          } else {
+            // If already exists in Auth, locate and update credentials
+            const { data: userSearch } = await supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 1000 });
+            const found = userSearch?.users?.find(
+              (u) => u.email?.toLowerCase() === studentEmail
+            );
+            if (found) {
+              authUserId = found.id;
+              await supabaseAdmin.auth.admin.updateUserById(found.id, {
+                password: appNum,
+                user_metadata: {
+                  full_name: r.fullName.trim(),
+                  application_number: appNum,
+                  role: "student",
+                },
+              });
+            }
           }
+        } else {
+          // Synchronize password to ensure application number is the active password
+          await supabaseAdmin.auth.admin.updateUserById(authUserId, {
+            password: appNum,
+            user_metadata: {
+              full_name: r.fullName.trim(),
+              application_number: appNum,
+              role: "student",
+            },
+          });
         }
       } catch (authException) {
         console.warn(`Auth creation notice for ${studentEmail}:`, authException);

@@ -1,0 +1,26 @@
+Department Code,Question Prompt,Option A,Option B,Option C,Option D,Correct Option
+AERO,"For an incompressible, inviscid flow over a circular cylinder of radius R, the maximum velocity on the surface is:",Equal to the freestream velocity V?,1.5 times V?,2 times V?,4 times V?,C
+AERO,The Kutta condition for a finite airfoil with a sharp trailing edge states that:,The flow separates at the trailing edge,The velocity at the trailing edge is zero,The trailing edge is a stagnation point wi,The pressure at the trailing edge equals freestream pressure,C
+AERO,"For a wing with aspect ratio AR = 8 and Oswald efficiency factor e = 0.8, the induced drag coefficient at CL = 1.0 is approximately:",0.02,0.05,0.08,0.1,B
+AERO,The critical Mach number of an airfoil is the freestream Mach number at which:,The flow becomes supersonic everywhere,Sonic conditions first appear at some point on the airfoil,Shock waves form at the trai,The lift coefficient becomes maximum,B
+AERO,The thrust produced by a turbojet engine is given by:,T = ?(Ve ? V?),T = ?(Ve + V?),T = ?(Ve × V?),T = ?(V? ? Ve),A
+AERO,"In a gas turbine engine, the function of the diffuser in the inlet is to:",Increase velocity and decrease pressure,Decrease velocity and increase pressure,Maintain constant velocity,Increase both velocity and,B
+AERO,The specific impulse (Isp) of a rocket engine is defined as:,Thrust per unit weight flow rate of propellant,Thrust per unit mass flow rate of propellant,Total impulse per unit mass,Both (a) and (c),D
+AERO,The bypass ratio of a turbofan engine is defined as the ratio of:,Core mass flow to fan mass flow,Fan mass flow to core mass flow,Fan thrust to core thrust,Total mass flow to fuel flow,B
+AERO,"For a thin-walled cylindrical pressure vessel of radius r and thickness t, the hoop stress is:",pr/2t,pr/t,2pr/t,pr/4t,B
+AERO,The Euler-Bernoulli beam theory neglects:,Bending moment effects,Shear deformation and rotary inertia,Axial loading,Torsion,B
+AERO,The buckling load for a column with both ends pinned (Euler column) is given by:,Pcr = ?²EI/L²,Pcr = 4?²EI/L²,Pcr = ?²EI/(4L²),Pcr = 2?²EI/L²,A
+AERO,"In a statically indeterminate structure, the number of unknowns exceeds:",The number of equilibrium equations,The number of members,The number of joints,The number of supports,A
+AERO,The maximum range of a jet aircraft occurs when it flies at:,Maximum lift-to-drag ratio (L/D)max,CL^0.5/CD maximum,CL^1.5/CD maximum,Maximum thrust,B
+AERO,The stall speed of an aircraft is:,Independent of altitude,Proportional to ?(W/S),Inversely proportional to ??,Both (b) and (c),D
+AERO,"For an aircraft to be statically stable in pitch, the center of gravity must be:",Behind the aerodynamic center,Ahead of the neutral point,At the aerodynamic center,Behind the neutral point,B
+AERO,Dutch roll is a combination of:,Pitch and yaw oscillations,Roll and yaw oscillations,Pitch and roll oscillations,Pure yaw oscillation,B
+AERO,Which of the following materials is most commonly used for aircraft fuselage skin due to its high strength-to-weight ratio?,Mild steel,Aluminium 2024-T3 alloy,Titanium Ti-6Al-4V,Carbon fibre reinforced polymer,B
+AERO,The fatigue life of a structural component can be improved by:,Increasing surface roughness,Shot peening,Annealing,Increasing stress concentration,B
+AERO,The Nusselt number (Nu) represents:,Ratio of inertial to viscous forces,Ratio of convective to conductive heat transfer,Ratio of momentum to thermal diffusivity,Ratio of buoyancy to viscous forces,B
+AERO,"For a flat plate in parallel flow, the thermal boundary layer thickness (?t) relative to the velocity boundary layer thickness (?) depends on:",Reynolds number,Prandtl number,Nusselt number,Grashof number,B
+AERO,The Laplace transform of f(t) = e^(at) is:,1/(s + a),1/(s ? a),s/(s² + a²),a/(s² + a²),B
+AERO,The divergence of the velocity field for an incompressible flow is:,Equal to 1,Equal to ?1,Zero,Undefined,C
+AERO,"The eigenvalues of the matrix A = [[2, 1], [1, 2]] are:",1 and 3,2 and 2,0 and 4,?1 and 3,A
+AERO,"The value of the integral ?_C (1/z) dz, where C is the unit circle |z| = 1 traversed counterclockwise, is:",0,1,2?i,?i,C
+AERO,"For a satellite in a circular orbit at altitude h, the orbital velocity is given by:",v = ?(GM/r),v = ?(2GM/r),v = ?(GM/2r),v = GM/r²,A

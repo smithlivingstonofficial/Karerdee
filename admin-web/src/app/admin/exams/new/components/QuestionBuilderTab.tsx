@@ -50,6 +50,9 @@ export function QuestionBuilderTab({
     sections[0]?.id || ""
   );
 
+  // Common Core Language Variant State ("EN" | "TA")
+  const [commonLang, setCommonLang] = useState<"EN" | "TA">("EN");
+
   // 2. Department Sub-tab State for Part B (Department Electives)
   const activeSection = sections.find((s) => s.id === activeSectionId) || sections[0];
   const isPartCommon = activeSection?.isCommon ?? true;
@@ -75,13 +78,42 @@ export function QuestionBuilderTab({
   const [isBankDrawerOpen, setIsBankDrawerOpen] = useState(false);
   const [isCsvDrawerOpen, setIsCsvDrawerOpen] = useState(false);
 
+  // Part A language partitioned questions
+  const partAEnglishQuestions = useMemo(() => {
+    return questions.filter(
+      (q) =>
+        q.sectionId === activeSection?.id &&
+        q.commonLanguage !== "TA" &&
+        !/[\u0B80-\u0BFF]/.test(q.prompt)
+    );
+  }, [questions, activeSection?.id]);
+
+  const partATamilQuestions = useMemo(() => {
+    return questions.filter(
+      (q) =>
+        q.sectionId === activeSection?.id &&
+        (q.commonLanguage === "TA" || /[\u0B80-\u0BFF]/.test(q.prompt))
+    );
+  }, [questions, activeSection?.id]);
+
   // 3. Filter questions for current view
-  const sectionQuestions = questions.filter((q) => {
-    if (q.sectionId !== activeSection?.id) return false;
-    if (isPartCommon) return true; // Part A shows all common questions
-    // Part B filters by active department sub-tab
-    return q.targetDepartment === effectiveDeptTrack;
-  });
+  const sectionQuestions = useMemo(() => {
+    if (!activeSection) return [];
+    if (isPartCommon) {
+      return commonLang === "TA" ? partATamilQuestions : partAEnglishQuestions;
+    }
+    return questions.filter(
+      (q) => q.sectionId === activeSection.id && q.targetDepartment === effectiveDeptTrack
+    );
+  }, [
+    questions,
+    activeSection,
+    isPartCommon,
+    commonLang,
+    partATamilQuestions,
+    partAEnglishQuestions,
+    effectiveDeptTrack,
+  ]);
 
   // Count helper per department in Part B
   function getDeptQuestionsCount(deptCode: string) {
@@ -98,7 +130,9 @@ export function QuestionBuilderTab({
   // Quota & Capacity Calculation for active section / department track
   const targetQuota = activeSection?.targetQuestionCount || 25;
   const currentQuotaCount = isPartCommon
-    ? sectionQuestions.length
+    ? commonLang === "TA"
+      ? partATamilQuestions.length
+      : partAEnglishQuestions.length
     : questions.filter(
         (q) => q.sectionId === activeSection?.id && q.targetDepartment === effectiveDeptTrack
       ).length;
@@ -134,6 +168,7 @@ export function QuestionBuilderTab({
       id: `q-${Date.now()}`,
       sectionId: activeSection.id,
       targetDepartment: !isPartCommon ? effectiveDeptTrack : null,
+      commonLanguage: isPartCommon ? commonLang : undefined,
       questionType: type,
       prompt: "",
       points: 1.0, // Standardized 1 mark
@@ -174,6 +209,7 @@ export function QuestionBuilderTab({
       ...q,
       id: `q-${Date.now()}`,
       prompt: `${q.prompt} (Copy)`,
+      commonLanguage: q.commonLanguage || (isPartCommon ? commonLang : undefined),
       orderIndex: sectionQuestions.length + 1,
       options: q.options.map((opt, i) => ({
         ...opt,
@@ -243,7 +279,15 @@ export function QuestionBuilderTab({
     let kept = 0;
     const updated = questions.filter((q) => {
       if (q.sectionId !== activeSection.id) return true;
-      if (!isPartCommon && q.targetDepartment !== effectiveDeptTrack) return true;
+      if (!isPartCommon) {
+        if (q.targetDepartment !== effectiveDeptTrack) return true;
+      } else {
+        const isCurrentLang =
+          commonLang === "TA"
+            ? q.commonLanguage === "TA" || /[\u0B80-\u0BFF]/.test(q.prompt)
+            : q.commonLanguage !== "TA" && !/[\u0B80-\u0BFF]/.test(q.prompt);
+        if (!isCurrentLang) return true;
+      }
 
       if (kept < targetQuota) {
         kept++;
@@ -262,6 +306,7 @@ export function QuestionBuilderTab({
     const contextualized = imported.slice(0, slotsLeft).map((q) => ({
       ...q,
       targetDepartment: !isPartCommon ? effectiveDeptTrack : null,
+      commonLanguage: isPartCommon ? (q.commonLanguage || commonLang) : undefined,
     }));
     onQuestionsChange([...questions, ...contextualized]);
   }
@@ -273,6 +318,7 @@ export function QuestionBuilderTab({
     const contextualized = imported.slice(0, slotsLeft).map((q) => ({
       ...q,
       targetDepartment: !isPartCommon ? effectiveDeptTrack : null,
+      commonLanguage: isPartCommon ? (q.commonLanguage || commonLang) : undefined,
     }));
     onQuestionsChange([...questions, ...contextualized]);
   }
@@ -331,7 +377,7 @@ export function QuestionBuilderTab({
                         : "bg-slate-200/60 text-slate-600 border-transparent"
                     }`}
                   >
-                    {isCommon ? `${count} / ${target}` : `${sec.targetDepartments?.length || 0} Tracks`}
+                    {isCommon ? `${partAEnglishQuestions.length} EN • ${partATamilQuestions.length} TA` : `${sec.targetDepartments?.length || 0} Tracks`}
                   </span>
                 </button>
               );
@@ -388,13 +434,58 @@ export function QuestionBuilderTab({
           {/* Left: Department Tracks (Part B) or Scope (Part A) */}
           <div className="flex-1 min-w-0 space-y-2">
             {isPartCommon ? (
-              <div className="flex items-center space-x-2 text-xs text-slate-600">
-                <div className="w-6 h-6 rounded-lg bg-blue-50 text-blue-700 flex items-center justify-center border border-blue-200/80">
-                  <Globe className="w-3.5 h-3.5 text-blue-700" />
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="inline-flex items-center p-1 bg-slate-100/90 rounded-xl border border-slate-200/90 space-x-1 shadow-2xs">
+                  <button
+                    type="button"
+                    onClick={() => setCommonLang("EN")}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center space-x-2 cursor-pointer ${
+                      commonLang === "EN"
+                        ? "bg-white text-blue-900 border border-blue-200 shadow-2xs ring-1 ring-blue-500/10"
+                        : "text-slate-600 hover:text-slate-900 hover:bg-white/60"
+                    }`}
+                  >
+                    <Globe className="w-3.5 h-3.5 text-blue-600" />
+                    <span>English Core (Universal)</span>
+                    <span
+                      className={`px-2 py-0.2 rounded-full text-[10px] font-black ${
+                        partAEnglishQuestions.length >= targetQuota
+                          ? "bg-emerald-100 text-emerald-800 border border-emerald-300"
+                          : "bg-blue-100 text-blue-800 border border-blue-200"
+                      }`}
+                    >
+                      {partAEnglishQuestions.length}/{targetQuota} {partAEnglishQuestions.length >= targetQuota ? "✓" : ""}
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setCommonLang("TA")}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center space-x-2 cursor-pointer ${
+                      commonLang === "TA"
+                        ? "bg-white text-purple-900 border border-purple-200 shadow-2xs ring-1 ring-purple-500/10"
+                        : "text-slate-600 hover:text-slate-900 hover:bg-white/60"
+                    }`}
+                  >
+                    <span className="font-serif font-black text-purple-700">த</span>
+                    <span>தமிழ் Core (Tamil Dept)</span>
+                    <span
+                      className={`px-2 py-0.2 rounded-full text-[10px] font-black ${
+                        partATamilQuestions.length >= targetQuota
+                          ? "bg-emerald-100 text-emerald-800 border border-emerald-300"
+                          : "bg-purple-100 text-purple-800 border border-purple-200"
+                      }`}
+                    >
+                      {partATamilQuestions.length}/{targetQuota} {partATamilQuestions.length >= targetQuota ? "✓" : ""}
+                    </span>
+                  </button>
                 </div>
-                <span className="font-bold text-slate-800">General Core Syllabus</span>
-                <span className="text-slate-300">•</span>
-                <span className="text-[11px] text-slate-500">Delivered universally to all registered examination candidates</span>
+
+                <div className="text-[11px] text-slate-500 font-medium hidden sm:block">
+                  {commonLang === "EN"
+                    ? "Delivered universally to CSE, MCA, ECE, MECH, MBA, etc."
+                    : "Delivered strictly to Tamil Department candidates"}
+                </div>
               </div>
             ) : (
               <div className="space-y-2">
@@ -476,7 +567,11 @@ export function QuestionBuilderTab({
             <div className="text-left sm:text-right">
               <div className="flex items-center space-x-1.5">
                 <span className="text-[11px] font-bold text-slate-600">
-                  {isPartCommon ? "Part A Quota:" : `${effectiveDeptTrack || "Dept"} Track:`}
+                  {isPartCommon
+                    ? commonLang === "TA"
+                      ? "Part A (தமிழ்):"
+                      : "Part A (English):"
+                    : `${effectiveDeptTrack || "Dept"} Track:`}
                 </span>
                 <span className="text-xs font-black text-slate-900 font-mono">
                   {currentQuotaCount} / {targetQuota} Qs
@@ -553,16 +648,26 @@ export function QuestionBuilderTab({
           <div className="max-w-md mx-auto space-y-1.5">
             <div className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full text-[11px] font-extrabold bg-purple-50 text-purple-700 border border-purple-200 mb-1 shadow-2xs">
               <Building2 className="w-3.5 h-3.5 text-purple-600" />
-              <span>{isPartCommon ? "Common Core Curriculum" : `${effectiveDeptTrack} Specialization Track`}</span>
+              <span>
+                {isPartCommon
+                  ? commonLang === "TA"
+                    ? "தமிழ் Common Core (Tamil Dept)"
+                    : "English Common Core (Universal)"
+                  : `${effectiveDeptTrack} Specialization Track`}
+              </span>
             </div>
             <h3 className="text-lg font-black text-slate-900 tracking-tight">
               {isPartCommon
-                ? "Part A (Common Core) Ready for Questions"
+                ? commonLang === "TA"
+                  ? "Part A (தமிழ் Core) Ready for Questions"
+                  : "Part A (English Core) Ready for Questions"
                 : `${effectiveDeptTrack} Track is Ready for Content`}
             </h3>
             <p className="text-xs text-slate-600 leading-relaxed">
               {isPartCommon
-                ? "This section is delivered universally to all candidates. Populate 20 research aptitude questions from the repository or author custom items."
+                ? commonLang === "TA"
+                  ? "This section provides the research methodology curriculum in Tamil language specifically for candidates in the Tamil Department."
+                  : "This section is delivered universally to all candidates in CSE, MCA, ECE, MECH, MBA, etc."
                 : `This track is allocated strictly to ${effectiveDeptName || effectiveDeptTrack} examinees. ${targetQuota} specialization questions are required to complete this track's quota.`}
             </p>
           </div>
@@ -878,10 +983,15 @@ export function QuestionBuilderTab({
       <QuestionBankDrawer
         isOpen={isBankDrawerOpen}
         onClose={() => setIsBankDrawerOpen(false)}
-        targetSectionTitle={activeSection?.title || "Active Section"}
+        targetSectionTitle={
+          isPartCommon
+            ? `Part A - ${commonLang === "TA" ? "தமிழ் Core" : "English Core"}`
+            : activeSection?.title || "Active Section"
+        }
         targetSectionId={activeSection?.id || ""}
         targetDepartment={!isPartCommon ? effectiveDeptTrack : null}
         targetDepartmentName={!isPartCommon ? effectiveDeptName : null}
+        targetLanguage={isPartCommon ? commonLang : undefined}
         targetLimit={targetQuota}
         currentCount={currentQuotaCount}
         questionBank={questionBank}
@@ -895,9 +1005,14 @@ export function QuestionBuilderTab({
       <CsvUploadDrawer
         isOpen={isCsvDrawerOpen}
         onClose={() => setIsCsvDrawerOpen(false)}
-        targetSectionTitle={activeSection?.title || "Active Section"}
+        targetSectionTitle={
+          isPartCommon
+            ? `Part A - ${commonLang === "TA" ? "தமிழ் Core" : "English Core"}`
+            : activeSection?.title || "Active Section"
+        }
         targetSectionId={activeSection?.id || ""}
         targetDepartment={!isPartCommon ? effectiveDeptTrack : null}
+        targetLanguage={isPartCommon ? commonLang : undefined}
         targetLimit={targetQuota}
         currentCount={currentQuotaCount}
         existingQuestionsCount={questions.length}

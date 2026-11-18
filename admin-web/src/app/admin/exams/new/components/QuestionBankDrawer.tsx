@@ -31,6 +31,7 @@ interface QuestionBankDrawerProps {
   targetSectionId: string;
   targetDepartment?: string | null;
   targetDepartmentName?: string | null;
+  targetLanguage?: "EN" | "TA";
   targetLimit?: number;
   currentCount?: number;
   questionBank: QuestionBankItem[];
@@ -47,6 +48,7 @@ export function QuestionBankDrawer({
   targetSectionId,
   targetDepartment = null,
   targetDepartmentName = null,
+  targetLanguage,
   targetLimit = 25,
   currentCount = 0,
   questionBank,
@@ -78,7 +80,7 @@ export function QuestionBankDrawer({
       setSelectedDifficultyFilter("ALL");
       setSelectedTopicFilter("ALL");
     }
-  }, [isOpen, targetDepartment]);
+  }, [isOpen, targetDepartment, targetLanguage]);
 
   // Existing question prompts or bank IDs to detect duplicates
   const existingSourceIds = useMemo(() => {
@@ -141,12 +143,25 @@ export function QuestionBankDrawer({
           opt.option_text.toLowerCase().includes(searchLower)
         );
 
-      // Dept filter: If targetDepartment is set, strictly lock to that track.
+      // Dept & Language filter: If targetDepartment is set, strictly lock to that track.
       let matchesDept = true;
       if (targetDepartment) {
         const cleanTarget = targetDepartment.trim().toUpperCase();
         const qCode = q.department?.code?.trim().toUpperCase();
         matchesDept = qCode === cleanTarget;
+      } else if (targetLanguage) {
+        const isTamil = Boolean(
+          q.language === "TA" ||
+          /[\u0B80-\u0BFF]/.test(q.prompt) ||
+          q.department?.code === "TAM" ||
+          (q.topic && /tamil|தமிழ்/i.test(q.topic))
+        );
+
+        if (targetLanguage === "TA") {
+          matchesDept = isTamil;
+        } else {
+          matchesDept = !isTamil && (!q.department_id || q.department?.code === "GENERAL");
+        }
       } else if (selectedDeptFilter === "GENERAL") {
         matchesDept = !q.department_id || !q.department;
       } else if (selectedDeptFilter !== "ALL") {
@@ -240,6 +255,9 @@ export function QuestionBankDrawer({
       id: `q-imported-${Date.now()}-${idx}`,
       sectionId: targetSectionId,
       targetDepartment: targetDepartment ? targetDepartment.trim().toUpperCase() : null,
+      commonLanguage: !targetDepartment
+        ? (targetLanguage || (q.language === "TA" || /[\u0B80-\u0BFF]/.test(q.prompt) ? "TA" : "EN"))
+        : undefined,
       questionType: q.question_type,
       prompt: q.prompt,
       codeSnippet: q.code_snippet || undefined,

@@ -73,16 +73,27 @@ export async function getExamAuthoringContextAction(): Promise<{
           : q.department
         : null;
 
+      const codeStr = String(deptObj?.code || "").toUpperCase();
+      const topicStr = String(q.topic || "").toLowerCase();
+      const promptStr = String(q.prompt || "");
+      const isTamil =
+        codeStr === "TAM" ||
+        codeStr === "TAMIL" ||
+        topicStr.includes("tamil") ||
+        topicStr.includes("தமிழ்") ||
+        /[\u0B80-\u0BFF]/.test(promptStr);
+
       return {
         id: q.id,
         department_id: q.department_id || null,
         department: deptObj
           ? {
-              code: String(deptObj.code || "").toUpperCase(),
+              code: codeStr,
               name: String(deptObj.name || ""),
             }
           : null,
         topic: q.topic || "",
+        language: isTamil ? "TA" : "EN",
         question_type: q.question_type || "MCQ_SINGLE",
         prompt: q.prompt || "",
         code_snippet: q.code_snippet || null,
@@ -451,10 +462,17 @@ export async function saveExamAction(payload: SaveExamPayload) {
       const isCommon = sectionIsCommonMap.get(resolvedSectionId) ?? true;
       const quotaLimit = sectionQuotaMap.get(resolvedSectionId) || 20;
 
-      // Track key: for common section, key is resolvedSectionId.
+      // Track key: for common section, key distinguishes between English and Tamil Common Core!
       // For elective section, key is resolvedSectionId + deptCode.
       const deptCode = q.targetDepartment ? q.targetDepartment.trim().toUpperCase() : "";
-      const trackKey = isCommon ? resolvedSectionId : `${resolvedSectionId}_${deptCode}`;
+      const isTamilCommon =
+        q.commonLanguage === "TA" ||
+        deptCode === "TAM" ||
+        deptCode === "TAMIL" ||
+        /[\u0B80-\u0BFF]/.test(q.prompt || "");
+
+      const langCode = isTamilCommon ? "TA" : "EN";
+      const trackKey = isCommon ? `${resolvedSectionId}_${langCode}` : `${resolvedSectionId}_${deptCode}`;
 
       // Deduplicate identical prompts within the same section/track
       const promptDedupeKey = `${trackKey}_${q.prompt.trim().toLowerCase()}`;
@@ -483,6 +501,13 @@ export async function saveExamAction(payload: SaveExamPayload) {
       // 1. High-Performance Atomic Batch Insert for All Questions with verified department audit metadata
       const questionsInsertPayload = questionsToSave.map(({ q, resolvedSectionId, orderIndex }) => {
         const cleanDept = q.targetDepartment ? q.targetDepartment.trim().toUpperCase() : null;
+        const isCommonSec = sectionIsCommonMap.get(resolvedSectionId);
+        const isTamil =
+          q.commonLanguage === "TA" ||
+          cleanDept === "TAM" ||
+          cleanDept === "TAMIL" ||
+          /[\u0B80-\u0BFF]/.test(q.prompt || "");
+
         return {
           exam_id: examId,
           section_id: resolvedSectionId,
@@ -491,8 +516,11 @@ export async function saveExamAction(payload: SaveExamPayload) {
           code_snippet: q.codeSnippet?.trim() || null,
           points: 1, // Standardized 1 mark
           negative_points: payload.exam.enableNegativeMarking ? q.negativePoints : 0,
-          rubric_criteria: sectionIsCommonMap.get(resolvedSectionId)
-            ? null
+          rubric_criteria: isCommonSec
+            ? {
+                common_language: isTamil ? "TA" : "EN",
+                target_department: isTamil ? "TAM" : null,
+              }
             : cleanDept
             ? {
                 target_department: cleanDept,
@@ -711,7 +739,15 @@ export async function getExamForEditingAction(examId: string): Promise<{
       const deptCode = q.rubric_criteria?.target_department
         ? String(q.rubric_criteria.target_department).trim().toUpperCase()
         : "";
-      const trackKey = isCommon ? q.section_id : `${q.section_id}_${deptCode}`;
+
+      const isTamil =
+        q.rubric_criteria?.common_language === "TA" ||
+        deptCode === "TAM" ||
+        deptCode === "TAMIL" ||
+        /[\u0B80-\u0BFF]/.test(q.prompt || "");
+
+      const langCode = isTamil ? "TA" : "EN";
+      const trackKey = isCommon ? `${q.section_id}_${langCode}` : `${q.section_id}_${deptCode}`;
       const promptDedupeKey = `${trackKey}_${String(q.prompt || "").trim().toLowerCase()}`;
 
       if (editSeenPrompts.has(promptDedupeKey)) {
@@ -730,6 +766,7 @@ export async function getExamForEditingAction(examId: string): Promise<{
         id: q.id,
         sectionId: q.section_id,
         targetDepartment: q.rubric_criteria?.target_department || null,
+        commonLanguage: isCommon ? langCode : undefined,
         questionType: q.question_type,
         prompt: q.prompt,
         codeSnippet: q.code_snippet || undefined,

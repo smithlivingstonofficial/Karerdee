@@ -191,10 +191,31 @@ export async function GET(req: NextRequest) {
       sectionCommonMap.set(sec.id, Boolean(sec.is_common));
     });
 
-    // Filter questions: Common core OR matching department
+    const isTamilStudent = cleanStudentDept === "TAM" || cleanStudentDept === "TAMIL";
+
+    // Check if the Common Core (Part A) contains dedicated Tamil questions
+    const hasTamilCommonQuestions = (rawQuestions || []).some((q: any) => {
+      const isCommonSection = sectionCommonMap.get(q.section_id) ?? false;
+      if (!isCommonSection) return false;
+      return (
+        q.rubric_criteria?.common_language === "TA" ||
+        q.rubric_criteria?.target_department === "TAM" ||
+        /[\u0B80-\u0BFF]/.test(q.prompt || "")
+      );
+    });
+
+    // Filter questions: Common core (routed by candidate department language) OR matching department specialization
     const candidateQuestions = (rawQuestions || []).filter((q: any) => {
       const isCommonSection = sectionCommonMap.get(q.section_id) ?? false;
       if (isCommonSection) {
+        if (hasTamilCommonQuestions) {
+          const qIsTamil =
+            q.rubric_criteria?.common_language === "TA" ||
+            q.rubric_criteria?.target_department === "TAM" ||
+            /[\u0B80-\u0BFF]/.test(q.prompt || "");
+
+          return isTamilStudent ? qIsTamil : !qIsTamil;
+        }
         return true;
       }
 

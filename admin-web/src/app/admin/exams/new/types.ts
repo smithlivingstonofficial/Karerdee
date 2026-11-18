@@ -9,6 +9,7 @@ export interface QuestionState {
   id: string;
   sectionId: string;
   targetDepartment?: string | null;
+  commonLanguage?: "EN" | "TA";
   questionType: "MCQ_SINGLE" | "MCQ_MULTIPLE";
   prompt: string;
   codeSnippet?: string;
@@ -72,6 +73,7 @@ export interface QuestionBankItem {
     name: string;
   } | null;
   topic?: string;
+  language?: "EN" | "TA";
   question_type: "MCQ_SINGLE" | "MCQ_MULTIPLE";
   prompt: string;
   code_snippet?: string | null;

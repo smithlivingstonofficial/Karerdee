@@ -47,21 +47,15 @@ export function BulkStudentCsvModal({ isOpen, onClose }: BulkStudentCsvModalProp
   }
 
   function parseCSV(text: string) {
-    const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
-    if (lines.length < 2) {
+    const cleanText = text.replace(/^\uFEFF/, "").trim();
+    const rawLines = cleanText.split(/\r?\n/).filter((l) => l.trim().length > 0);
+    if (rawLines.length < 2) {
       setError("The uploaded CSV must contain a header row and at least one student record.");
       return;
     }
 
-    // Header check
-    const headerLine = lines[0].toLowerCase();
-    const parsed: ParsedStudentRow[] = [];
-
-    for (let i = 1; i < lines.length; i++) {
-      const line = lines[i].trim();
-      if (!line) continue;
-
-      // Basic CSV token parser handling quotes
+    // Helper to parse CSV line handling quotes and escaped quotes
+    const tokenizeRow = (line: string): string[] => {
       const values: string[] = [];
       let currentVal = "";
       let inQuotes = false;
@@ -69,7 +63,12 @@ export function BulkStudentCsvModal({ isOpen, onClose }: BulkStudentCsvModalProp
       for (let c = 0; c < line.length; c++) {
         const char = line[c];
         if (char === '"') {
-          inQuotes = !inQuotes;
+          if (inQuotes && line[c + 1] === '"') {
+            currentVal += '"';
+            c++;
+          } else {
+            inQuotes = !inQuotes;
+          }
         } else if (char === "," && !inQuotes) {
           values.push(currentVal.trim());
           currentVal = "";
@@ -78,17 +77,55 @@ export function BulkStudentCsvModal({ isOpen, onClose }: BulkStudentCsvModalProp
         }
       }
       values.push(currentVal.trim());
+      return values.map((v) => v.replace(/^"|"$/g, "").trim());
+    };
 
-      const appNum = (values[0] || "").replace(/^"|"$/g, "").trim().toUpperCase();
-      const name = (values[1] || "").replace(/^"|"$/g, "").trim();
-      const email = (values[2] || "").replace(/^"|"$/g, "").trim().toLowerCase();
-      const deptCode = (values[3] || "").replace(/^"|"$/g, "").trim().toUpperCase();
+    const headerCells = tokenizeRow(rawLines[0]).map((h) => h.toLowerCase());
+
+    // Intelligent header alias matchers
+    const findColIndex = (aliases: string[], fallbackIdx: number): number => {
+      const idx = headerCells.findIndex((cell) =>
+        aliases.some((alias) => cell === alias || cell.includes(alias))
+      );
+      return idx !== -1 ? idx : fallbackIdx;
+    };
+
+    const appNumIdx = findColIndex(
+      ["application number", "application no", "application_number", "app no", "app number", "roll number", "roll no", "roll_number", "reg no", "register no", "registration number", "candidate id"],
+      0
+    );
+    const nameIdx = findColIndex(
+      ["student name", "candidate name", "full name", "fullname", "name", "candidate_name", "student_name"],
+      1
+    );
+    const emailIdx = findColIndex(
+      ["institutional email", "candidate email", "student email", "email address", "email", "mail"],
+      2
+    );
+    const deptIdx = findColIndex(
+      ["department code", "department", "dept code", "dept", "department_code", "branch", "discipline"],
+      3
+    );
+
+    const parsed: ParsedStudentRow[] = [];
+
+    for (let i = 1; i < rawLines.length; i++) {
+      const line = rawLines[i].trim();
+      if (!line) continue;
+
+      const values = tokenizeRow(line);
+
+      const appNum = (values[appNumIdx] || "").trim().toUpperCase();
+      const name = (values[nameIdx] || "").trim();
+      const email = (values[emailIdx] || "").trim().toLowerCase();
+      const deptCode = (values[deptIdx] || "").trim().toUpperCase();
 
       const isValid = appNum.length > 0 && name.length > 0 && email.length > 0;
       let errorReason = "";
-      if (!appNum) errorReason = "Missing Application Number (Password). ";
+      if (!appNum) errorReason = "Missing Application Number. ";
       if (!name) errorReason += "Missing Name. ";
-      if (!email) errorReason += "Missing Institutional Email (Username).";
+      if (!email) errorReason += "Missing Institutional Email. ";
+      if (email && !email.includes("@")) errorReason += "Invalid Email format.";
 
       parsed.push({
         applicationNumber: appNum,

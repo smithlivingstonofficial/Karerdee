@@ -198,13 +198,24 @@ export async function bulkImportQuestionsAction(rows: BulkQuestionCsvRow[]) {
     const deptMap = new Map<string, string>();
     (depts || []).forEach((d) => deptMap.set(d.code.toUpperCase().trim(), d.id));
 
-    // 2. Strict Pre-validation: verify all department codes exist or are explicitly GENERAL/COMMON
+    // 2. Strict Pre-validation: verify all department codes exist or are explicitly GENERAL/COMMON/GENERAL_T
     for (let i = 0; i < rows.length; i++) {
-      const rawDept = (rows[i].departmentCode || "").trim().toUpperCase();
-      if (rawDept && rawDept !== "GENERAL" && rawDept !== "COMMON") {
+      let rawDept = (rows[i].departmentCode || "").trim().toUpperCase();
+      if (rawDept === "TAMIL" && deptMap.has("TAM")) {
+        rawDept = "TAM";
+      }
+      const isGeneral =
+        rawDept === "GENERAL" ||
+        rawDept === "COMMON" ||
+        rawDept === "GENERAL_T" ||
+        rawDept === "GENERAL_TAMIL" ||
+        rawDept === "GENERAL_TA" ||
+        rawDept === "COMMON_TAMIL";
+
+      if (rawDept && !isGeneral) {
         if (!deptMap.has(rawDept)) {
           return {
-            error: `Unrecognized Department Code on row ${i + 1}: '${rawDept}'. Each question must either be designated 'GENERAL' or match a registered department code. Upload aborted to prevent misallocation.`,
+            error: `Unrecognized Department Code on row ${i + 1}: '${rawDept}'. Each question must either be designated 'GENERAL', 'GENERAL_T' (Tamil Common), or match a registered department code (e.g., AERO, TAM, MCA, CSE). Upload aborted to prevent misallocation.`,
           };
         }
       }
@@ -217,12 +228,34 @@ export async function bulkImportQuestionsAction(rows: BulkQuestionCsvRow[]) {
         continue;
       }
 
-      const rawDept = (r.departmentCode || "").trim().toUpperCase();
-      let targetDeptId: string | null = null;
+      let rawDept = (r.departmentCode || "").trim().toUpperCase();
+      if (rawDept === "TAMIL" && deptMap.has("TAM")) {
+        rawDept = "TAM";
+      }
 
-      // Assign targetDeptId if specific department
-      if (rawDept && rawDept !== "GENERAL" && rawDept !== "COMMON") {
+      const isTamilCommon =
+        rawDept === "GENERAL_T" ||
+        rawDept === "GENERAL_TAMIL" ||
+        rawDept === "GENERAL_TA" ||
+        rawDept === "COMMON_TAMIL";
+
+      const isGeneral =
+        rawDept === "GENERAL" || rawDept === "COMMON" || isTamilCommon;
+
+      let targetDeptId: string | null = null;
+      if (rawDept && !isGeneral) {
         targetDeptId = deptMap.get(rawDept) || null;
+      }
+
+      let derivedTopic = r.topic?.trim();
+      if (!derivedTopic || derivedTopic.toLowerCase() === "general") {
+        if (isTamilCommon) {
+          derivedTopic = "ஆராய்ச்சி முறைமை (Tamil)";
+        } else if (rawDept === "GENERAL" || rawDept === "COMMON") {
+          derivedTopic = "Research Methodology";
+        } else {
+          derivedTopic = `${rawDept} Specialization`;
+        }
       }
 
       const diff = ["EASY", "MEDIUM", "HARD"].includes((r.difficulty || "").toUpperCase())
@@ -237,7 +270,7 @@ export async function bulkImportQuestionsAction(rows: BulkQuestionCsvRow[]) {
         .from("department_questions")
         .insert({
           department_id: targetDeptId,
-          topic: r.topic?.trim() || "General",
+          topic: derivedTopic,
           difficulty: diff,
           question_type: qType,
           prompt: r.prompt.trim(),
