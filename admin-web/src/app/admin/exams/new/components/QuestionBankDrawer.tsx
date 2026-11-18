@@ -10,6 +10,10 @@ import {
   CheckCircle2,
   ArrowRight,
   Sparkles,
+  Lock,
+  ExternalLink,
+  Upload,
+  AlertTriangle,
 } from "lucide-react";
 
 interface QuestionBankDrawerProps {
@@ -18,12 +22,14 @@ interface QuestionBankDrawerProps {
   targetSectionTitle: string;
   targetSectionId: string;
   targetDepartment?: string | null;
+  targetDepartmentName?: string | null;
   targetLimit?: number;
   currentCount?: number;
   questionBank: QuestionBankItem[];
   departments?: Department[];
   existingQuestions: QuestionState[];
   onImport: (newQuestions: QuestionState[]) => void;
+  onSwitchToCsv?: () => void;
 }
 
 export function QuestionBankDrawer({
@@ -32,12 +38,14 @@ export function QuestionBankDrawer({
   targetSectionTitle,
   targetSectionId,
   targetDepartment = null,
+  targetDepartmentName = null,
   targetLimit = 25,
   currentCount = 0,
   questionBank,
   departments = [],
   existingQuestions,
   onImport,
+  onSwitchToCsv,
 }: QuestionBankDrawerProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedDeptFilter, setSelectedDeptFilter] = useState<string>("ALL");
@@ -104,9 +112,13 @@ export function QuestionBankDrawer({
           opt.option_text.toLowerCase().includes(searchLower)
         );
 
-      // Dept filter
+      // Dept filter: If targetDepartment is set, strictly lock to that track.
       let matchesDept = true;
-      if (selectedDeptFilter === "GENERAL") {
+      if (targetDepartment) {
+        const cleanTarget = targetDepartment.trim().toUpperCase();
+        const qCode = q.department?.code?.trim().toUpperCase();
+        matchesDept = qCode === cleanTarget;
+      } else if (selectedDeptFilter === "GENERAL") {
         matchesDept = !q.department_id || !q.department;
       } else if (selectedDeptFilter !== "ALL") {
         const filterCode = selectedDeptFilter.trim().toUpperCase();
@@ -158,10 +170,24 @@ export function QuestionBankDrawer({
 
     const itemsToImport = questionBank.filter((q) => selectedIds.has(q.id));
 
+    // Security check: Enforce strict department isolation
+    if (targetDepartment) {
+      const cleanTarget = targetDepartment.trim().toUpperCase();
+      const mismatched = itemsToImport.filter(
+        (q) => q.department?.code?.trim()?.toUpperCase() !== cleanTarget
+      );
+      if (mismatched.length > 0) {
+        alert(
+          `Academic Integrity Violation: Cannot import ${mismatched.length} question(s) from other departments into the ${cleanTarget} track. Syllabus isolation is strictly enforced.`
+        );
+        return;
+      }
+    }
+
     const convertedQuestions: QuestionState[] = itemsToImport.map((q, idx) => ({
       id: `q-imported-${Date.now()}-${idx}`,
       sectionId: targetSectionId,
-      targetDepartment: targetDepartment || null,
+      targetDepartment: targetDepartment ? targetDepartment.trim().toUpperCase() : null,
       questionType: q.question_type,
       prompt: q.prompt,
       codeSnippet: q.code_snippet || undefined,
@@ -238,22 +264,41 @@ export function QuestionBankDrawer({
               />
             </div>
 
-            {/* Department Filter */}
-            <div className="sm:w-56">
-              <select
-                value={selectedDeptFilter}
-                onChange={(e) => setSelectedDeptFilter(e.target.value)}
-                className="w-full px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-bold focus:outline-none focus:ring-2 focus:ring-blue-700"
-              >
-                <option value="ALL">All Repository Items</option>
-                <option value="GENERAL">General Core (Common to All)</option>
-                {departmentsList.map((d) => (
-                  <option key={d.code} value={d.code}>
-                    {d.code} — {d.name}
-                  </option>
-                ))}
-              </select>
-            </div>
+            {/* Department Filter / Track Lock */}
+            {targetDepartment ? (
+              <div className="sm:w-64 px-3 py-1.5 bg-purple-50 border border-purple-200 rounded-lg flex items-center justify-between shadow-2xs">
+                <div className="flex items-center space-x-1.5 min-w-0">
+                  <Lock className="w-3.5 h-3.5 text-purple-700 flex-shrink-0" />
+                  <div className="min-w-0">
+                    <span className="text-[10px] font-extrabold uppercase text-purple-600 block leading-none">
+                      Locked Track
+                    </span>
+                    <span className="text-xs font-bold text-purple-950 truncate block leading-tight" title={targetDepartmentName || targetDepartment}>
+                      {targetDepartment} {targetDepartmentName ? `— ${targetDepartmentName}` : "Specialization"}
+                    </span>
+                  </div>
+                </div>
+                <span className="text-[9px] font-extrabold uppercase px-1.5 py-0.5 bg-purple-200/80 text-purple-900 rounded flex-shrink-0 ml-1">
+                  Isolated
+                </span>
+              </div>
+            ) : (
+              <div className="sm:w-56">
+                <select
+                  value={selectedDeptFilter}
+                  onChange={(e) => setSelectedDeptFilter(e.target.value)}
+                  className="w-full px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-bold focus:outline-none focus:ring-2 focus:ring-blue-700"
+                >
+                  <option value="GENERAL">General Core (Common to All)</option>
+                  <option value="ALL">All Repository Items</option>
+                  {departmentsList.map((d) => (
+                    <option key={d.code} value={d.code}>
+                      {d.code} — {d.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
 
             {/* Type Filter */}
             <div className="sm:w-40">
@@ -314,12 +359,49 @@ export function QuestionBankDrawer({
         {/* Question List */}
         <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-3 bg-slate-50/50">
           {filteredQuestions.length === 0 ? (
-            <div className="bg-white border border-slate-200 rounded-xl p-10 text-center shadow-xs">
-              <Sparkles className="w-8 h-8 text-slate-300 mx-auto mb-2" />
-              <h4 className="text-xs font-bold text-slate-800">No Questions Found</h4>
-              <p className="text-[11px] text-slate-500 mt-1 max-w-sm mx-auto">
-                No items match your active filters ({selectedDeptFilter}). Try adjusting the filter or adding questions to this department in Question Bank.
-              </p>
+            <div className="bg-white border border-slate-200 rounded-2xl p-8 sm:p-10 text-center shadow-xs space-y-3 max-w-lg mx-auto my-6">
+              <div className="w-12 h-12 rounded-2xl bg-slate-100 text-slate-500 mx-auto flex items-center justify-center border border-slate-200">
+                <BookOpen className="w-6 h-6 text-slate-400" />
+              </div>
+              <div>
+                <h4 className="text-sm font-bold text-slate-900">
+                  {targetDepartment
+                    ? `No Questions Available in ${targetDepartment} Question Bank`
+                    : "No Questions Found"}
+                </h4>
+                <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                  {targetDepartment
+                    ? `The ${targetDepartment} department repository currently has no questions in the Question Bank. To uphold syllabus integrity, importing questions from other departments into the ${targetDepartment} specialization track is restricted.`
+                    : "No items match your active search and filter criteria in the question repository."}
+                </p>
+              </div>
+
+              {targetDepartment && (
+                <div className="pt-3 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-center gap-2">
+                  {onSwitchToCsv && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onClose();
+                        onSwitchToCsv();
+                      }}
+                      className="w-full sm:w-auto inline-flex items-center justify-center space-x-1.5 px-3.5 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-2xs transition-all cursor-pointer"
+                    >
+                      <Upload className="w-3.5 h-3.5" />
+                      <span>Upload {targetDepartment} CSV</span>
+                    </button>
+                  )}
+                  <a
+                    href={`/admin/questions`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-full sm:w-auto inline-flex items-center justify-center space-x-1.5 px-3.5 py-2 text-xs font-bold text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 rounded-xl shadow-2xs transition-all cursor-pointer"
+                  >
+                    <span>Open Question Bank</span>
+                    <ExternalLink className="w-3.5 h-3.5 text-slate-400" />
+                  </a>
+                </div>
+              )}
             </div>
           ) : (
             filteredQuestions.map((q, idx) => {

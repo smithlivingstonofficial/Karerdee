@@ -344,12 +344,95 @@ export async function saveExamAction(payload: SaveExamPayload) {
     // Build quota limits per section and department track
     const sectionQuotaMap = new Map<string, number>();
     const sectionIsCommonMap = new Map<string, boolean>();
+    const sectionTargetDeptsMap = new Map<string, string[]>();
 
     for (const sec of payload.sections) {
       const dbSecId = sectionIdMap.get(sec.id);
       if (!dbSecId) continue;
       sectionQuotaMap.set(dbSecId, sec.targetQuestionCount || 20);
       sectionIsCommonMap.set(dbSecId, sec.isCommon);
+      sectionTargetDeptsMap.set(
+        dbSecId,
+        (sec.targetDepartments || []).map((d) => d.trim().toUpperCase())
+      );
+    }
+
+    const rawCandidateQuestions = isDraft
+      ? payload.questions.filter((q) => q.prompt?.trim())
+      : payload.questions;
+
+    // =========================================================================
+    // SECURITY INTEGRITY CHECK: Cross-Department Track Isolation Verification
+    // Prevent importing or saving questions from other departments into mismatched tracks.
+    // =========================================================================
+    const sourceQuestionIds = rawCandidateQuestions
+      .map((q) => q.sourceQuestionId)
+      .filter((id): id is string => Boolean(id));
+
+    const sourceQuestionMap = new Map<string, any>();
+    if (sourceQuestionIds.length > 0) {
+      const { data: dbSourceQuestions, error: sourceErr } = await supabaseAdmin
+        .from("department_questions")
+        .select(`
+          id,
+          department_id,
+          prompt,
+          department:departments (
+            id,
+            code,
+            name
+          )
+        `)
+        .in("id", sourceQuestionIds);
+
+      if (sourceErr) {
+        console.warn("Failed to verify source question bank origins:", sourceErr);
+      } else if (dbSourceQuestions) {
+        dbSourceQuestions.forEach((sq: any) => {
+          sourceQuestionMap.set(sq.id, sq);
+        });
+      }
+    }
+
+    // Validate every candidate question against section and true department origin
+    for (const q of rawCandidateQuestions) {
+      const resolvedSectionId =
+        sectionIdMap.get(q.sectionId) || (savedSections[0] ? savedSections[0].id : "");
+      if (!resolvedSectionId) continue;
+
+      const isCommon = sectionIsCommonMap.get(resolvedSectionId) ?? true;
+      const allowedDepts = sectionTargetDeptsMap.get(resolvedSectionId) || [];
+      const targetDept = q.targetDepartment ? q.targetDepartment.trim().toUpperCase() : "";
+
+      if (!isCommon) {
+        if (!targetDept) {
+          return {
+            error: `Validation Error: Question "${q.prompt.slice(0, 40)}..." is placed in a department specialization section but is missing a department track assignment.`,
+          };
+        }
+        if (allowedDepts.length > 0 && !allowedDepts.includes(targetDept)) {
+          return {
+            error: `Security Error: Department track "${targetDept}" is not authorized for this section. Permitted department tracks: ${allowedDepts.join(", ")}.`,
+          };
+        }
+      }
+
+      // Check origin from Question Bank
+      if (q.sourceQuestionId) {
+        const srcRecord = sourceQuestionMap.get(q.sourceQuestionId);
+        if (srcRecord) {
+          const deptObj = Array.isArray(srcRecord.department)
+            ? srcRecord.department[0]
+            : srcRecord.department;
+          const trueSourceCode = deptObj?.code ? deptObj.code.trim().toUpperCase() : "GENERAL";
+
+          if (!isCommon && targetDept && trueSourceCode !== "GENERAL" && trueSourceCode !== targetDept) {
+            return {
+              error: `Academic Integrity Security Violation: Question "${q.prompt.slice(0, 45)}..." originates from the ${trueSourceCode} (${deptObj?.name || trueSourceCode}) repository, but was assigned to the ${targetDept} track. Cross-department track contamination is strictly prohibited.`,
+            };
+          }
+        }
+      }
     }
 
     const sectionTrackCounts = new Map<string, number>();
@@ -359,10 +442,6 @@ export async function saveExamAction(payload: SaveExamPayload) {
       resolvedSectionId: string;
       orderIndex: number;
     }> = [];
-
-    const rawCandidateQuestions = isDraft
-      ? payload.questions.filter((q) => q.prompt?.trim())
-      : payload.questions;
 
     for (const q of rawCandidateQuestions) {
       const resolvedSectionId =
@@ -401,7 +480,7 @@ export async function saveExamAction(payload: SaveExamPayload) {
     const savedQuestions: QuestionState[] = [];
 
     if (questionsToSave.length > 0) {
-      // 1. High-Performance Atomic Batch Insert for All Questions
+      // 1. High-Performance Atomic Batch Insert for All Questions with verified department audit metadata
       const questionsInsertPayload = questionsToSave.map(({ q, resolvedSectionId, orderIndex }) => {
         const cleanDept = q.targetDepartment ? q.targetDepartment.trim().toUpperCase() : null;
         return {
@@ -415,7 +494,12 @@ export async function saveExamAction(payload: SaveExamPayload) {
           rubric_criteria: sectionIsCommonMap.get(resolvedSectionId)
             ? null
             : cleanDept
-            ? { target_department: cleanDept }
+            ? {
+                target_department: cleanDept,
+                source_question_id: q.sourceQuestionId || null,
+                source_department: cleanDept,
+                verified_track: true,
+              }
             : null,
           order_index: orderIndex,
         };

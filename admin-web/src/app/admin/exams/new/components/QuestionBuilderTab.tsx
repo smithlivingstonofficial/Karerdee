@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { QuestionState, SectionState, QuestionBankItem } from "../types";
 import { Department } from "@/types/database.types";
 import { QuestionBankDrawer } from "./QuestionBankDrawer";
@@ -59,6 +59,11 @@ export function QuestionBuilderTab({
       ? selectedDeptTrack
       : sectionDepts[0] || ""
     : "";
+
+  const effectiveDeptName = useMemo(() => {
+    if (!effectiveDeptTrack) return null;
+    return departments.find((d) => d.code === effectiveDeptTrack)?.name || null;
+  }, [departments, effectiveDeptTrack]);
 
   const [isBankDrawerOpen, setIsBankDrawerOpen] = useState(false);
   const [isCsvDrawerOpen, setIsCsvDrawerOpen] = useState(false);
@@ -763,12 +768,14 @@ export function QuestionBuilderTab({
         targetSectionTitle={activeSection?.title || "Active Section"}
         targetSectionId={activeSection?.id || ""}
         targetDepartment={!isPartCommon ? effectiveDeptTrack : null}
+        targetDepartmentName={!isPartCommon ? effectiveDeptName : null}
         targetLimit={targetQuota}
         currentCount={currentQuotaCount}
         questionBank={questionBank}
         departments={departments}
         existingQuestions={questions}
         onImport={handleImportFromBank}
+        onSwitchToCsv={() => setIsCsvDrawerOpen(true)}
       />
 
       {/* 5. Bulk Spreadsheet / CSV Ingestion Drawer */}
