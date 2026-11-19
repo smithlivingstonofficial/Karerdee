@@ -2718,28 +2718,28 @@ function CandidateSittingContent() {
       : "C";
 
     return (
-      <div className="min-h-screen lg:h-screen lg:max-h-screen w-full bg-slate-100/70 flex items-center justify-center p-2.5 sm:p-3.5 lg:p-4 font-sans lg:overflow-hidden select-none">
-        <div className="w-full max-w-6xl lg:h-[95vh] lg:max-h-[730px] bg-white border border-slate-200/90 rounded-2xl p-3.5 sm:p-4 lg:p-5 shadow-sm flex flex-col justify-between lg:overflow-hidden gap-2.5">
+      <div className="min-h-screen lg:h-screen lg:max-h-screen w-full bg-slate-100/70 flex items-center justify-center p-2 sm:p-3 lg:p-3.5 font-sans lg:overflow-hidden select-none">
+        <div className="w-full max-w-6xl lg:h-[96vh] lg:max-h-[760px] bg-white border border-slate-200/90 rounded-2xl p-3 sm:p-4 lg:p-4.5 shadow-sm flex flex-col justify-between gap-2">
           {/* Institutional Top Header */}
-          <div className="border-b border-slate-100 pb-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 shrink-0">
+          <div className="border-b border-slate-100 pb-2 flex flex-col sm:flex-row sm:items-center justify-between gap-2 shrink-0">
             <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 rounded-xl bg-blue-700 text-white flex items-center justify-center shadow-xs font-bold text-base shrink-0">
+              <div className="w-9 h-9 rounded-xl bg-blue-700 text-white flex items-center justify-center shadow-xs font-bold text-sm shrink-0">
                 K
               </div>
               <div className="space-y-0.5">
                 <div className="flex items-center space-x-2">
-                  <span className="text-[10px] font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200 uppercase tracking-wider">
+                  <span className="text-[9.5px] font-bold text-blue-700 bg-blue-50 px-2 py-0.2 rounded border border-blue-200 uppercase tracking-wider">
                     Official Admission Confirmed
                   </span>
                   <span className="text-[10px] text-slate-400 font-semibold hidden sm:inline">•</span>
-                  <span className="text-[11px] font-semibold text-slate-500 hidden sm:inline">Pre-Sitting Desk</span>
+                  <span className="text-[10px] font-semibold text-slate-500 hidden sm:inline">Pre-Sitting Desk</span>
                 </div>
-                <h1 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight leading-tight">
+                <h1 className="text-sm sm:text-base font-bold text-slate-900 tracking-tight leading-tight">
                   {exam?.title || "Ph.D Research Eligibility & Entrance Examination"}
                 </h1>
-                <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-500">
                   <span className="inline-flex items-center text-slate-600 font-medium">
-                    <Clock className="w-3.5 h-3.5 mr-1 text-slate-400" />
+                    <Clock className="w-3 h-3 mr-1 text-slate-400" />
                     Duration: <strong className="ml-1 text-slate-800">{exam?.durationMinutes || 90} Minutes</strong>
                   </span>
                   <span>•</span>
@@ -2753,19 +2753,19 @@ function CandidateSittingContent() {
             </div>
 
             {/* Candidate Identity Card */}
-            <div className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 flex items-center space-x-3 self-start sm:self-auto shadow-2xs shrink-0">
-              <div className="w-9 h-9 rounded-full bg-blue-700 text-white flex items-center justify-center font-bold text-xs shadow-2xs shrink-0">
+            <div className="bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 flex items-center space-x-2.5 self-start sm:self-auto shadow-2xs shrink-0">
+              <div className="w-8 h-8 rounded-full bg-blue-700 text-white flex items-center justify-center font-bold text-xs shadow-2xs shrink-0">
                 {candInitials}
               </div>
               <div className="text-left text-xs leading-tight">
-                <span className="font-bold text-slate-900 block text-xs sm:text-sm truncate max-w-[180px]">
+                <span className="font-bold text-slate-900 block text-xs truncate max-w-[180px]">
                   {candidate?.fullName}
                 </span>
                 <div className="flex items-center space-x-1.5 mt-0.5">
-                  <span className="font-mono text-[10px] text-blue-700 font-bold bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200">
+                  <span className="font-mono text-[9.5px] text-blue-700 font-bold bg-blue-50 px-1.5 py-0.2 rounded border border-blue-200">
                     {candidate?.applicationNumber || candidate?.rollNumber || "ID"}
                   </span>
-                  <span className="text-[10px] font-bold text-slate-600 bg-slate-200/70 px-1.5 py-0.5 rounded">
+                  <span className="text-[9.5px] font-bold text-slate-600 bg-slate-200/70 px-1.5 py-0.2 rounded">
                     Dept: {candidate?.department}
                   </span>
                 </div>
@@ -2774,18 +2774,18 @@ function CandidateSittingContent() {
           </div>
 
           {/* Two-Column Layout: Left (Instructions in Clear Basic English) + Right (Webcam & Pre-Flight) */}
-          <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-12 gap-3 items-stretch lg:overflow-hidden">
+          <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-12 gap-3 items-stretch">
             {/* Left Column (7 cols): Comprehensive & Categorized Instructions */}
-            <div className="lg:col-span-7 flex flex-col justify-between gap-2 min-h-0 lg:overflow-hidden">
+            <div className="lg:col-span-7 flex flex-col justify-between gap-2 min-h-0">
               {/* Card 1: Question Paper Structure & Scoring */}
-              <div className="bg-slate-50/80 border border-slate-200/90 rounded-xl p-3 sm:p-3.5 space-y-2.5 shadow-2xs text-xs">
+              <div className="bg-slate-50/80 border border-slate-200/90 rounded-xl p-2.5 sm:p-3 space-y-2 shadow-2xs text-xs shrink-0">
                 {/* Title & Meta Header */}
-                <div className="flex items-center justify-between border-b border-slate-200/70 pb-2">
+                <div className="flex items-center justify-between border-b border-slate-200/70 pb-1.5">
                   <h3 className="font-bold text-slate-900 flex items-center text-xs sm:text-sm">
-                    <BookOpen className="w-4 h-4 mr-1.5 text-blue-700" />
+                    <BookOpen className="w-3.5 h-3.5 mr-1.5 text-blue-700" />
                     1. Question Paper Pattern &amp; Scoring Scheme
                   </h3>
-                  <span className="text-[10px] font-bold text-blue-700 bg-blue-50 border border-blue-200 px-2.5 py-0.5 rounded-full">
+                  <span className="text-[9.5px] font-bold text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.2 rounded-full">
                     50 Questions • 50.0 Total Marks
                   </span>
                 </div>
@@ -2793,188 +2793,155 @@ function CandidateSittingContent() {
                 {/* Part A & Part B Split Grid */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
                   {/* Part A Card */}
-                  <div className="p-2.5 rounded-xl bg-white border border-slate-200 shadow-2xs space-y-1">
+                  <div className="p-2 rounded-lg bg-white border border-slate-200 shadow-2xs space-y-0.5">
                     <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-bold text-blue-700 bg-blue-50 px-2 py-0.2 rounded border border-blue-200 uppercase tracking-wider">
-                        Part A • Common
+                      <span className="text-[9.5px] font-bold text-blue-700 bg-blue-50 px-1.5 py-0.2 rounded border border-blue-200 uppercase tracking-wider">
+                        Part A • Common Core
                       </span>
-                      <span className="text-[10px] font-semibold text-slate-500">
+                      <span className="text-[9.5px] font-semibold text-slate-500">
                         Q01 – Q25 • 25 Marks
                       </span>
                     </div>
                     <div className="font-bold text-slate-900 text-xs pt-0.5">
                       Research Methodology &amp; Quantitative Aptitude
                     </div>
-                    <p className="text-[11px] text-slate-600 leading-tight">
-                      Research methodology, logical reasoning, data interpretation, and quantitative skills common to all candidates.
+                    <p className="text-[10.5px] text-slate-600 leading-tight">
+                      Research methodology, logical deduction, and quantitative skills common to all candidates.
                     </p>
                   </div>
 
                   {/* Part B Card */}
-                  <div className="p-2.5 rounded-xl bg-white border border-slate-200 shadow-2xs space-y-1">
+                  <div className="p-2 rounded-lg bg-white border border-slate-200 shadow-2xs space-y-0.5">
                     <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 px-2 py-0.2 rounded border border-indigo-200 uppercase tracking-wider">
+                      <span className="text-[9.5px] font-bold text-indigo-700 bg-indigo-50 px-1.5 py-0.2 rounded border border-indigo-200 uppercase tracking-wider">
                         Part B • Specialization
                       </span>
-                      <span className="text-[10px] font-semibold text-slate-500">
+                      <span className="text-[9.5px] font-semibold text-slate-500">
                         Q26 – Q50 • 25 Marks
                       </span>
                     </div>
-                    <div className="font-bold text-slate-900 text-xs pt-0.5 flex items-center space-x-1.5 truncate">
+                    <div className="font-bold text-slate-900 text-xs pt-0.5 flex items-center space-x-1 truncate">
                       <span>Core Subject:</span>
                       <span className="text-blue-700 font-bold underline decoration-blue-300">
                         {candidate?.department || "Major Track"}
                       </span>
                     </div>
-                    <p className="text-[11px] text-slate-600 leading-tight">
-                      Advanced domain-specific questions tailored exclusively for your registered department specialization.
+                    <p className="text-[10.5px] text-slate-600 leading-tight">
+                      Advanced subject-specific questions mapped strictly to your registered department.
                     </p>
                   </div>
                 </div>
 
-                {/* Scoring & Navigation Policies (Structured Feature List) */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-0.5 text-xs">
-                  {/* Item 1: Marks per question */}
-                  <div className="p-2 rounded-lg bg-white border border-slate-200/80 space-y-0.5">
-                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
-                      Marking Scheme
+                {/* Scoring & Navigation Policies (Compact 3-Pill Strip) */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-1.5 pt-0.5 text-xs">
+                  <div className="p-1.5 px-2 rounded-lg bg-white border border-slate-200/80">
+                    <span className="text-[9.5px] font-bold text-slate-500 uppercase tracking-wider block">Marking Policy</span>
+                    <span className="font-bold text-slate-900 text-[11px] block">+1.0 Mark / Question</span>
+                    <span className="text-[10px] text-slate-500 leading-tight block">1 mark per correct answer (Total: 50.0).</span>
+                  </div>
+
+                  <div className={`p-1.5 px-2 rounded-lg border ${exam?.enableNegativeMarking ? "bg-amber-50/70 border-amber-200" : "bg-emerald-50/70 border-emerald-200"}`}>
+                    <span className={`text-[9.5px] font-bold uppercase tracking-wider block ${exam?.enableNegativeMarking ? "text-amber-800" : "text-emerald-800"}`}>Negative Marking</span>
+                    <span className={`font-bold text-[11px] block ${exam?.enableNegativeMarking ? "text-amber-900" : "text-emerald-900"}`}>
+                      {exam?.enableNegativeMarking ? "0.25 Mark Deduction" : "Zero Penalty (0.0)"}
                     </span>
-                    <span className="font-bold text-slate-900 block text-xs">
-                      +1.0 Mark / Question
-                    </span>
-                    <span className="text-[10.5px] text-slate-600 leading-tight block">
-                      1 mark for every correct answer (Total: 50.0).
+                    <span className={`text-[10px] leading-tight block ${exam?.enableNegativeMarking ? "text-amber-800" : "text-emerald-800"}`}>
+                      {exam?.enableNegativeMarking ? "Deduction for wrong answers." : "Attempt all 50 questions freely!"}
                     </span>
                   </div>
 
-                  {/* Item 2: Negative Marking */}
-                  <div
-                    className={`p-2 rounded-lg border space-y-0.5 ${
-                      exam?.enableNegativeMarking
-                        ? "bg-amber-50/70 border-amber-200"
-                        : "bg-emerald-50/70 border-emerald-200"
-                    }`}
-                  >
-                    <span
-                      className={`text-[10px] font-bold uppercase tracking-wider block ${
-                        exam?.enableNegativeMarking ? "text-amber-800" : "text-emerald-800"
-                      }`}
-                    >
-                      Negative Marking
-                    </span>
-                    <span
-                      className={`font-bold block text-xs ${
-                        exam?.enableNegativeMarking ? "text-amber-900" : "text-emerald-900"
-                      }`}
-                    >
-                      {exam?.enableNegativeMarking ? "0.25 Penalty" : "Zero Penalty (0.0)"}
-                    </span>
-                    <span
-                      className={`text-[10.5px] leading-tight block ${
-                        exam?.enableNegativeMarking ? "text-amber-800" : "text-emerald-800"
-                      }`}
-                    >
-                      {exam?.enableNegativeMarking
-                        ? "0.25 deduction for wrong answers."
-                        : "No penalty. Attempt all 50 questions!"}
-                    </span>
-                  </div>
-
-                  {/* Item 3: Navigation Freedom */}
-                  <div className="p-2 rounded-lg bg-white border border-slate-200/80 space-y-0.5">
-                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
-                      Question Navigation
-                    </span>
-                    <span className="font-bold text-slate-900 block text-xs">
-                      Free Jump &amp; Review
-                    </span>
-                    <span className="text-[10.5px] text-slate-600 leading-tight block">
-                      Switch between Part A &amp; B and edit anytime.
-                    </span>
+                  <div className="p-1.5 px-2 rounded-lg bg-white border border-slate-200/80">
+                    <span className="text-[9.5px] font-bold text-slate-500 uppercase tracking-wider block">Navigation Freedom</span>
+                    <span className="font-bold text-slate-900 text-[11px] block">Free Jump &amp; Revisit</span>
+                    <span className="text-[10px] text-slate-500 leading-tight block">Switch between Part A &amp; B and edit anytime.</span>
                   </div>
                 </div>
               </div>
 
               {/* Card 2: Essential Examination Rules & Candidate Safeguards */}
-              <div className="bg-slate-50/80 border border-slate-200/90 rounded-xl p-3 sm:p-3.5 space-y-2.5 shadow-2xs text-xs">
+              <div className="bg-slate-50/80 border border-slate-200/90 rounded-xl p-2.5 sm:p-3 space-y-2 shadow-2xs text-xs shrink-0">
                 {/* Header & Meta */}
-                <div className="flex items-center justify-between border-b border-slate-200/70 pb-2">
+                <div className="flex items-center justify-between border-b border-slate-200/70 pb-1.5">
                   <h3 className="font-bold text-slate-900 flex items-center text-xs sm:text-sm">
-                    <ShieldCheck className="w-4 h-4 mr-1.5 text-blue-700" />
+                    <ShieldCheck className="w-3.5 h-3.5 mr-1.5 text-blue-700" />
                     2. Essential Examination Rules &amp; Anti-Cheat Regulations
                   </h3>
-                  <span className="text-[10px] font-bold text-blue-700 bg-blue-50 border border-blue-200 px-2.5 py-0.5 rounded-full">
+                  <span className="text-[9.5px] font-bold text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.2 rounded-full">
                     Strict Proctoring Enforced
                   </span>
                 </div>
 
                 {/* 4 Core Rules (2x2 Grid) */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs leading-snug">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-xs leading-snug">
                   {/* Rule 1: Fullscreen */}
-                  <div className="flex items-start space-x-2 p-2.5 rounded-xl bg-white border border-slate-200/80 shadow-2xs">
-                    <span className="text-emerald-600 font-bold text-sm shrink-0">✔</span>
-                    <div className="space-y-0.5">
-                      <strong className="text-slate-800 block text-xs">Mandatory Fullscreen Mode</strong>
-                      <p className="text-slate-600 text-[11px] leading-tight">
-                        Exam operates in fullscreen. Switching tabs, minimizing windows, or pressing <kbd className="bg-slate-100 text-slate-700 px-1 py-0.2 rounded font-mono text-[10px] border border-slate-200">Alt+Tab</kbd> records an infraction strike.
-                      </p>
+                  <div className="flex items-start space-x-1.5 p-2 rounded-lg bg-white border border-slate-200/80 shadow-2xs">
+                    <span className="text-emerald-600 font-bold text-xs shrink-0 mt-0.5">✔</span>
+                    <div>
+                      <strong className="text-slate-800 text-[11px] block">Mandatory Fullscreen Mode</strong>
+                      <span className="text-slate-600 text-[10.5px] leading-tight block">
+                        No <kbd className="bg-slate-100 text-slate-700 px-1 py-0.2 rounded font-mono text-[9px] border border-slate-200">Alt+Tab</kbd> or tab switching; exit registers strike.
+                      </span>
                     </div>
                   </div>
 
                   {/* Rule 2: Face Centered */}
-                  <div className="flex items-start space-x-2 p-2.5 rounded-xl bg-white border border-slate-200/80 shadow-2xs">
-                    <span className="text-emerald-600 font-bold text-sm shrink-0">✔</span>
-                    <div className="space-y-0.5">
-                      <strong className="text-slate-800 block text-xs">Keep Face Centered in Camera</strong>
-                      <p className="text-slate-600 text-[11px] leading-tight">
-                        Sit upright in clear lighting. If your face leaves the webcam frame for over 10 seconds, a security strike is logged automatically.
-                      </p>
+                  <div className="flex items-start space-x-1.5 p-2 rounded-lg bg-white border border-slate-200/80 shadow-2xs">
+                    <span className="text-emerald-600 font-bold text-xs shrink-0 mt-0.5">✔</span>
+                    <div>
+                      <strong className="text-slate-800 text-[11px] block">Keep Face Centered in Camera</strong>
+                      <span className="text-slate-600 text-[10.5px] leading-tight block">
+                        Sit upright in clear lighting. Face missing &gt;10s logs a security strike.
+                      </span>
                     </div>
                   </div>
 
                   {/* Rule 3: No Refresh or Exit */}
-                  <div className="flex items-start space-x-2 p-2.5 rounded-xl bg-white border border-slate-200/80 shadow-2xs">
-                    <span className="text-red-600 font-bold text-sm shrink-0">✖</span>
-                    <div className="space-y-0.5">
-                      <strong className="text-slate-800 block text-xs">Do Not Refresh or Exit</strong>
-                      <p className="text-slate-600 text-[11px] leading-tight">
-                        Do not press <kbd className="bg-slate-100 text-slate-700 px-1 py-0.2 rounded font-mono text-[10px] border border-slate-200">F5</kbd> or <kbd className="bg-slate-100 text-slate-700 px-1 py-0.2 rounded font-mono text-[10px] border border-slate-200">Ctrl+R</kbd>. Browser navigation and reload keys are locked to safeguard your exam progress.
-                      </p>
+                  <div className="flex items-start space-x-1.5 p-2 rounded-lg bg-white border border-slate-200/80 shadow-2xs">
+                    <span className="text-red-600 font-bold text-xs shrink-0 mt-0.5">✖</span>
+                    <div>
+                      <strong className="text-slate-800 text-[11px] block">Do Not Refresh or Exit</strong>
+                      <span className="text-slate-600 text-[10.5px] leading-tight block">
+                        <kbd className="bg-slate-100 text-slate-700 px-1 py-0.2 rounded font-mono text-[9px] border border-slate-200">F5</kbd> and <kbd className="bg-slate-100 text-slate-700 px-1 py-0.2 rounded font-mono text-[9px] border border-slate-200">Ctrl+R</kbd> are locked to protect your session.
+                      </span>
                     </div>
                   </div>
 
                   {/* Rule 4: Work Alone */}
-                  <div className="flex items-start space-x-2 p-2.5 rounded-xl bg-white border border-slate-200/80 shadow-2xs">
-                    <span className="text-red-600 font-bold text-sm shrink-0">✖</span>
-                    <div className="space-y-0.5">
-                      <strong className="text-slate-800 block text-xs">Work Strictly Alone</strong>
-                      <p className="text-slate-600 text-[11px] leading-tight">
-                        Mobile phones, secondary screens, smartwatches, notes, calculators, and other persons in the examination room are strictly prohibited.
-                      </p>
+                  <div className="flex items-start space-x-1.5 p-2 rounded-lg bg-white border border-slate-200/80 shadow-2xs">
+                    <span className="text-red-600 font-bold text-xs shrink-0 mt-0.5">✖</span>
+                    <div>
+                      <strong className="text-slate-800 text-[11px] block">Work Strictly Alone</strong>
+                      <span className="text-slate-600 text-[10.5px] leading-tight block">
+                        Phones, secondary screens, smartwatches, notes, and guests are barred.
+                      </span>
                     </div>
                   </div>
                 </div>
 
-                {/* Integrated Safeguards: Auto-Save & Invigilator Helpdesk */}
+                {/* Integrated Safeguards: Auto-Save & Invigilator Helpdesk (Fully Visible 2-Box Strip) */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-0.5 text-xs">
                   {/* Auto-Save */}
-                  <div className="p-2 rounded-lg bg-white border border-slate-200/80 flex items-start space-x-2">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5" />
-                    <div>
-                      <strong className="text-slate-800 block text-[11px]">Automatic Answer Saving</strong>
-                      <span className="text-slate-600 text-[10.5px] leading-tight block">
-                        Answers save instantly. If your internet disconnects, progress stays safe locally and syncs automatically.
+                  <div className="p-2 rounded-lg bg-emerald-50/70 border border-emerald-200/90 flex items-center space-x-2 shadow-2xs">
+                    <div className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                    </div>
+                    <div className="leading-tight min-w-0">
+                      <strong className="text-emerald-950 text-[11px] block truncate">Automatic Answer Saving</strong>
+                      <span className="text-emerald-800 text-[10px] leading-tight block">
+                        Answers save instantly. In case of internet drop, progress stays safe locally.
                       </span>
                     </div>
                   </div>
 
                   {/* Helpdesk */}
-                  <div className="p-2 rounded-lg bg-white border border-slate-200/80 flex items-start space-x-2">
-                    <HelpCircle className="w-3.5 h-3.5 text-blue-700 shrink-0 mt-0.5" />
-                    <div>
-                      <strong className="text-slate-800 block text-[11px]">Invigilator Live Helpdesk</strong>
-                      <span className="text-slate-600 text-[10.5px] leading-tight block">
-                        Need assistance or have a technical doubt? Click <strong>Helpdesk</strong> at the top right to message the proctor live.
+                  <div className="p-2 rounded-lg bg-blue-50/70 border border-blue-200/90 flex items-center space-x-2 shadow-2xs">
+                    <div className="w-5 h-5 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center shrink-0">
+                      <HelpCircle className="w-3.5 h-3.5" />
+                    </div>
+                    <div className="leading-tight min-w-0">
+                      <strong className="text-blue-950 text-[11px] block truncate">Invigilator Live Helpdesk</strong>
+                      <span className="text-blue-800 text-[10px] leading-tight block">
+                        Have a question? Click <strong>Helpdesk</strong> at top right to message proctor live.
                       </span>
                     </div>
                   </div>
@@ -2983,12 +2950,12 @@ function CandidateSittingContent() {
 
               {/* Examiner Specific Notes (if any configured) */}
               {exam?.instructions && (
-                <div className="p-2.5 bg-blue-50/70 border border-blue-200/80 rounded-xl space-y-0.5 text-xs shrink-0">
-                  <span className="font-bold text-blue-950 flex items-center text-xs">
-                    <Sparkles className="w-3.5 h-3.5 mr-1 text-blue-700" />
+                <div className="p-2 bg-blue-50/70 border border-blue-200/80 rounded-xl space-y-0.5 text-xs shrink-0">
+                  <span className="font-bold text-blue-950 flex items-center text-[10.5px]">
+                    <Sparkles className="w-3 h-3 mr-1 text-blue-700" />
                     Special Guidelines from the Examination Committee:
                   </span>
-                  <p className="text-slate-700 whitespace-pre-line text-[11px] leading-relaxed pl-4 line-clamp-2">
+                  <p className="text-slate-700 whitespace-pre-line text-[10px] leading-snug pl-4 line-clamp-2">
                     {exam.instructions}
                   </p>
                 </div>
@@ -2996,16 +2963,16 @@ function CandidateSittingContent() {
             </div>
 
             {/* Right Column (5 cols): Pre-Exam Live Webcam Diagnostics & Environment Checklist */}
-            <div className="lg:col-span-5 flex flex-col justify-between gap-2 min-h-0 lg:overflow-hidden">
+            <div className="lg:col-span-5 flex flex-col justify-between gap-2 min-h-0">
               {/* Webcam Calibration Card */}
-              <div className="bg-slate-50 border border-slate-200/90 rounded-xl p-3 space-y-2 flex-1 flex flex-col justify-between min-h-0">
-                <div className="flex items-center justify-between border-b border-slate-200/80 pb-1.5 shrink-0">
+              <div className="bg-slate-50 border border-slate-200/90 rounded-xl p-2.5 sm:p-3 space-y-2 flex-1 flex flex-col justify-between min-h-0">
+                <div className="flex items-center justify-between border-b border-slate-200/80 pb-1 shrink-0">
                   <span className="text-xs sm:text-sm font-bold text-slate-900 flex items-center">
-                    <Camera className="w-4 h-4 mr-1.5 text-blue-700" />
+                    <Camera className="w-3.5 h-3.5 mr-1.5 text-blue-700" />
                     Webcam &amp; Diagnostics Check
                   </span>
                   <span
-                    className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full border flex items-center space-x-1.5 ${
+                    className={`text-[9.5px] font-bold px-2 py-0.5 rounded-full border flex items-center space-x-1.5 ${
                       isCameraActive
                         ? "bg-emerald-50 text-emerald-700 border-emerald-200"
                         : "bg-amber-50 text-amber-800 border-amber-200"
@@ -3021,7 +2988,7 @@ function CandidateSittingContent() {
                 </div>
 
                 {/* Live Video Preview Box in Original 4:3 Ratio */}
-                <div className="relative rounded-xl overflow-hidden bg-slate-950 aspect-[4/3] w-full max-w-[280px] sm:max-w-[290px] mx-auto border border-slate-300/80 shadow-md flex items-center justify-center shrink-0">
+                <div className="relative rounded-xl overflow-hidden bg-slate-950 aspect-[4/3] w-full max-w-[260px] sm:max-w-[270px] mx-auto border border-slate-300/80 shadow-md flex items-center justify-center shrink-0">
                   <video
                     ref={instructionsVideoRef}
                     autoPlay
@@ -3030,15 +2997,15 @@ function CandidateSittingContent() {
                     className={`w-full h-full object-cover ${isCameraActive ? "block" : "hidden"}`}
                   />
                   {!isCameraActive && (
-                    <div className="p-4 text-center text-slate-400 text-xs space-y-2">
-                      <CameraOff className="w-6 h-6 mx-auto text-slate-500" />
-                      <p className="text-[11px] text-slate-400 leading-tight">
+                    <div className="p-3 text-center text-slate-400 text-xs space-y-1.5">
+                      <CameraOff className="w-5 h-5 mx-auto text-slate-500" />
+                      <p className="text-[10.5px] text-slate-400 leading-tight">
                         {cameraError || "Requesting camera stream for proctoring verification..."}
                       </p>
                       <button
                         type="button"
                         onClick={initializeSecureCamera}
-                        className="px-3 py-1.5 bg-blue-700 text-white rounded-lg text-xs font-bold hover:bg-blue-800 transition-colors cursor-pointer inline-flex items-center space-x-1"
+                        className="px-2.5 py-1 bg-blue-700 text-white rounded-lg text-xs font-bold hover:bg-blue-800 transition-colors cursor-pointer inline-flex items-center space-x-1"
                       >
                         <RefreshCw className="w-3 h-3 mr-1" />
                         <span>Grant Camera Permission</span>
@@ -3049,14 +3016,14 @@ function CandidateSittingContent() {
                   {isCameraActive && (
                     <>
                       {/* Top Overlay Badge */}
-                      <div className="absolute top-2 left-2 px-2.5 py-0.5 rounded-full bg-slate-900/80 text-emerald-300 border border-emerald-500/40 text-[10px] font-bold flex items-center space-x-1.5 backdrop-blur-xs">
+                      <div className="absolute top-1.5 left-1.5 px-2 py-0.5 rounded-full bg-slate-900/80 text-emerald-300 border border-emerald-500/40 text-[9px] font-bold flex items-center space-x-1 backdrop-blur-xs">
                         <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
                         <span>LIVE FEED • 640x480</span>
                       </div>
 
                       {/* Proctor Framing Target Markers */}
-                      <div className="absolute inset-4 pointer-events-none border border-white/20 rounded-lg border-dashed flex items-center justify-center">
-                        <span className="text-[9px] text-white/40 font-mono tracking-wider uppercase">
+                      <div className="absolute inset-3 pointer-events-none border border-white/20 rounded-lg border-dashed flex items-center justify-center">
+                        <span className="text-[8.5px] text-white/40 font-mono tracking-wider uppercase">
                           Center Face Here
                         </span>
                       </div>
@@ -3066,33 +3033,33 @@ function CandidateSittingContent() {
 
                 {/* Pre-Flight Diagnostics Strip */}
                 <div className="bg-white border border-slate-200 rounded-xl divide-y divide-slate-100 text-xs shadow-2xs">
-                  <div className="flex items-center justify-between px-3 py-1.5">
-                    <span className="text-slate-600 font-medium flex items-center">
-                      <Camera className="w-3.5 h-3.5 mr-1.5 text-slate-400" />
+                  <div className="flex items-center justify-between px-2.5 py-1">
+                    <span className="text-slate-600 font-medium flex items-center text-[11px]">
+                      <Camera className="w-3 h-3 mr-1.5 text-slate-400" />
                       Video Capture Device:
                     </span>
-                    <span className="font-semibold text-slate-900 truncate max-w-[170px]">
+                    <span className="font-semibold text-slate-900 truncate max-w-[170px] text-[11px]">
                       {cameraDeviceLabel || "Integrated Webcam"}
                     </span>
                   </div>
 
-                  <div className="flex items-center justify-between px-3 py-1.5">
-                    <span className="text-slate-600 font-medium flex items-center">
-                      <Maximize2 className="w-3.5 h-3.5 mr-1.5 text-slate-400" />
+                  <div className="flex items-center justify-between px-2.5 py-1">
+                    <span className="text-slate-600 font-medium flex items-center text-[11px]">
+                      <Maximize2 className="w-3 h-3 mr-1.5 text-slate-400" />
                       Fullscreen Security:
                     </span>
-                    <span className="font-semibold text-blue-700 bg-blue-50 px-2 py-0.2 rounded text-[11px] border border-blue-200">
+                    <span className="font-semibold text-blue-700 bg-blue-50 px-1.5 py-0.2 rounded text-[10.5px] border border-blue-200">
                       Enforced on Start
                     </span>
                   </div>
 
-                  <div className="flex items-center justify-between px-3 py-1.5">
-                    <span className="text-slate-600 font-medium flex items-center">
-                      <Wifi className="w-3.5 h-3.5 mr-1.5 text-slate-400" />
+                  <div className="flex items-center justify-between px-2.5 py-1">
+                    <span className="text-slate-600 font-medium flex items-center text-[11px]">
+                      <Wifi className="w-3 h-3 mr-1.5 text-slate-400" />
                       Network Connection:
                     </span>
-                    <span className="font-semibold text-emerald-700 flex items-center bg-emerald-50 px-2 py-0.2 rounded text-[11px] border border-emerald-200">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1.5 animate-pulse" />
+                    <span className="font-semibold text-emerald-700 flex items-center bg-emerald-50 px-1.5 py-0.2 rounded text-[10.5px] border border-emerald-200">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1 animate-pulse" />
                       Connected &amp; Synced
                     </span>
                   </div>
@@ -3100,30 +3067,30 @@ function CandidateSittingContent() {
               </div>
 
               {/* Workstation Readiness Checklist */}
-              <div className="bg-white border border-slate-200 rounded-xl p-2.5 sm:p-3 space-y-1.5 text-xs shadow-2xs shrink-0">
+              <div className="bg-white border border-slate-200 rounded-xl p-2 sm:p-2.5 space-y-1 text-xs shadow-2xs shrink-0">
                 <div className="flex items-center justify-between border-b border-slate-100 pb-1">
                   <span className="font-bold text-slate-900 flex items-center text-xs">
-                    <UserCheck className="w-4 h-4 mr-1.5 text-blue-700" />
+                    <UserCheck className="w-3.5 h-3.5 mr-1.5 text-blue-700" />
                     Desk &amp; Room Checklist
                   </span>
-                  <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.2 rounded-full">
+                  <span className="text-[9.5px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.2 rounded-full">
                     Pre-Sitting Verified
                   </span>
                 </div>
-                <ul className="space-y-1 text-xs text-slate-600">
-                  <li className="flex items-center space-x-2">
+                <ul className="space-y-0.5 text-[11px] text-slate-600">
+                  <li className="flex items-center space-x-1.5">
                     <div className="w-3.5 h-3.5 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
                       <Check className="w-2.5 h-2.5 stroke-[3]" />
                     </div>
                     <span>Sit in a quiet, private room with no background noise.</span>
                   </li>
-                  <li className="flex items-center space-x-2">
+                  <li className="flex items-center space-x-1.5">
                     <div className="w-3.5 h-3.5 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
                       <Check className="w-2.5 h-2.5 stroke-[3]" />
                     </div>
                     <span>Desk is cleared of books, papers, and mobile phones.</span>
                   </li>
-                  <li className="flex items-center space-x-2">
+                  <li className="flex items-center space-x-1.5">
                     <div className="w-3.5 h-3.5 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
                       <Check className="w-2.5 h-2.5 stroke-[3]" />
                     </div>
@@ -3135,7 +3102,7 @@ function CandidateSittingContent() {
           </div>
 
           {/* Rules Agreement & Action Ribbon */}
-          <div className="pt-2.5 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0">
+          <div className="pt-2 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0">
             <label className="flex items-center space-x-2.5 cursor-pointer select-none flex-1 min-w-0">
               <input
                 type="checkbox"
@@ -3143,7 +3110,7 @@ function CandidateSittingContent() {
                 onChange={(e) => setHasAgreedRules(e.target.checked)}
                 className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500 cursor-pointer shrink-0"
               />
-              <span className="text-xs text-slate-700 font-medium leading-relaxed">
+              <span className="text-xs text-slate-700 font-medium leading-snug">
                 I confirm that I am <strong>{candidate?.fullName}</strong> (Application ID: <strong>{candidate?.applicationNumber || candidate?.rollNumber}</strong>). I have read and agree to all instructions and regulations in basic English above, and promise to sit this examination honestly without any unauthorized assistance.
               </span>
             </label>
