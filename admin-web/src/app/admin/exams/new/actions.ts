@@ -8,6 +8,7 @@ import { revalidatePath } from "next/cache";
 import { ExamGeneralState, SectionState, QuestionState, QuestionBankItem } from "./types";
 import { Department } from "@/types/database.types";
 import { parseISTDateTime, formatToISTDateTimeLocal } from "@/lib/date";
+import { sanitizeCodeSnippet, isBogusDepartmentSnippet } from "@/lib/snippets";
 
 export interface SaveExamPayload {
   examId?: string | null;
@@ -98,7 +99,7 @@ export async function getExamAuthoringContextAction(): Promise<{
         language: isTamil ? "TA" : "EN",
         question_type: q.question_type || "MCQ_SINGLE",
         prompt: q.prompt || "",
-        code_snippet: q.code_snippet || null,
+        code_snippet: sanitizeCodeSnippet(q.code_snippet, codeStr) || null,
         points: 1, // Standardized 1 mark
         negative_points: Number(q.default_negative_points ?? 0),
         difficulty: q.difficulty || "MEDIUM",
@@ -515,7 +516,7 @@ export async function saveExamAction(payload: SaveExamPayload) {
           section_id: resolvedSectionId,
           question_type: q.questionType || "MCQ_SINGLE",
           prompt: q.prompt.trim(),
-          code_snippet: q.codeSnippet?.trim() || null,
+          code_snippet: sanitizeCodeSnippet(q.codeSnippet, cleanDept) || null,
           points: 1, // Standardized 1 mark
           negative_points: payload.exam.enableNegativeMarking ? q.negativePoints : 0,
           rubric_criteria: isCommonSec
@@ -771,7 +772,7 @@ export async function getExamForEditingAction(examId: string): Promise<{
         commonLanguage: isCommon ? langCode : undefined,
         questionType: q.question_type,
         prompt: q.prompt,
-        codeSnippet: q.code_snippet || undefined,
+        codeSnippet: sanitizeCodeSnippet(q.code_snippet, deptCode),
         points: Number(q.points) || 1,
         negativePoints: Number(q.negative_points) || 0,
         orderIndex: count + 1,
@@ -963,7 +964,7 @@ export async function bulkImportAllDepartmentQuestionsAction(
           targetDepartment: deptCode,
           questionType: bq.question_type || "MCQ_SINGLE",
           prompt: bq.prompt,
-          codeSnippet: bq.code_snippet || undefined,
+          codeSnippet: sanitizeCodeSnippet(bq.code_snippet, deptCode),
           points: 1.0,
           negativePoints: defaultNegativePoints,
           orderIndex: currentCount + addedForThisDept + 1,

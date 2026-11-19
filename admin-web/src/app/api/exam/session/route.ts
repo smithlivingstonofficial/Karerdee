@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import jwt from "jsonwebtoken";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { shuffleWithSeed } from "@/lib/utils";
+import { sanitizeCodeSnippet } from "@/lib/snippets";
 
 export const dynamic = "force-dynamic";
 
@@ -283,7 +284,7 @@ export async function GET(req: NextRequest) {
         sectionId: q.section_id,
         questionType: q.question_type,
         prompt: q.prompt,
-        codeSnippet: q.code_snippet,
+        codeSnippet: sanitizeCodeSnippet(q.code_snippet, cleanStudentDept) || undefined,
         points: 1, // Standardized 1 mark
         negativePoints: exam.enable_negative_marking ? (Number(q.negative_points) || 0.25) : 0,
         orderIndex: q.order_index,

@@ -7,6 +7,7 @@ import { QuestionBankDrawer } from "./QuestionBankDrawer";
 import { CsvUploadDrawer } from "./CsvUploadDrawer";
 import { MathText } from "@/components/MathText";
 import { bulkImportAllDepartmentQuestionsAction } from "../actions";
+import { isBogusDepartmentSnippet } from "@/lib/snippets";
 import {
   Plus,
   Trash2,
@@ -1064,22 +1065,23 @@ export function QuestionBuilderTab({
               <div>
                 <button
                   type="button"
-                  onClick={() =>
+                  onClick={() => {
+                    const isCurrentlyShowing = q.codeSnippet !== undefined && !isBogusDepartmentSnippet(q.codeSnippet, q.targetDepartment);
                     updateQuestion(q.id, {
-                      codeSnippet: q.codeSnippet !== undefined ? undefined : "",
-                    })
-                  }
+                      codeSnippet: isCurrentlyShowing ? undefined : "",
+                    });
+                  }}
                   className="text-xs font-bold text-blue-700 hover:text-blue-800 flex items-center space-x-1.5 cursor-pointer mb-1.5"
                 >
                   <Code2 className="w-3.5 h-3.5" />
                   <span>
-                    {q.codeSnippet !== undefined
+                    {q.codeSnippet !== undefined && !isBogusDepartmentSnippet(q.codeSnippet, q.targetDepartment)
                       ? "Remove Code Snippet"
                       : "+ Add Code Snippet (Monospace)"}
                   </span>
                 </button>
 
-                {q.codeSnippet !== undefined && (
+                {q.codeSnippet !== undefined && !isBogusDepartmentSnippet(q.codeSnippet, q.targetDepartment) && (
                   <textarea
                     rows={3}
                     value={q.codeSnippet}

@@ -8,6 +8,7 @@ import { BulkDeleteConfirmModal } from "./BulkDeleteConfirmModal";
 import { BulkReassignScopeModal } from "./BulkReassignScopeModal";
 import { exportQuestionsToCsv } from "@/lib/exportQuestionsCsv";
 import { MathText } from "@/components/MathText";
+import { isBogusDepartmentSnippet } from "@/lib/snippets";
 import {
   deleteQuestionAction,
   bulkDeleteQuestionsAction,
@@ -1028,7 +1029,7 @@ export function QuestionsClientView({
                 </div>
 
                 {/* Code Snippet */}
-                {q.code_snippet && (
+                {q.code_snippet && !isBogusDepartmentSnippet(q.code_snippet, q.department?.code) && (
                   <div className="rounded-xl overflow-hidden border border-slate-800 bg-slate-900 text-slate-100 p-3.5 font-mono text-xs">
                     <pre className="overflow-x-auto">{q.code_snippet}</pre>
                   </div>

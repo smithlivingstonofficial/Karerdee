@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import { formatTime, formatDateTime } from "@/lib/date";
 import { supabaseClient } from "@/lib/supabase/client";
+import { isBogusDepartmentSnippet } from "@/lib/snippets";
 import {
   Clock,
   CheckCircle2,
@@ -3337,7 +3338,7 @@ function CandidateSittingContent() {
                   <MathText as="p" className="leading-relaxed" text={activeQuestion.prompt} />
 
                   {/* Code Snippet if applicable */}
-                  {activeQuestion.codeSnippet && (
+                  {activeQuestion.codeSnippet && !isBogusDepartmentSnippet(activeQuestion.codeSnippet) && (
                     <div className="p-3.5 bg-slate-900 text-emerald-400 font-mono text-xs rounded-xl overflow-x-auto shadow-2xs">
                       <pre>{activeQuestion.codeSnippet}</pre>
                     </div>

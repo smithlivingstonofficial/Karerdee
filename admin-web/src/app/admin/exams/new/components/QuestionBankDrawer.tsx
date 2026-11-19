@@ -4,6 +4,7 @@ import React, { useState, useMemo, useEffect } from "react";
 import { QuestionBankItem, QuestionState } from "../types";
 import { Department } from "@/types/database.types";
 import { MathText } from "@/components/MathText";
+import { sanitizeCodeSnippet } from "@/lib/snippets";
 import {
   X,
   Search,
@@ -261,7 +262,7 @@ export function QuestionBankDrawer({
         : undefined,
       questionType: q.question_type,
       prompt: q.prompt,
-      codeSnippet: q.code_snippet || undefined,
+      codeSnippet: sanitizeCodeSnippet(q.code_snippet, targetDepartment || q.department?.code),
       points: 1.0, // Standardized 1 mark
       negativePoints: q.negative_points || 0.0,
       orderIndex: existingQuestions.length + idx + 1,
