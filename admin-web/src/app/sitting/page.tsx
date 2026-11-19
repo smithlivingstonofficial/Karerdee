@@ -403,6 +403,16 @@ function CandidateSittingContent() {
     }
   }, [stage, isCameraActive]);
 
+  // Continuously guarantee background capture video element is permanently wired to webcam stream
+  useEffect(() => {
+    if (videoRef.current && streamRef.current) {
+      if (videoRef.current.srcObject !== streamRef.current) {
+        videoRef.current.srcObject = streamRef.current;
+      }
+      videoRef.current.play().catch(() => {});
+    }
+  }, [stage, isCameraActive]);
+
   // Fullscreen Entry Helper
   async function enterFullscreen() {
     try {
@@ -495,9 +505,26 @@ function CandidateSittingContent() {
   // Generate Evidentiary Watermarked JPEG Frame (Canvas 2D)
   function captureWatermarkedSnapshot(violationType: string): string | null {
     try {
-      const video = videoRef.current;
+      let video = videoRef.current;
       const canvas = canvasRef.current;
-      if (!video || !canvas || video.readyState < 2) return null;
+
+      // Fallback to instructions preview video if primary hidden capture video is not yet loaded
+      if ((!video || video.readyState < 2) && instructionsVideoRef.current && instructionsVideoRef.current.readyState >= 2) {
+        video = instructionsVideoRef.current;
+      }
+
+      // If video element exists but stream is not bound or paused, attempt instant binding
+      if (video && streamRef.current && (!video.srcObject || video.readyState < 2)) {
+        if (video.srcObject !== streamRef.current) {
+          video.srcObject = streamRef.current;
+        }
+        video.play().catch(() => {});
+      }
+
+      if (!video || !canvas || video.readyState < 2) {
+        console.warn("captureWatermarkedSnapshot: camera video stream not ready (readyState: " + (video?.readyState ?? "null") + ")");
+        return null;
+      }
 
       const ctx = canvas.getContext("2d");
       if (!ctx) return null;
@@ -511,13 +538,18 @@ function CandidateSittingContent() {
       // 2. Draw Forensic Watermark Overlay at bottom 76px
       const barHeight = 76;
       const barY = 480 - barHeight;
-      const isAudit = violationType === "PROCTOR_REQUESTED_SNAPSHOT";
+      const isAudit =
+        violationType === "PROCTOR_REQUESTED_SNAPSHOT" ||
+        violationType === "ROUTINE_SURVEILLANCE" ||
+        violationType === "SURVEILLANCE_SNAPSHOT" ||
+        violationType === "EXAM_COMMENCED_BASELINE" ||
+        violationType === "BASELINE_SURVEILLANCE";
 
       // Semi-transparent deep slate banner
       ctx.fillStyle = "rgba(15, 23, 42, 0.95)";
       ctx.fillRect(0, barY, 640, barHeight);
 
-      // Accent line: Emerald for on-demand audit, Crimson for integrity infractions
+      // Accent line: Emerald for on-demand audit & routine surveillance, Crimson for integrity infractions
       ctx.fillStyle = isAudit ? "#059669" : "#DC2626";
       ctx.fillRect(0, barY, 640, 3);
 
@@ -526,7 +558,7 @@ function CandidateSittingContent() {
       ctx.fillStyle = isAudit ? "#34D399" : "#38BDF8"; // Emerald-400 or Sky-400
       ctx.fillText(
         isAudit
-          ? "KARE-SES PROCTOR AUDIT • INSTANT LIVE WEBCAM VERIFICATION"
+          ? "KARE-SES PROCTOR AUDIT • VERIFIED CANDIDATE BIOMETRIC SURVEILLANCE"
           : "KARE-SES SECURE EXAM INTEGRITY WATCHDOG • FORENSIC AUDIT EVIDENCE",
         14,
         barY + 18
@@ -548,7 +580,7 @@ function CandidateSittingContent() {
       const maxStrk = exam?.maxStrikes || 3;
       ctx.fillText(
         isAudit
-          ? "STATUS: ON-DEMAND PROCTOR VERIFICATION SNAPSHOT [Active Inspection]"
+          ? `STATUS: ${violationType.replace(/_/g, " ")} [Active Proctored Sitting]`
           : `INFRACTION: ${violationType}  [Strike #${strikeNum} of ${maxStrk}]`,
         14,
         barY + 54
@@ -568,15 +600,20 @@ function CandidateSittingContent() {
     }
   }
 
-  // Report Security Violation to Telemetry Backend (/api/telemetry/violation)
+  // Report Security Violation / Surveillance Snapshot to Telemetry Backend (/api/telemetry/violation)
   async function reportSecurityViolation(violationType: string, reason?: string) {
     if (!token || !sessionId) return;
 
-    const isProctorSnap = violationType === "PROCTOR_REQUESTED_SNAPSHOT";
+    const isAudit =
+      violationType === "PROCTOR_REQUESTED_SNAPSHOT" ||
+      violationType === "ROUTINE_SURVEILLANCE" ||
+      violationType === "SURVEILLANCE_SNAPSHOT" ||
+      violationType === "EXAM_COMMENCED_BASELINE" ||
+      violationType === "BASELINE_SURVEILLANCE";
 
-    // 3-second cooldown to prevent event flood cascades (bypassed for on-demand proctor snap)
+    // 3-second cooldown to prevent event flood cascades (bypassed for on-demand proctor snap & routine surveillance)
     const now = Date.now();
-    if (!isProctorSnap && now - lastViolationTimeRef.current < 3000) return;
+    if (!isAudit && now - lastViolationTimeRef.current < 3000) return;
     lastViolationTimeRef.current = now;
 
     try {
@@ -597,17 +634,21 @@ function CandidateSittingContent() {
             reason: reason || violationType,
             timestamp: new Date().toISOString(),
             deviceLabel: cameraDeviceLabel,
-            isAudit: isProctorSnap,
+            isAudit,
+            isSurveillance: isAudit,
+            candidateName: candidate?.fullName,
+            applicationNumber: candidate?.applicationNumber || candidate?.rollNumber,
+            department: candidate?.department,
           },
         }),
       });
 
       if (res.ok) {
         const data = await res.json();
-        if (typeof data.currentStrikes === "number" && !isProctorSnap) {
+        if (typeof data.currentStrikes === "number" && !isAudit) {
           setStrikes(data.currentStrikes);
         }
-        if (data.isLocked && !isProctorSnap) {
+        if (data.isLocked && !isAudit) {
           setIsWorkstationLocked(true);
           setLockoutReason(
             "Security Infraction Threshold Reached. Workstation locked by Safe Exam Watchdog."
@@ -987,13 +1028,10 @@ function CandidateSittingContent() {
             setTimeout(() => setProctorAnnouncement(null), 12000);
           } else if (cmd === "CMD_REQUEST_SNAP") {
             // Immediate on-demand webcam snapshot capture requested by proctor
-            const snap = captureWatermarkedSnapshot("PROCTOR_REQUESTED_SNAPSHOT");
-            if (snap) {
-              reportSecurityViolation(
-                "PROCTOR_REQUESTED_SNAPSHOT",
-                "On-demand invigilator audit snap"
-              );
-            }
+            reportSecurityViolation(
+              "PROCTOR_REQUESTED_SNAPSHOT",
+              "On-demand invigilator audit snap"
+            );
           } else if (cmd === "CMD_TERMINATE") {
             setIsWorkstationLocked(true);
             setLockoutReason(
@@ -1035,6 +1073,32 @@ function CandidateSittingContent() {
       supabaseClient.removeChannel(channel);
     };
   }, [stage, sessionId, exam]);
+
+  // Automated Candidate Biometric Surveillance (Baseline Snapshot on Commencing + Every 60s Routine Check)
+  useEffect(() => {
+    if (stage !== "ACTIVE_EXAM" || !sessionId || !token || !isCameraActive) return;
+
+    // 1. Initial verified commencement baseline snapshot after 2.5s camera stabilization
+    const baselineTimer = setTimeout(() => {
+      reportSecurityViolation(
+        "EXAM_COMMENCED_BASELINE",
+        "Initial examination commencement baseline webcam snapshot"
+      );
+    }, 2500);
+
+    // 2. Continuous background surveillance snapshot every 60 seconds
+    const surveillanceInterval = setInterval(() => {
+      reportSecurityViolation(
+        "ROUTINE_SURVEILLANCE",
+        "Periodic background candidate biometric surveillance snapshot"
+      );
+    }, 60000);
+
+    return () => {
+      clearTimeout(baselineTimer);
+      clearInterval(surveillanceInterval);
+    };
+  }, [stage, sessionId, token, isCameraActive]);
 
   // Load existing conversation thread on active exam entrance
   useEffect(() => {
@@ -2044,6 +2108,37 @@ function CandidateSittingContent() {
             <span>Continuous Telemetry &amp; Anti-Tamper Protected</span>
           </div>
         </div>
+
+        {/* Off-Screen Video and Canvas for Pre-Wired Snapshot Synthesis */}
+        <video
+          ref={videoRef}
+          playsInline
+          autoPlay
+          muted
+          style={{
+            position: "fixed",
+            top: -9999,
+            left: -9999,
+            width: 640,
+            height: 480,
+            pointerEvents: "none",
+            opacity: 0,
+          }}
+        />
+        <canvas
+          ref={canvasRef}
+          width={640}
+          height={480}
+          style={{
+            position: "fixed",
+            top: -9999,
+            left: -9999,
+            width: 640,
+            height: 480,
+            pointerEvents: "none",
+            opacity: 0,
+          }}
+        />
       </div>
     );
   }
@@ -2256,6 +2351,37 @@ function CandidateSittingContent() {
             </div>
           </div>
         </div>
+
+        {/* Off-Screen Video and Canvas for Pre-Wired Snapshot Synthesis */}
+        <video
+          ref={videoRef}
+          playsInline
+          autoPlay
+          muted
+          style={{
+            position: "fixed",
+            top: -9999,
+            left: -9999,
+            width: 640,
+            height: 480,
+            pointerEvents: "none",
+            opacity: 0,
+          }}
+        />
+        <canvas
+          ref={canvasRef}
+          width={640}
+          height={480}
+          style={{
+            position: "fixed",
+            top: -9999,
+            left: -9999,
+            width: 640,
+            height: 480,
+            pointerEvents: "none",
+            opacity: 0,
+          }}
+        />
       </div>
     );
   }
@@ -2459,6 +2585,37 @@ function CandidateSittingContent() {
             </button>
           </div>
         </div>
+
+        {/* Off-Screen Video and Canvas for Pre-Wired Snapshot Synthesis */}
+        <video
+          ref={videoRef}
+          playsInline
+          autoPlay
+          muted
+          style={{
+            position: "fixed",
+            top: -9999,
+            left: -9999,
+            width: 640,
+            height: 480,
+            pointerEvents: "none",
+            opacity: 0,
+          }}
+        />
+        <canvas
+          ref={canvasRef}
+          width={640}
+          height={480}
+          style={{
+            position: "fixed",
+            top: -9999,
+            left: -9999,
+            width: 640,
+            height: 480,
+            pointerEvents: "none",
+            opacity: 0,
+          }}
+        />
       </div>
     );
   }
@@ -2605,6 +2762,37 @@ function CandidateSittingContent() {
             </button>
           </div>
         </div>
+
+        {/* Off-Screen Video and Canvas for Pre-Wired Snapshot Synthesis */}
+        <video
+          ref={videoRef}
+          playsInline
+          autoPlay
+          muted
+          style={{
+            position: "fixed",
+            top: -9999,
+            left: -9999,
+            width: 640,
+            height: 480,
+            pointerEvents: "none",
+            opacity: 0,
+          }}
+        />
+        <canvas
+          ref={canvasRef}
+          width={640}
+          height={480}
+          style={{
+            position: "fixed",
+            top: -9999,
+            left: -9999,
+            width: 640,
+            height: 480,
+            pointerEvents: "none",
+            opacity: 0,
+          }}
+        />
       </div>
     );
   }

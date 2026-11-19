@@ -99,13 +99,11 @@ export default function PublicLandingPage() {
           <div className="space-y-4 max-w-3xl mx-auto">
             <h1 className="text-3xl sm:text-5xl font-extrabold text-slate-900 tracking-tight leading-[1.15]">
               <span className="block text-blue-700 text-2xl sm:text-3xl font-bold tracking-normal mb-2">
-                Department of Research and Development
+                Office of Research and Development
               </span>
-              KARE PhD Entrance Exam
+              KARE Ph. D. Entrance Exam
             </h1>
-            <p className="text-sm sm:text-base text-slate-600 leading-relaxed max-w-2xl mx-auto font-normal">
-              Official entrance and research examination portal for Kalasalingam Academy of Research and Education. Secure candidate verification, digital evaluation, and proctored examination engine.
-            </p>
+
           </div>
 
           {/* Instant Candidate Hall Ticket Search Card */}

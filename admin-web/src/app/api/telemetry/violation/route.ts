@@ -91,16 +91,31 @@ export async function POST(req: NextRequest) {
         } else if (uploadError) {
           console.warn("Storage snapshot upload error:", uploadError.message);
         }
+
+        // Fallback: If publicUrl was not generated, persist Base64 Data URI directly so photo is 100% saved in DB
+        if (!snapshotUrl && cleanBase64) {
+          snapshotUrl = snapshotBase64.startsWith("data:")
+            ? snapshotBase64
+            : `data:image/jpeg;base64,${cleanBase64}`;
+        }
       } catch (storageErr) {
         console.warn("Storage snapshot exception:", storageErr);
+        if (snapshotBase64) {
+          snapshotUrl = snapshotBase64;
+        }
       }
     }
 
     const isAuditSnapshot =
       violationType === "PROCTOR_REQUESTED_SNAPSHOT" ||
-      metadata?.isAudit === true;
+      violationType === "ROUTINE_SURVEILLANCE" ||
+      violationType === "SURVEILLANCE_SNAPSHOT" ||
+      violationType === "EXAM_COMMENCED_BASELINE" ||
+      violationType === "BASELINE_SURVEILLANCE" ||
+      metadata?.isAudit === true ||
+      metadata?.isSurveillance === true;
 
-    // 3. Atomically increment strike count on session (unless neutral on-demand proctor audit snap)
+    // 3. Atomically increment strike count on session (unless neutral on-demand proctor audit snap or routine surveillance)
     if (!isAuditSnapshot) {
       currentStrikes = (session.strikes_count || 0) + 1;
       const maxStrikes = (session as any).exams?.max_strikes || 3;
@@ -118,15 +133,50 @@ export async function POST(req: NextRequest) {
       isLocked = session.status === "LOCKED";
     }
 
-    // 4. Record violation log with snapshot URL
+    // 4. Map violation_type to allowed PostgreSQL CHECK constraint values in violation_logs
+    const ALLOWED_DB_TYPES = new Set([
+      "NO_FACE",
+      "MULTIPLE_FACES",
+      "BLACK_LISTED_PROCESS",
+      "MULTI_MONITOR_DETECTED",
+      "SCREEN_CAPTURE_ATTEMPT",
+      "SYSTEM_HOTKEY_ATTEMPT",
+      "VM_DETECTED",
+      "WINDOW_UNFOCUSED",
+    ]);
+
+    let dbViolationType = violationType;
+    if (!ALLOWED_DB_TYPES.has(dbViolationType)) {
+      if (violationType === "WINDOW_FOCUS_LOST" || violationType === "FULLSCREEN_EXITED") {
+        dbViolationType = "WINDOW_UNFOCUSED";
+      } else if (
+        violationType.includes("FACE") ||
+        violationType.includes("CAMERA")
+      ) {
+        dbViolationType = "NO_FACE";
+      } else {
+        // Routine surveillance, baseline photos, or other telemetries map to WINDOW_UNFOCUSED in DB with 0 strikes
+        dbViolationType = "WINDOW_UNFOCUSED";
+      }
+    }
+
+    const combinedMetadata = {
+      ...(metadata || {}),
+      actualViolationType: violationType,
+      isAudit: isAuditSnapshot,
+      isSurveillance: isAuditSnapshot,
+      recordedAt: new Date().toISOString(),
+    };
+
+    // 5. Record violation log with snapshot URL
     const { data: insertedViol, error: violInsertErr } = await supabaseAdmin
       .from("violation_logs")
       .insert({
         session_id: sessionId,
-        violation_type: violationType,
-        strike_number: currentStrikes,
+        violation_type: dbViolationType,
+        strike_number: isAuditSnapshot ? 0 : currentStrikes,
         snapshot_url: snapshotUrl || null,
-        metadata: metadata || {},
+        metadata: combinedMetadata,
       })
       .select("id, created_at")
       .single();
@@ -156,11 +206,11 @@ export async function POST(req: NextRequest) {
                   sessionId,
                   violationId: insertedViol?.id,
                   violationType,
-                  strikeNumber: currentStrikes,
+                  strikeNumber: isAuditSnapshot ? 0 : currentStrikes,
                   snapshotUrl: snapshotUrl || null,
                   isLocked,
                   isAuditSnapshot,
-                  metadata: metadata || {},
+                  metadata: combinedMetadata,
                   recordedAt: insertedViol?.created_at || new Date().toISOString(),
                   student: {
                     fullName: (session as any).students?.full_name,
@@ -176,11 +226,11 @@ export async function POST(req: NextRequest) {
                   sessionId,
                   violationId: insertedViol?.id,
                   violationType,
-                  strikeNumber: currentStrikes,
+                  strikeNumber: isAuditSnapshot ? 0 : currentStrikes,
                   snapshotUrl: snapshotUrl || null,
                   isLocked,
                   isAuditSnapshot,
-                  metadata: metadata || {},
+                  metadata: combinedMetadata,
                   recordedAt: insertedViol?.created_at || new Date().toISOString(),
                   student: {
                     fullName: (session as any).students?.full_name,

@@ -165,9 +165,16 @@ export async function getProctoringData(targetExamId?: string): Promise<Proctori
     const lateEntryMap = new Map<string, any>();
 
     if (rawViolations) {
-      const filteredViolations = targetExamId && targetExamId !== "ALL"
+      const filteredViolations = (targetExamId && targetExamId !== "ALL"
         ? rawViolations.filter((v: any) => v.session?.exam_id === targetExamId || v.session?.exam?.id === targetExamId)
-        : rawViolations;
+        : rawViolations
+      ).filter((v: any) => {
+        // Exclude routine background surveillance snapshots from the violation alerts feed
+        const isLateAttempt = v.metadata?.event_type === "LATE_ENTRY_ATTEMPT";
+        if (isLateAttempt) return true;
+        if (v.metadata?.isSurveillance && v.strike_number === 0) return false;
+        return true;
+      });
 
       violations = filteredViolations.map((v: any) => {
         const isLateAttempt = v.metadata?.event_type === "LATE_ENTRY_ATTEMPT";
@@ -178,6 +185,10 @@ export async function getProctoringData(targetExamId?: string): Promise<Proctori
           });
         }
 
+        const displayType = isLateAttempt
+          ? `LATE_ENTRY_ATTEMPT (+${v.metadata?.delayMinutes ?? 15}m)`
+          : (v.metadata?.actualViolationType || v.violation_type || "Integrity Violation");
+
         return {
           id: v.id,
           sessionId: v.session_id,
@@ -185,9 +196,7 @@ export async function getProctoringData(targetExamId?: string): Promise<Proctori
           applicationNumber: v.session?.student?.application_number || "",
           departmentCode: v.session?.student?.department?.code || "GENERAL",
           examTitle: v.session?.exam?.title || "Examination",
-          violationType: isLateAttempt
-            ? `LATE_ENTRY_ATTEMPT (+${v.metadata?.delayMinutes ?? 15}m)`
-            : v.violation_type || "Integrity Violation",
+          violationType: displayType,
           strikeNumber: v.strike_number || (isLateAttempt ? 0 : 1),
           snapshotUrl: v.snapshot_url || null,
           createdAt: v.created_at,

@@ -276,8 +276,10 @@ export function LiveProctoringClientView({
           examTitle: currentExamObj?.title || "Examination",
         };
 
-        // Prepend to violations feed
-        setViolations((prev) => [newViol, ...prev.filter((v) => v.id !== newViol.id)]);
+        // Prepend to violations feed only if it is an actual infraction (not neutral background surveillance)
+        if (!payload.isAuditSnapshot && (payload.strikeNumber ?? 1) > 0) {
+          setViolations((prev) => [newViol, ...prev.filter((v) => v.id !== newViol.id)]);
+        }
 
         // Update candidate session status in grid
         setSessions((prev) =>
@@ -285,21 +287,23 @@ export function LiveProctoringClientView({
             s.id === payload.sessionId
               ? {
                   ...s,
-                  strikesCount: payload.strikeNumber ?? s.strikesCount,
+                  strikesCount: payload.isAuditSnapshot ? s.strikesCount : (payload.strikeNumber ?? s.strikesCount),
                   status: payload.isLocked ? "LOCKED" : s.status,
                   latestSnapshotUrl: payload.snapshotUrl || s.latestSnapshotUrl,
                   latestSnapshotTime: payload.snapshotUrl ? (payload.recordedAt || new Date().toISOString()) : s.latestSnapshotTime,
                   snapshotsCount: payload.snapshotUrl ? (s.snapshotsCount || 0) + 1 : s.snapshotsCount,
-                  latestActionText: payload.violationType?.replace(/_/g, " ") || s.latestActionText,
+                  latestActionText: payload.isAuditSnapshot
+                    ? (payload.snapshotUrl ? "Webcam Snapshot Verified" : s.latestActionText)
+                    : (payload.violationType?.replace(/_/g, " ") || s.latestActionText),
                   latestActionTime: payload.recordedAt || new Date().toISOString(),
-                  latestActionType: "VIOLATION" as const,
+                  latestActionType: payload.isAuditSnapshot ? s.latestActionType : ("VIOLATION" as const),
                 }
               : s
           )
         );
 
-        // If on-demand audit snapshot was requested, open forensic evidence viewer directly
-        if (payload.isAuditSnapshot && payload.snapshotUrl) {
+        // If on-demand audit snapshot was requested by invigilator, open forensic evidence viewer directly
+        if (payload.isAuditSnapshot && payload.violationType === "PROCTOR_REQUESTED_SNAPSHOT" && payload.snapshotUrl) {
           setSelectedEvidence(newViol);
           setNotice({
             type: "success",

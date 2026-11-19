@@ -1,6 +1,6 @@
 "use client";
 
-import React, { memo } from "react";
+import React, { memo, useState, useEffect } from "react";
 import { ProctoringSession } from "./LiveProctoringClientView";
 import { formatTime } from "@/lib/date";
 import {
@@ -90,6 +90,13 @@ export const CandidateProctorCard = memo(function CandidateProctorCard({
   const isLocked = session.status === "LOCKED";
   const isSubmitted = session.status === "SUBMITTED";
   const isWarning = session.strikesCount > 0 && !isLocked && !isSubmitted;
+
+  // Track image load error to gracefully fall back to surveillance placeholder if URL is invalid
+  const [imgError, setImgError] = useState(false);
+
+  useEffect(() => {
+    setImgError(false);
+  }, [session.latestSnapshotUrl]);
 
   // Determine card outer border & status accent
   const borderStatusClass = isLocked
@@ -188,7 +195,7 @@ export const CandidateProctorCard = memo(function CandidateProctorCard({
 
       {/* 2. Webcam Surveillance Viewport Frame (Aspect 16:9) */}
       <div className="relative aspect-video w-full bg-slate-900 overflow-hidden cursor-pointer">
-        {session.latestSnapshotUrl ? (
+        {session.latestSnapshotUrl && !imgError ? (
           <>
             {/* Captured Candidate Image */}
             <img
@@ -196,6 +203,7 @@ export const CandidateProctorCard = memo(function CandidateProctorCard({
               alt={`Webcam snap of ${session.candidateName}`}
               className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
               loading="lazy"
+              onError={() => setImgError(true)}
               onClick={() => onViewDetailed(session)}
             />
 
