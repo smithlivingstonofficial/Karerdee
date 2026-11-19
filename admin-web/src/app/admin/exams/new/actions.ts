@@ -519,7 +519,7 @@ export async function saveExamAction(payload: SaveExamPayload) {
           rubric_criteria: isCommonSec
             ? {
                 common_language: isTamil ? "TA" : "EN",
-                target_department: isTamil ? "TAM" : null,
+                target_department: null,
               }
             : cleanDept
             ? {
