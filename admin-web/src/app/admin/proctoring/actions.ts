@@ -480,6 +480,86 @@ export async function requestProctorSnapshotAction(sessionId: string) {
   }
 }
 
+export async function getCandidateDetailedLogAction(sessionId: string) {
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { error: "Unauthorized access" };
+    if (!sessionId) return { error: "Session ID required" };
+
+    // 1. Fetch exam session with student, department, and exam metadata
+    const { data: session, error: sessErr } = await supabaseAdmin
+      .from("exam_sessions")
+      .select(`
+        id,
+        student_id,
+        exam_id,
+        hardware_fingerprint,
+        client_version,
+        status,
+        strikes_count,
+        extra_time_minutes,
+        started_at,
+        submitted_at,
+        student:students (
+          id,
+          full_name,
+          application_number,
+          roll_number,
+          email,
+          department:departments (
+            id,
+            code,
+            name
+          )
+        ),
+        exam:exams (
+          id,
+          title,
+          max_strikes,
+          passcode,
+          duration_minutes
+        )
+      `)
+      .eq("id", sessionId)
+      .single();
+
+    if (sessErr || !session) throw sessErr || new Error("Exam session not found");
+
+    // 2. Fetch all violation logs & forensic snapshots
+    const { data: violations } = await supabaseAdmin
+      .from("violation_logs")
+      .select("id, session_id, violation_type, strike_number, snapshot_url, metadata, created_at")
+      .eq("session_id", sessionId)
+      .order("created_at", { ascending: false });
+
+    // 3. Fetch submissions count & recent question progress
+    const { data: submissions } = await supabaseAdmin
+      .from("submissions")
+      .select("id, question_id, is_auto_graded, awarded_points, last_synced_at")
+      .eq("session_id", sessionId)
+      .order("last_synced_at", { ascending: false });
+
+    // 4. Fetch proctor actions / administrative audits
+    const { data: proctorActions } = await supabaseAdmin
+      .from("proctor_actions")
+      .select("id, session_id, proctor_id, action_type, reason, action_payload, created_at")
+      .eq("session_id", sessionId)
+      .order("created_at", { ascending: false });
+
+    return {
+      success: true,
+      session,
+      violations: violations || [],
+      submissions: submissions || [],
+      proctorActions: proctorActions || [],
+    };
+  } catch (err: any) {
+    return { error: err.message || "Failed to load candidate detailed log." };
+  }
+}
+
+
 
 
 

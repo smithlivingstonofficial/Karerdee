@@ -102,7 +102,7 @@ export async function getProctoringData(targetExamId?: string): Promise<Proctori
       submissionCounts.set(sub.session_id, (submissionCounts.get(sub.session_id) || 0) + 1);
     });
 
-    // 4. Fetch recent violation logs
+    // 4. Fetch recent violation logs & latest forensic snapshots
     const { data: rawViolations, error: violError } = await supabaseAdmin
       .from("violation_logs")
       .select(`
@@ -125,7 +125,42 @@ export async function getProctoringData(targetExamId?: string): Promise<Proctori
         )
       `)
       .order("created_at", { ascending: false })
-      .limit(60);
+      .limit(100);
+
+    // 4b. Fetch latest webcam snapshot per session
+    const { data: rawSnapshots } = await supabaseAdmin
+      .from("violation_logs")
+      .select("id, session_id, snapshot_url, created_at")
+      .not("snapshot_url", "is", null)
+      .order("created_at", { ascending: false })
+      .limit(300);
+
+    const latestSnapshotMap = new Map<string, { url: string; time: string; count: number }>();
+    if (rawSnapshots) {
+      for (const snap of rawSnapshots) {
+        if (!snap.session_id || !snap.snapshot_url) continue;
+        const existing = latestSnapshotMap.get(snap.session_id);
+        if (!existing) {
+          latestSnapshotMap.set(snap.session_id, {
+            url: snap.snapshot_url,
+            time: snap.created_at,
+            count: 1,
+          });
+        } else {
+          existing.count += 1;
+        }
+      }
+    }
+
+    const latestViolationMap = new Map<string, any>();
+    if (rawViolations) {
+      for (const v of rawViolations) {
+        if (!v.session_id) continue;
+        if (!latestViolationMap.has(v.session_id)) {
+          latestViolationMap.set(v.session_id, v);
+        }
+      }
+    }
 
     const lateEntryMap = new Map<string, any>();
 
@@ -167,6 +202,48 @@ export async function getProctoringData(targetExamId?: string): Promise<Proctori
         const dept = student.department || {};
         const exam = s.exam || {};
         const lateDetails = lateEntryMap.get(s.id);
+        const latestSnap = latestSnapshotMap.get(s.id);
+        const latestViol = latestViolationMap.get(s.id);
+        const subCount = submissionCounts.get(s.id) || 0;
+
+        let latestActionText = "Active in Examination Sitting";
+        let latestActionTime = s.started_at;
+        let latestActionType: "ANSWER" | "VIOLATION" | "SYSTEM" | "INQUIRY" | "PROCTOR" = "SYSTEM";
+
+        if (s.status === "SUBMITTED") {
+          latestActionText = `Exam Submitted (${subCount} answers recorded)`;
+          latestActionTime = s.submitted_at || s.started_at;
+          latestActionType = "ANSWER";
+        } else if (s.status === "LOCKED") {
+          latestActionText = latestViol?.violation_type
+            ? `Workstation Locked: ${latestViol.violation_type.replace(/_/g, " ")}`
+            : "Workstation Locked by Invigilator";
+          latestActionTime = latestViol?.created_at || s.updated_at || s.started_at;
+          latestActionType = "VIOLATION";
+        } else if (latestViol && new Date(latestViol.created_at).getTime() > new Date(s.started_at).getTime()) {
+          if (latestViol.violation_type === "PROCTOR_WARNING") {
+            latestActionText = "Proctor Warning Dispatched";
+            latestActionType = "PROCTOR";
+          } else if (latestViol.violation_type === "WINDOW_UNFOCUSED") {
+            latestActionText = "Window Focus Lost / Minimized";
+            latestActionType = "VIOLATION";
+          } else if (latestViol.violation_type === "SYSTEM_HOTKEY_ATTEMPT") {
+            latestActionText = "Blocked System HotKey (Alt+Tab/Win)";
+            latestActionType = "VIOLATION";
+          } else {
+            latestActionText = latestViol.violation_type.replace(/_/g, " ");
+            latestActionType = "VIOLATION";
+          }
+          latestActionTime = latestViol.created_at;
+        } else if (subCount > 0) {
+          latestActionText = `Progressing: ${subCount} Answers Saved`;
+          latestActionType = "ANSWER";
+          latestActionTime = s.updated_at || s.started_at;
+        } else {
+          latestActionText = "Sitting Active • Normal Behavior";
+          latestActionType = "SYSTEM";
+          latestActionTime = s.started_at;
+        }
 
         return {
           id: s.id,
@@ -187,10 +264,16 @@ export async function getProctoringData(targetExamId?: string): Promise<Proctori
           extraTimeMinutes: s.extra_time_minutes || 0,
           startedAt: s.started_at,
           updatedAt: s.submitted_at || s.started_at,
-          submissionsCount: submissionCounts.get(s.id) || 0,
+          submissionsCount: subCount,
           isPendingLateEntry: Boolean(lateDetails && s.status === "LOCKED"),
           lateEntryDetails: lateDetails || null,
           recentViolations: [],
+          latestSnapshotUrl: latestSnap?.url || null,
+          latestSnapshotTime: latestSnap?.time || null,
+          snapshotsCount: latestSnap?.count || 0,
+          latestActionText,
+          latestActionTime,
+          latestActionType,
         };
       });
     }
