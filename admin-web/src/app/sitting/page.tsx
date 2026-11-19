@@ -2620,12 +2620,12 @@ function CandidateSittingContent() {
                 </div>
 
                 {/* Prompt Text */}
-                <div className="text-sm font-semibold text-slate-900 leading-relaxed space-y-3">
-                  <MathText as="p" text={activeQuestion.prompt} />
+                <div className="text-[15px] font-semibold text-slate-900 leading-relaxed space-y-3 py-1">
+                  <MathText as="p" className="leading-relaxed" text={activeQuestion.prompt} />
 
                   {/* Code Snippet if applicable */}
                   {activeQuestion.codeSnippet && (
-                    <div className="p-3 bg-slate-900 text-emerald-400 font-mono text-xs rounded-xl overflow-x-auto shadow-2xs">
+                    <div className="p-3.5 bg-slate-900 text-emerald-400 font-mono text-xs rounded-xl overflow-x-auto shadow-2xs">
                       <pre>{activeQuestion.codeSnippet}</pre>
                     </div>
                   )}
@@ -2649,7 +2649,7 @@ function CandidateSittingContent() {
                             activeQuestion.questionType === "MCQ_MULTIPLE"
                           )
                         }
-                        className={`w-full text-left p-3.5 rounded-xl border text-xs font-medium transition-all flex items-center justify-between cursor-pointer ${
+                        className={`w-full text-left p-3.5 min-h-[46px] rounded-xl border text-xs sm:text-[13px] font-medium transition-all flex items-center justify-between cursor-pointer ${
                           isSelected
                             ? "bg-blue-50/80 border-blue-600 text-blue-950 font-semibold ring-1 ring-blue-600/20"
                             : "bg-white border-slate-200 text-slate-800 hover:bg-slate-50 hover:border-slate-300"
@@ -2665,7 +2665,7 @@ function CandidateSittingContent() {
                           >
                             {letter}
                           </span>
-                          <MathText as="span" className="leading-snug flex-1" text={opt.text} />
+                          <MathText as="span" className="leading-normal flex-1 text-slate-900" text={opt.text} />
                         </div>
                         {isSelected && (
                           <div className="w-5 h-5 rounded-full bg-blue-700 text-white flex items-center justify-center flex-shrink-0">

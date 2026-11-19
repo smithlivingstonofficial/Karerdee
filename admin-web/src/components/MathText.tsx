@@ -18,10 +18,13 @@ interface ParsedToken {
 
 /**
  * Converts Unicode mathematical symbols, superscripts, subscripts,
- * and notation patterns (like Pcr = π²EI/L², √(W/S), etc.) into valid LaTeX syntax.
+ * and notation patterns (like Pcr = π²EI/L², √(W/S), T = ṁ(Ve − V∞), etc.) into valid LaTeX syntax.
  */
 function unicodeToLatex(str: string): string {
   let s = str.trim();
+
+  // Normalize Unicode dashes (en-dash, em-dash, minus)
+  s = s.replace(/[\u2013\u2014\u2212]/g, " - ");
 
   // Greek letters mapping
   const greekMap: Record<string, string> = {
@@ -44,15 +47,15 @@ function unicodeToLatex(str: string): string {
     "ϕ": "\\phi ",
     "ψ": "\\psi ",
     "η": "\\eta ",
+    "φ": "\\phi ",
   };
   for (const [char, replacement] of Object.entries(greekMap)) {
     s = s.split(char).join(replacement);
   }
 
-  // Operators and special symbols
+  // Operators and special mathematical symbols
   const symbolMap: Record<string, string> = {
     "∞": "\\infty ",
-    "−": " - ",
     "×": " \\times ",
     "±": " \\pm ",
     "≠": " \\neq ",
@@ -63,45 +66,55 @@ function unicodeToLatex(str: string): string {
     "∫": "\\int ",
     "∑": "\\sum ",
     "∂": "\\partial ",
+    "→": " \\to ",
+    "∈": " \\in ",
+    "·": " \\cdot ",
+    "•": " \\cdot ",
   };
   for (const [char, replacement] of Object.entries(symbolMap)) {
     s = s.split(char).join(replacement);
   }
 
-  // Superscripts (x² -> x^2)
-  const supMap: Record<string, string> = {
-    "⁰": "^0", "¹": "^1", "²": "^2", "³": "^3", "⁴": "^4",
-    "⁵": "^5", "⁶": "^6", "⁷": "^7", "⁸": "^8", "⁹": "^9",
-    "⁺": "^+", "⁻": "^-", "ⁿ": "^n",
-  };
-  for (const [char, replacement] of Object.entries(supMap)) {
-    s = s.split(char).join(replacement);
-  }
+  // Multi-character superscripts like ⁻³, ⁻², ⁺¹, ², ³, etc.
+  s = s.replace(/([⁰¹²³⁴⁵⁶⁷⁸⁹⁺⁻ⁿ]+)/g, (match) => {
+    const charMap: Record<string, string> = {
+      "⁰": "0", "¹": "1", "²": "2", "³": "3", "⁴": "4",
+      "⁵": "5", "⁶": "6", "⁷": "7", "⁸": "8", "⁹": "9",
+      "⁺": "+", "⁻": "-", "ⁿ": "n",
+    };
+    const mapped = match.split("").map((c) => charMap[c] || c).join("");
+    return `^{${mapped}}`;
+  });
 
-  // Subscripts (x₀ -> x_0)
-  const subMap: Record<string, string> = {
-    "₀": "_0", "₁": "_1", "₂": "_2", "₃": "_3", "₄": "_4",
-    "₅": "_5", "₆": "_6", "₇": "_7", "₈": "_8", "₉": "_9",
-    "₊": "_+", "₋": "_-",
-  };
-  for (const [char, replacement] of Object.entries(subMap)) {
-    s = s.split(char).join(replacement);
-  }
+  // Multi-character subscripts like ₀, ₁, ₂, ₓ, etc.
+  s = s.replace(/([₀₁₂₃₄₅₆₇₈₉₊₋ₓ]+)/g, (match) => {
+    const charMap: Record<string, string> = {
+      "₀": "0", "₁": "1", "₂": "2", "₃": "3", "₄": "4",
+      "₅": "5", "₆": "6", "₇": "7", "₈": "8", "₉": "9",
+      "₊": "+", "₋": "-", "ₓ": "x",
+    };
+    const mapped = match.split("").map((c) => charMap[c] || c).join("");
+    return `_{${mapped}}`;
+  });
 
-  // Square roots: √(expr) -> \sqrt{expr} and √x -> \sqrt{x}
+  // Square roots: √(expr) -> \sqrt{expr} and √x, √2, √8 -> \sqrt{x}, \sqrt{2}
   s = s.replace(/√\(([^)]+)\)/g, (_, expr) => `\\sqrt{${expr}}`);
-  s = s.replace(/√([a-zA-Z\\]+)/g, (_, expr) => `\\sqrt{${expr}}`);
+  s = s.replace(/√([0-9a-zA-Z\\]+)/g, (_, expr) => `\\sqrt{${expr}}`);
 
-  // Domain-specific acronym subscripts commonly found in aerospace/mechanics
+  // Domain-specific acronym subscripts commonly found in engineering/mechanics
   s = s.replace(/\bPcr\b/g, "P_{cr}");
   s = s.replace(/\bVe\b/g, "V_e");
-  s = s.replace(/\bV_e\s*-\s*V\\infty/g, "V_e - V_\\infty");
-  s = s.replace(/\bV\\infty\b/g, "V_\\infty");
+  s = s.replace(/\bV_e\s*-\s*V\\infty/g, "V_e - V_{\\infty}");
+  s = s.replace(/\bV\\infty\b/g, "V_{\\infty}");
+  s = s.replace(/V_\\infty/g, "V_{\\infty}");
   s = s.replace(/\bδt\b/g, "\\delta_t");
   s = s.replace(/\bIsp\b/g, "I_{sp}");
 
   // Exponential functions e^(at) -> e^{at}
   s = s.replace(/e\^\(([^)]+)\)/g, (_, expr) => `e^{${expr}}`);
+
+  // Handle trailing scientific units like " J", " m/s", " eV"
+  s = s.replace(/\s+([A-Za-z]+)$/, (_, unit) => ` \\text{ ${unit}}`);
 
   return s;
 }
@@ -147,7 +160,7 @@ function parseTextToTokens(text: string): ParsedToken[] {
     /^[a-zA-Z0-9_\^\\{}\s]+\/[a-zA-Z0-9_\^\\{}()+\-\s]+$/.test(trimmed) ||
     // Short mathematical terms without English prose words
     (!trimmed.split(/\s+/).some((w) => /^[a-zA-Z]{4,}$/.test(w)) &&
-      /[²³⁴⁰¹⁵⁶⁷⁸⁹πδρṁ√∮∫∞±×÷^]/.test(trimmed));
+      /[²³⁴⁰¹⁵⁶⁷⁸⁹⁺⁻ⁿ₀₁₂₃₄₅₆₇₈₉πδρṁ√∮∫∞±×÷^]/.test(trimmed));
 
   if (isPureFormula) {
     return [{ type: "math", content: unicodeToLatex(trimmed), isDisplay: false }];
@@ -155,7 +168,7 @@ function parseTextToTokens(text: string): ParsedToken[] {
 
   // 3. Mixed prose with embedded formulas (e.g. "Proportional to √(W/S)")
   const embeddedMathRegex =
-    /(?:[A-Za-z]\([a-z]\)\s*=\s*[^\s,;]+|√\([^)]+\)|√[a-zA-Zπδρ]+|∮_[a-zA-Z0-9]\s*\([^)]+\)\s*dz|V∞|δt|[a-zA-Z0-9_\^]+\/[a-zA-Z0-9_\^()+\-]+|[0-9]*[πδρ][a-zA-Z0-9²³⁴]*|[a-zA-Z0-9]+[²³⁴⁰¹⁵⁶⁷⁸⁹]+)/g;
+    /(?:[A-Za-z]\([a-z]\)\s*=\s*[^\s,;]+|√\([^)]+\)|√[0-9a-zA-Zπδρ]+|∮_[a-zA-Z0-9]\s*\([^)]+\)\s*dz|V∞|V_{\\infty}|δt|[a-zA-Z0-9_\^]+\/[a-zA-Z0-9_\^()+\-]+|[0-9]*[πδρ][a-zA-Z0-9²³⁴]*|[a-zA-Z0-9]+[²³⁴⁰¹⁵⁶⁷⁸⁹]+)/g;
 
   if (embeddedMathRegex.test(text)) {
     embeddedMathRegex.lastIndex = 0;
@@ -187,11 +200,11 @@ function RenderMathChunk({ content, isDisplay }: { content: string; isDisplay?: 
     try {
       return katex.renderToString(content, {
         displayMode: Boolean(isDisplay),
-        throwOnError: false,
+        throwOnError: true,
         output: "htmlAndMathml",
       });
-    } catch (e) {
-      console.warn("KaTeX render error on content:", content, e);
+    } catch {
+      // Return null so we can render clean academic text fallback without red error boxes
       return null;
     }
   }, [content, isDisplay]);

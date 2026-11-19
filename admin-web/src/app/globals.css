@@ -87,9 +87,14 @@ code, kbd, samp, pre {
   font-size: 1.05em;
   color: var(--text-primary);
   text-rendering: auto;
+  line-height: 1.25;
 }
 
 .katex-html {
+  white-space: normal;
+}
+
+.katex-html > .base {
   white-space: nowrap;
 }
 
