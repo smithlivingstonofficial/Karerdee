@@ -2778,107 +2778,212 @@ function CandidateSittingContent() {
             {/* Left Column (7 cols): Comprehensive & Categorized Instructions */}
             <div className="lg:col-span-7 flex flex-col justify-between gap-2 min-h-0 lg:overflow-hidden">
               {/* Card 1: Question Paper Structure & Scoring */}
-              <div className="bg-slate-50/80 border border-slate-200/90 rounded-xl p-3 space-y-2 shadow-2xs text-xs">
-                <h3 className="font-bold text-slate-900 flex items-center text-xs sm:text-sm">
-                  <BookOpen className="w-4 h-4 mr-1.5 text-blue-700" />
-                  1. Question Paper Pattern &amp; Scoring Scheme
-                </h3>
-                <div className="grid grid-cols-2 gap-2 text-xs">
-                  <div className="p-2 rounded-lg bg-white border border-slate-200/80">
-                    <span className="font-bold text-slate-800 block text-xs">Part A — General Aptitude (25 Qs)</span>
-                    <span className="text-slate-600 text-[11px] leading-tight block mt-0.5">Research Methodology, Logical Reasoning &amp; Quantitative Skills (Common).</span>
+              <div className="bg-slate-50/80 border border-slate-200/90 rounded-xl p-3 sm:p-3.5 space-y-2.5 shadow-2xs text-xs">
+                {/* Title & Meta Header */}
+                <div className="flex items-center justify-between border-b border-slate-200/70 pb-2">
+                  <h3 className="font-bold text-slate-900 flex items-center text-xs sm:text-sm">
+                    <BookOpen className="w-4 h-4 mr-1.5 text-blue-700" />
+                    1. Question Paper Pattern &amp; Scoring Scheme
+                  </h3>
+                  <span className="text-[10px] font-bold text-blue-700 bg-blue-50 border border-blue-200 px-2.5 py-0.5 rounded-full">
+                    50 Questions • 50.0 Total Marks
+                  </span>
+                </div>
+
+                {/* Part A & Part B Split Grid */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                  {/* Part A Card */}
+                  <div className="p-2.5 rounded-xl bg-white border border-slate-200 shadow-2xs space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-bold text-blue-700 bg-blue-50 px-2 py-0.2 rounded border border-blue-200 uppercase tracking-wider">
+                        Part A • Common
+                      </span>
+                      <span className="text-[10px] font-semibold text-slate-500">
+                        Q01 – Q25 • 25 Marks
+                      </span>
+                    </div>
+                    <div className="font-bold text-slate-900 text-xs pt-0.5">
+                      Research Methodology &amp; Quantitative Aptitude
+                    </div>
+                    <p className="text-[11px] text-slate-600 leading-tight">
+                      Research methodology, logical reasoning, data interpretation, and quantitative skills common to all candidates.
+                    </p>
                   </div>
-                  <div className="p-2 rounded-lg bg-white border border-slate-200/80">
-                    <span className="font-bold text-slate-800 block text-xs">Part B — Core Specialization (25 Qs)</span>
-                    <span className="text-slate-600 text-[11px] leading-tight block mt-0.5">Advanced domain questions mapped to your major (<strong>{candidate?.department || "Department"}</strong>).</span>
+
+                  {/* Part B Card */}
+                  <div className="p-2.5 rounded-xl bg-white border border-slate-200 shadow-2xs space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 px-2 py-0.2 rounded border border-indigo-200 uppercase tracking-wider">
+                        Part B • Specialization
+                      </span>
+                      <span className="text-[10px] font-semibold text-slate-500">
+                        Q26 – Q50 • 25 Marks
+                      </span>
+                    </div>
+                    <div className="font-bold text-slate-900 text-xs pt-0.5 flex items-center space-x-1.5 truncate">
+                      <span>Core Subject:</span>
+                      <span className="text-blue-700 font-bold underline decoration-blue-300">
+                        {candidate?.department || "Major Track"}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-600 leading-tight">
+                      Advanced domain-specific questions tailored exclusively for your registered department specialization.
+                    </p>
                   </div>
                 </div>
-                <div className="space-y-1 text-xs text-slate-600 pt-0.5">
-                  <div className="flex items-center space-x-1.5">
-                    <span className="font-bold text-blue-700">•</span>
-                    <span><strong>Marks per Question:</strong> You receive <strong>+1.0 Mark</strong> for every correct answer (Total: 50.0 Marks).</span>
+
+                {/* Scoring & Navigation Policies (Structured Feature List) */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-0.5 text-xs">
+                  {/* Item 1: Marks per question */}
+                  <div className="p-2 rounded-lg bg-white border border-slate-200/80 space-y-0.5">
+                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
+                      Marking Scheme
+                    </span>
+                    <span className="font-bold text-slate-900 block text-xs">
+                      +1.0 Mark / Question
+                    </span>
+                    <span className="text-[10.5px] text-slate-600 leading-tight block">
+                      1 mark for every correct answer (Total: 50.0).
+                    </span>
                   </div>
-                  <div className="flex items-center space-x-1.5">
-                    <span className="font-bold text-blue-700">•</span>
-                    {exam?.enableNegativeMarking ? (
-                      <span className="text-amber-800 font-semibold">⚠️ <strong>Negative Marking:</strong> 0.25 Mark deducted per incorrect answer. Unanswered questions incur zero penalty.</span>
-                    ) : (
-                      <span className="text-emerald-700 font-semibold">✅ <strong>No Negative Marking:</strong> Zero penalty for incorrect answers. You are encouraged to attempt all 50 questions!</span>
-                    )}
+
+                  {/* Item 2: Negative Marking */}
+                  <div
+                    className={`p-2 rounded-lg border space-y-0.5 ${
+                      exam?.enableNegativeMarking
+                        ? "bg-amber-50/70 border-amber-200"
+                        : "bg-emerald-50/70 border-emerald-200"
+                    }`}
+                  >
+                    <span
+                      className={`text-[10px] font-bold uppercase tracking-wider block ${
+                        exam?.enableNegativeMarking ? "text-amber-800" : "text-emerald-800"
+                      }`}
+                    >
+                      Negative Marking
+                    </span>
+                    <span
+                      className={`font-bold block text-xs ${
+                        exam?.enableNegativeMarking ? "text-amber-900" : "text-emerald-900"
+                      }`}
+                    >
+                      {exam?.enableNegativeMarking ? "0.25 Penalty" : "Zero Penalty (0.0)"}
+                    </span>
+                    <span
+                      className={`text-[10.5px] leading-tight block ${
+                        exam?.enableNegativeMarking ? "text-amber-800" : "text-emerald-800"
+                      }`}
+                    >
+                      {exam?.enableNegativeMarking
+                        ? "0.25 deduction for wrong answers."
+                        : "No penalty. Attempt all 50 questions!"}
+                    </span>
                   </div>
-                  <div className="flex items-center space-x-1.5">
-                    <span className="font-bold text-blue-700">•</span>
-                    <span><strong>Free Navigation:</strong> You can move forward, backward, mark questions for review, and change your answers anytime before final submission.</span>
+
+                  {/* Item 3: Navigation Freedom */}
+                  <div className="p-2 rounded-lg bg-white border border-slate-200/80 space-y-0.5">
+                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
+                      Question Navigation
+                    </span>
+                    <span className="font-bold text-slate-900 block text-xs">
+                      Free Jump &amp; Review
+                    </span>
+                    <span className="text-[10.5px] text-slate-600 leading-tight block">
+                      Switch between Part A &amp; B and edit anytime.
+                    </span>
                   </div>
                 </div>
               </div>
 
-              {/* Card 2: Essential Examination Rules & Anti-Cheat Protocols */}
-              <div className="bg-slate-50/80 border border-slate-200/90 rounded-xl p-3 space-y-2 shadow-2xs text-xs">
-                <h3 className="font-bold text-slate-900 flex items-center text-xs sm:text-sm">
-                  <ShieldCheck className="w-4 h-4 mr-1.5 text-blue-700" />
-                  2. Essential Examination Rules &amp; Anti-Cheat Regulations
-                </h3>
+              {/* Card 2: Essential Examination Rules & Candidate Safeguards */}
+              <div className="bg-slate-50/80 border border-slate-200/90 rounded-xl p-3 sm:p-3.5 space-y-2.5 shadow-2xs text-xs">
+                {/* Header & Meta */}
+                <div className="flex items-center justify-between border-b border-slate-200/70 pb-2">
+                  <h3 className="font-bold text-slate-900 flex items-center text-xs sm:text-sm">
+                    <ShieldCheck className="w-4 h-4 mr-1.5 text-blue-700" />
+                    2. Essential Examination Rules &amp; Anti-Cheat Regulations
+                  </h3>
+                  <span className="text-[10px] font-bold text-blue-700 bg-blue-50 border border-blue-200 px-2.5 py-0.5 rounded-full">
+                    Strict Proctoring Enforced
+                  </span>
+                </div>
+
+                {/* 4 Core Rules (2x2 Grid) */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs leading-snug">
-                  <div className="flex items-start space-x-2 p-2 rounded-lg bg-white border border-slate-200/80">
+                  {/* Rule 1: Fullscreen */}
+                  <div className="flex items-start space-x-2 p-2.5 rounded-xl bg-white border border-slate-200/80 shadow-2xs">
                     <span className="text-emerald-600 font-bold text-sm shrink-0">✔</span>
-                    <div>
+                    <div className="space-y-0.5">
                       <strong className="text-slate-800 block text-xs">Mandatory Fullscreen Mode</strong>
-                      <span className="text-slate-600 text-[11px]">Do not press <code className="bg-slate-100 px-1 py-0.2 rounded text-[10px]">Alt+Tab</code>, switch tabs, or minimize the browser. Doing so records an infraction strike.</span>
+                      <p className="text-slate-600 text-[11px] leading-tight">
+                        Exam operates in fullscreen. Switching tabs, minimizing windows, or pressing <kbd className="bg-slate-100 text-slate-700 px-1 py-0.2 rounded font-mono text-[10px] border border-slate-200">Alt+Tab</kbd> records an infraction strike.
+                      </p>
                     </div>
                   </div>
-                  <div className="flex items-start space-x-2 p-2 rounded-lg bg-white border border-slate-200/80">
+
+                  {/* Rule 2: Face Centered */}
+                  <div className="flex items-start space-x-2 p-2.5 rounded-xl bg-white border border-slate-200/80 shadow-2xs">
                     <span className="text-emerald-600 font-bold text-sm shrink-0">✔</span>
-                    <div>
+                    <div className="space-y-0.5">
                       <strong className="text-slate-800 block text-xs">Keep Face Centered in Camera</strong>
-                      <span className="text-slate-600 text-[11px]">Sit upright in clear lighting. If your face leaves the camera frame for over 10 seconds, a security strike is recorded.</span>
+                      <p className="text-slate-600 text-[11px] leading-tight">
+                        Sit upright in clear lighting. If your face leaves the webcam frame for over 10 seconds, a security strike is logged automatically.
+                      </p>
                     </div>
                   </div>
-                  <div className="flex items-start space-x-2 p-2 rounded-lg bg-white border border-slate-200/80">
+
+                  {/* Rule 3: No Refresh or Exit */}
+                  <div className="flex items-start space-x-2 p-2.5 rounded-xl bg-white border border-slate-200/80 shadow-2xs">
                     <span className="text-red-600 font-bold text-sm shrink-0">✖</span>
-                    <div>
+                    <div className="space-y-0.5">
                       <strong className="text-slate-800 block text-xs">Do Not Refresh or Exit</strong>
-                      <span className="text-slate-600 text-[11px]">Do not press <code className="bg-slate-100 px-1 py-0.2 rounded text-[10px]">F5</code> or <code className="bg-slate-100 px-1 py-0.2 rounded text-[10px]">Ctrl+R</code>. Shortcut keys are locked to prevent loss of your exam session.</span>
+                      <p className="text-slate-600 text-[11px] leading-tight">
+                        Do not press <kbd className="bg-slate-100 text-slate-700 px-1 py-0.2 rounded font-mono text-[10px] border border-slate-200">F5</kbd> or <kbd className="bg-slate-100 text-slate-700 px-1 py-0.2 rounded font-mono text-[10px] border border-slate-200">Ctrl+R</kbd>. Browser navigation and reload keys are locked to safeguard your exam progress.
+                      </p>
                     </div>
                   </div>
-                  <div className="flex items-start space-x-2 p-2 rounded-lg bg-white border border-slate-200/80">
+
+                  {/* Rule 4: Work Alone */}
+                  <div className="flex items-start space-x-2 p-2.5 rounded-xl bg-white border border-slate-200/80 shadow-2xs">
                     <span className="text-red-600 font-bold text-sm shrink-0">✖</span>
-                    <div>
+                    <div className="space-y-0.5">
                       <strong className="text-slate-800 block text-xs">Work Strictly Alone</strong>
-                      <span className="text-slate-600 text-[11px]">Mobile phones, second monitors, smartwatches, external notes, and other persons in the room are prohibited.</span>
+                      <p className="text-slate-600 text-[11px] leading-tight">
+                        Mobile phones, secondary screens, smartwatches, notes, calculators, and other persons in the examination room are strictly prohibited.
+                      </p>
                     </div>
                   </div>
                 </div>
-              </div>
 
-              {/* Card 3: Automatic Saving & Invigilator Help */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-                {/* Auto-Save & Network */}
-                <div className="bg-slate-50/80 border border-slate-200/90 rounded-xl p-2.5 sm:p-3 space-y-1 shadow-2xs">
-                  <h4 className="font-bold text-slate-900 flex items-center text-xs">
-                    <CheckCircle2 className="w-3.5 h-3.5 mr-1 text-emerald-600" />
-                    Automatic Answer Saving
-                  </h4>
-                  <p className="text-[11px] text-slate-600 leading-relaxed">
-                    Every answer is saved instantly. If your internet disconnects temporarily, your answers stay safe on your computer and sync as soon as you reconnect.
-                  </p>
-                </div>
+                {/* Integrated Safeguards: Auto-Save & Invigilator Helpdesk */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-0.5 text-xs">
+                  {/* Auto-Save */}
+                  <div className="p-2 rounded-lg bg-white border border-slate-200/80 flex items-start space-x-2">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5" />
+                    <div>
+                      <strong className="text-slate-800 block text-[11px]">Automatic Answer Saving</strong>
+                      <span className="text-slate-600 text-[10.5px] leading-tight block">
+                        Answers save instantly. If your internet disconnects, progress stays safe locally and syncs automatically.
+                      </span>
+                    </div>
+                  </div>
 
-                {/* Built-in Aids & Helpdesk */}
-                <div className="bg-slate-50/80 border border-slate-200/90 rounded-xl p-2.5 sm:p-3 space-y-1 shadow-2xs">
-                  <h4 className="font-bold text-slate-900 flex items-center text-xs">
-                    <HelpCircle className="w-3.5 h-3.5 mr-1 text-blue-700" />
-                    Invigilator Helpdesk
-                  </h4>
-                  <p className="text-[11px] text-slate-600 leading-relaxed">
-                    If you have any doubt or technical issue during the exam, click the <strong>Helpdesk</strong> button at the top right to message the invigilator in real time.
-                  </p>
+                  {/* Helpdesk */}
+                  <div className="p-2 rounded-lg bg-white border border-slate-200/80 flex items-start space-x-2">
+                    <HelpCircle className="w-3.5 h-3.5 text-blue-700 shrink-0 mt-0.5" />
+                    <div>
+                      <strong className="text-slate-800 block text-[11px]">Invigilator Live Helpdesk</strong>
+                      <span className="text-slate-600 text-[10.5px] leading-tight block">
+                        Need assistance or have a technical doubt? Click <strong>Helpdesk</strong> at the top right to message the proctor live.
+                      </span>
+                    </div>
+                  </div>
                 </div>
               </div>
 
               {/* Examiner Specific Notes (if any configured) */}
               {exam?.instructions && (
-                <div className="p-2.5 bg-blue-50/70 border border-blue-200/80 rounded-xl space-y-0.5 text-xs">
+                <div className="p-2.5 bg-blue-50/70 border border-blue-200/80 rounded-xl space-y-0.5 text-xs shrink-0">
                   <span className="font-bold text-blue-950 flex items-center text-xs">
                     <Sparkles className="w-3.5 h-3.5 mr-1 text-blue-700" />
                     Special Guidelines from the Examination Committee:
@@ -2893,8 +2998,8 @@ function CandidateSittingContent() {
             {/* Right Column (5 cols): Pre-Exam Live Webcam Diagnostics & Environment Checklist */}
             <div className="lg:col-span-5 flex flex-col justify-between gap-2 min-h-0 lg:overflow-hidden">
               {/* Webcam Calibration Card */}
-              <div className="bg-slate-50 border border-slate-200/90 rounded-xl p-3 space-y-2.5 flex-1 flex flex-col justify-between min-h-0">
-                <div className="flex items-center justify-between border-b border-slate-200 pb-2 shrink-0">
+              <div className="bg-slate-50 border border-slate-200/90 rounded-xl p-3 space-y-2 flex-1 flex flex-col justify-between min-h-0">
+                <div className="flex items-center justify-between border-b border-slate-200/80 pb-1.5 shrink-0">
                   <span className="text-xs sm:text-sm font-bold text-slate-900 flex items-center">
                     <Camera className="w-4 h-4 mr-1.5 text-blue-700" />
                     Webcam &amp; Diagnostics Check
@@ -2915,8 +3020,8 @@ function CandidateSittingContent() {
                   </span>
                 </div>
 
-                {/* Live Video Preview Box */}
-                <div className="relative rounded-xl overflow-hidden bg-slate-950 h-32 sm:h-36 border border-slate-200 shadow-inner flex items-center justify-center shrink-0">
+                {/* Live Video Preview Box in Original 4:3 Ratio */}
+                <div className="relative rounded-xl overflow-hidden bg-slate-950 aspect-[4/3] w-full max-w-[280px] sm:max-w-[290px] mx-auto border border-slate-300/80 shadow-md flex items-center justify-center shrink-0">
                   <video
                     ref={instructionsVideoRef}
                     autoPlay
@@ -2942,54 +3047,86 @@ function CandidateSittingContent() {
                   )}
 
                   {isCameraActive && (
-                    <div className="absolute top-2 left-2 px-2.5 py-0.5 rounded-full bg-slate-900/80 text-emerald-300 border border-emerald-500/40 text-[10px] font-bold flex items-center space-x-1.5 backdrop-blur-xs">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                      <span>LIVE FEED • 640x480</span>
-                    </div>
+                    <>
+                      {/* Top Overlay Badge */}
+                      <div className="absolute top-2 left-2 px-2.5 py-0.5 rounded-full bg-slate-900/80 text-emerald-300 border border-emerald-500/40 text-[10px] font-bold flex items-center space-x-1.5 backdrop-blur-xs">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                        <span>LIVE FEED • 640x480</span>
+                      </div>
+
+                      {/* Proctor Framing Target Markers */}
+                      <div className="absolute inset-4 pointer-events-none border border-white/20 rounded-lg border-dashed flex items-center justify-center">
+                        <span className="text-[9px] text-white/40 font-mono tracking-wider uppercase">
+                          Center Face Here
+                        </span>
+                      </div>
+                    </>
                   )}
                 </div>
 
-                {/* Pre-Flight Checklist */}
-                <div className="space-y-1.5 text-xs">
-                  <div className="flex items-center justify-between px-3 py-1.5 rounded-lg bg-white border border-slate-200/80">
-                    <span className="text-slate-600 font-medium">Video Capture Device:</span>
+                {/* Pre-Flight Diagnostics Strip */}
+                <div className="bg-white border border-slate-200 rounded-xl divide-y divide-slate-100 text-xs shadow-2xs">
+                  <div className="flex items-center justify-between px-3 py-1.5">
+                    <span className="text-slate-600 font-medium flex items-center">
+                      <Camera className="w-3.5 h-3.5 mr-1.5 text-slate-400" />
+                      Video Capture Device:
+                    </span>
                     <span className="font-semibold text-slate-900 truncate max-w-[170px]">
-                      {cameraDeviceLabel}
+                      {cameraDeviceLabel || "Integrated Webcam"}
                     </span>
                   </div>
 
-                  <div className="flex items-center justify-between px-3 py-1.5 rounded-lg bg-white border border-slate-200/80">
-                    <span className="text-slate-600 font-medium">Fullscreen Security:</span>
-                    <span className="font-semibold text-blue-700">Enforced on Start</span>
+                  <div className="flex items-center justify-between px-3 py-1.5">
+                    <span className="text-slate-600 font-medium flex items-center">
+                      <Maximize2 className="w-3.5 h-3.5 mr-1.5 text-slate-400" />
+                      Fullscreen Security:
+                    </span>
+                    <span className="font-semibold text-blue-700 bg-blue-50 px-2 py-0.2 rounded text-[11px] border border-blue-200">
+                      Enforced on Start
+                    </span>
                   </div>
 
-                  <div className="flex items-center justify-between px-3 py-1.5 rounded-lg bg-white border border-slate-200/80">
-                    <span className="text-slate-600 font-medium">Network Connection:</span>
-                    <span className="font-semibold text-emerald-700 flex items-center">
-                      <Wifi className="w-3.5 h-3.5 mr-1 text-emerald-600" />
+                  <div className="flex items-center justify-between px-3 py-1.5">
+                    <span className="text-slate-600 font-medium flex items-center">
+                      <Wifi className="w-3.5 h-3.5 mr-1.5 text-slate-400" />
+                      Network Connection:
+                    </span>
+                    <span className="font-semibold text-emerald-700 flex items-center bg-emerald-50 px-2 py-0.2 rounded text-[11px] border border-emerald-200">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1.5 animate-pulse" />
                       Connected &amp; Synced
                     </span>
                   </div>
                 </div>
               </div>
 
-              {/* Sitting Environment Readiness Checklist */}
-              <div className="bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 space-y-1.5 text-xs shadow-2xs shrink-0">
-                <span className="font-bold text-slate-900 flex items-center text-xs">
-                  <UserCheck className="w-4 h-4 mr-1.5 text-blue-700" />
-                  Desk &amp; Room Checklist
-                </span>
+              {/* Workstation Readiness Checklist */}
+              <div className="bg-white border border-slate-200 rounded-xl p-2.5 sm:p-3 space-y-1.5 text-xs shadow-2xs shrink-0">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-1">
+                  <span className="font-bold text-slate-900 flex items-center text-xs">
+                    <UserCheck className="w-4 h-4 mr-1.5 text-blue-700" />
+                    Desk &amp; Room Checklist
+                  </span>
+                  <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.2 rounded-full">
+                    Pre-Sitting Verified
+                  </span>
+                </div>
                 <ul className="space-y-1 text-xs text-slate-600">
                   <li className="flex items-center space-x-2">
-                    <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                    <div className="w-3.5 h-3.5 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
+                      <Check className="w-2.5 h-2.5 stroke-[3]" />
+                    </div>
                     <span>Sit in a quiet, private room with no background noise.</span>
                   </li>
                   <li className="flex items-center space-x-2">
-                    <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                    <div className="w-3.5 h-3.5 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
+                      <Check className="w-2.5 h-2.5 stroke-[3]" />
+                    </div>
                     <span>Desk is cleared of books, papers, and mobile phones.</span>
                   </li>
                   <li className="flex items-center space-x-2">
-                    <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                    <div className="w-3.5 h-3.5 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
+                      <Check className="w-2.5 h-2.5 stroke-[3]" />
+                    </div>
                     <span>Webcam is facing directly forward with clear lighting.</span>
                   </li>
                 </ul>
