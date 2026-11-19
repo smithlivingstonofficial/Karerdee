@@ -4,7 +4,17 @@ import React, { useState } from "react";
 import Link from "next/link";
 import { QuestionModal } from "./QuestionModal";
 import { BulkQuestionCsvModal } from "./BulkQuestionCsvModal";
-import { deleteQuestionAction } from "../actions";
+import { BulkDeleteConfirmModal } from "./BulkDeleteConfirmModal";
+import { BulkReassignScopeModal } from "./BulkReassignScopeModal";
+import { exportQuestionsToCsv } from "@/lib/exportQuestionsCsv";
+import {
+  deleteQuestionAction,
+  bulkDeleteQuestionsAction,
+  bulkUpdateQuestionsScopeAction,
+  bulkUpdateQuestionsDifficultyAction,
+  bulkUpdateQuestionsFormatAction,
+  duplicateQuestionAction,
+} from "../actions";
 import { DepartmentQuestion, Department } from "@/types/database.types";
 import {
   BookOpen,
@@ -22,7 +32,16 @@ import {
   Check,
   CheckCheck,
   Globe,
-  ChevronRight
+  ChevronRight,
+  Copy,
+  Download,
+  ArrowRightLeft,
+  Sliders,
+  CheckSquare,
+  Square,
+  MinusSquare,
+  X,
+  Loader2,
 } from "lucide-react";
 
 interface QuestionsClientViewProps {
@@ -43,6 +62,12 @@ export function QuestionsClientView({
   const [csvModalOpen, setCsvModalOpen] = useState(false);
   const [editingQuestion, setEditingQuestion] = useState<DepartmentQuestion | null>(null);
   const [actionNotice, setActionNotice] = useState<{ type: "success" | "error"; message: string } | null>(null);
+
+  // Multi-question selection & batch management state
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkDeleteModalOpen, setBulkDeleteModalOpen] = useState(false);
+  const [bulkReassignModalOpen, setBulkReassignModalOpen] = useState(false);
+  const [isBulkOperating, setIsBulkOperating] = useState(false);
 
   // Extract unique topics
   const topics = Array.from(new Set(initialQuestions.map((q) => q.topic || "General"))).sort();
@@ -97,8 +122,157 @@ export function QuestionsClientView({
     if (res.error) {
       setActionNotice({ type: "error", message: res.error });
     } else {
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
       setActionNotice({ type: "success", message: "Question removed from master repository." });
     }
+  }
+
+  // Multi-Selection Logic
+  function toggleSelect(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  }
+
+  const isAllFilteredSelected = filtered.length > 0 && filtered.every((q) => selectedIds.has(q.id));
+  const isSomeFilteredSelected = filtered.some((q) => selectedIds.has(q.id)) && !isAllFilteredSelected;
+
+  function toggleSelectAllFiltered() {
+    if (isAllFilteredSelected) {
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        filtered.forEach((q) => next.delete(q.id));
+        return next;
+      });
+    } else {
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        filtered.forEach((q) => next.add(q.id));
+        return next;
+      });
+    }
+  }
+
+  function clearSelection() {
+    setSelectedIds(new Set());
+  }
+
+  // Question Duplication
+  async function handleDuplicate(id: string) {
+    setActionNotice(null);
+    setIsBulkOperating(true);
+    const res = await duplicateQuestionAction(id);
+    setIsBulkOperating(false);
+    if (res.error) {
+      setActionNotice({ type: "error", message: res.error });
+    } else {
+      setActionNotice({ type: "success", message: "Question duplicated successfully." });
+    }
+  }
+
+  // Bulk Operations Handlers
+  async function handleBulkDeleteConfirm() {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+    setIsBulkOperating(true);
+    const res = await bulkDeleteQuestionsAction(ids);
+    setIsBulkOperating(false);
+    setBulkDeleteModalOpen(false);
+    if (res.error) {
+      setActionNotice({ type: "error", message: res.error });
+    } else {
+      clearSelection();
+      setActionNotice({
+        type: "success",
+        message: `Successfully deleted ${res.count || ids.length} questions from repository.`,
+      });
+    }
+  }
+
+  async function handleBulkReassign(targetScope: string) {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+    setIsBulkOperating(true);
+    let res;
+    if (targetScope === "GENERAL_EN") {
+      res = await bulkUpdateQuestionsScopeAction(ids, null, false);
+    } else if (targetScope === "GENERAL_TA") {
+      res = await bulkUpdateQuestionsScopeAction(ids, null, true);
+    } else {
+      res = await bulkUpdateQuestionsScopeAction(ids, targetScope, false);
+    }
+    setIsBulkOperating(false);
+    setBulkReassignModalOpen(false);
+    if (res.error) {
+      setActionNotice({ type: "error", message: res.error });
+    } else {
+      clearSelection();
+      setActionNotice({
+        type: "success",
+        message: `Successfully reassigned scope for ${res.count || ids.length} questions.`,
+      });
+    }
+  }
+
+  async function handleBulkDifficulty(diff: "EASY" | "MEDIUM" | "HARD") {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+    setIsBulkOperating(true);
+    const res = await bulkUpdateQuestionsDifficultyAction(ids, diff);
+    setIsBulkOperating(false);
+    if (res.error) {
+      setActionNotice({ type: "error", message: res.error });
+    } else {
+      setActionNotice({
+        type: "success",
+        message: `Updated difficulty to ${diff} for ${res.count || ids.length} questions.`,
+      });
+    }
+  }
+
+  async function handleBulkFormat(fmt: "MCQ_SINGLE" | "MCQ_MULTIPLE") {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+    setIsBulkOperating(true);
+    const res = await bulkUpdateQuestionsFormatAction(ids, fmt);
+    setIsBulkOperating(false);
+    if (res.error) {
+      setActionNotice({ type: "error", message: res.error });
+    } else {
+      setActionNotice({
+        type: "success",
+        message: `Updated format to ${fmt === "MCQ_MULTIPLE" ? "Multi-Select" : "Single Choice"} for ${res.count || ids.length} questions.`,
+      });
+    }
+  }
+
+  // CSV Exports
+  function handleExportSelectedCsv() {
+    const questionsToExport = initialQuestions.filter((q) => selectedIds.has(q.id));
+    if (questionsToExport.length === 0) return;
+    exportQuestionsToCsv(questionsToExport, "GENERAL", `selected_${questionsToExport.length}_questions`);
+  }
+
+  function handleExportFilteredCsv() {
+    if (filtered.length === 0) return;
+    let prefix = "master_questions";
+    if (selectedScope === "GENERAL_TA") prefix = "common_tamil_questions";
+    else if (selectedScope === "GENERAL_EN" || selectedScope === "GENERAL") prefix = "general_core_questions";
+    else if (selectedScope !== "ALL") {
+      const dept = departments.find((d) => d.id === selectedScope);
+      prefix = dept ? `${dept.code}_questions` : "department_questions";
+    }
+    exportQuestionsToCsv(filtered, "GENERAL", prefix);
   }
 
   function handleOpenCreate(type: "MCQ_SINGLE" | "MCQ_MULTIPLE" = "MCQ_SINGLE") {
@@ -326,72 +500,117 @@ export function QuestionsClientView({
 
       {/* Filter and Search Bar */}
       <div className="bg-white border border-slate-200/90 rounded-2xl p-3 sm:p-4 shadow-xs space-y-3">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-          {/* Search Box */}
-          <div className="relative flex-1 max-w-md">
-            <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-            <input
-              type="text"
-              placeholder="Search by prompt, topic, code, or option..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-9 pr-7 py-1.5 text-xs bg-slate-50 hover:bg-white border border-slate-200 rounded-xl text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 focus:bg-white transition-all shadow-2xs"
-            />
-            {searchTerm && (
-              <button
-                type="button"
-                onClick={() => setSearchTerm("")}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 hover:text-slate-700 px-1 font-bold"
-              >
-                ✕
-              </button>
-            )}
-          </div>
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+          {/* Left: Quick Select & Search Box */}
+          <div className="flex items-center gap-2 flex-1">
+            {/* Quick Multi-Select Filtered Button */}
+            <button
+              type="button"
+              onClick={toggleSelectAllFiltered}
+              className={`px-2.5 py-1.5 rounded-xl text-xs font-semibold transition-all inline-flex items-center cursor-pointer whitespace-nowrap border shadow-2xs ${
+                isAllFilteredSelected
+                  ? "bg-blue-600 text-white border-blue-600"
+                  : selectedIds.size > 0
+                  ? "bg-blue-50 text-blue-700 border-blue-300"
+                  : "bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100"
+              }`}
+              title="Select or deselect all visible filtered questions"
+            >
+              {isAllFilteredSelected ? (
+                <CheckSquare className="w-3.5 h-3.5 mr-1.5 stroke-[2.5]" />
+              ) : selectedIds.size > 0 ? (
+                <MinusSquare className="w-3.5 h-3.5 mr-1.5 text-blue-600 stroke-[2.5]" />
+              ) : (
+                <Square className="w-3.5 h-3.5 mr-1.5 text-slate-400" />
+              )}
+              <span>
+                {selectedIds.size > 0
+                  ? `${selectedIds.size} Selected`
+                  : `Select All (${filtered.length})`}
+              </span>
+            </button>
 
-          {/* Format Filter */}
-          <div className="flex items-center space-x-2">
-            <span className="text-xs font-semibold text-slate-500">Format:</span>
-            <div className="inline-flex p-1 bg-slate-100/90 rounded-xl border border-slate-200/70 text-xs font-semibold text-slate-600">
-              {[
-                { id: "ALL", label: "ALL" },
-                { id: "MCQ_SINGLE", label: `Single (${singleChoiceCount})` },
-                { id: "MCQ_MULTIPLE", label: `Multi-Select (${multiChoiceCount})` },
-              ].map((fmt) => (
+            {/* Search Box */}
+            <div className="relative flex-1 max-w-md">
+              <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+              <input
+                type="text"
+                placeholder="Search by prompt, topic, code, or option..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-9 pr-7 py-1.5 text-xs bg-slate-50 hover:bg-white border border-slate-200 rounded-xl text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 focus:bg-white transition-all shadow-2xs"
+              />
+              {searchTerm && (
                 <button
-                  key={fmt.id}
                   type="button"
-                  onClick={() => setSelectedFormat(fmt.id as any)}
-                  className={`px-2.5 py-1 rounded-lg text-xs transition-all cursor-pointer ${
-                    selectedFormat === fmt.id
-                      ? "bg-white text-blue-700 shadow-xs font-bold border border-slate-200/60"
-                      : "text-slate-600 hover:text-slate-900 hover:bg-white/40 font-medium"
-                  }`}
+                  onClick={() => setSearchTerm("")}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 hover:text-slate-700 px-1 font-bold"
                 >
-                  {fmt.label}
+                  ✕
                 </button>
-              ))}
+              )}
             </div>
           </div>
 
-          {/* Difficulty Filter */}
-          <div className="flex items-center space-x-2">
-            <span className="text-xs font-semibold text-slate-500">Difficulty:</span>
-            <div className="inline-flex p-1 bg-slate-100/90 rounded-xl border border-slate-200/70 text-xs font-semibold text-slate-600">
-              {["ALL", "EASY", "MEDIUM", "HARD"].map((diff) => (
-                <button
-                  key={diff}
-                  type="button"
-                  onClick={() => setSelectedDifficulty(diff)}
-                  className={`px-3 py-1 rounded-lg text-xs transition-all cursor-pointer ${
-                    selectedDifficulty === diff
-                      ? "bg-white text-blue-700 shadow-xs font-bold border border-slate-200/60"
-                      : "text-slate-600 hover:text-slate-900 hover:bg-white/40 font-medium"
-                  }`}
-                >
-                  {diff}
-                </button>
-              ))}
+          {/* Right: Filters & Export CSV */}
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Format Filter */}
+            <div className="flex items-center space-x-1.5">
+              <span className="text-xs font-semibold text-slate-500">Format:</span>
+              <div className="inline-flex p-1 bg-slate-100/90 rounded-xl border border-slate-200/70 text-xs font-semibold text-slate-600">
+                {[
+                  { id: "ALL", label: "ALL" },
+                  { id: "MCQ_SINGLE", label: `Single (${singleChoiceCount})` },
+                  { id: "MCQ_MULTIPLE", label: `Multi (${multiChoiceCount})` },
+                ].map((fmt) => (
+                  <button
+                    key={fmt.id}
+                    type="button"
+                    onClick={() => setSelectedFormat(fmt.id as any)}
+                    className={`px-2 py-1 rounded-lg text-xs transition-all cursor-pointer ${
+                      selectedFormat === fmt.id
+                        ? "bg-white text-blue-700 shadow-xs font-bold border border-slate-200/60"
+                        : "text-slate-600 hover:text-slate-900 hover:bg-white/40 font-medium"
+                    }`}
+                  >
+                    {fmt.label}
+                  </button>
+                ))}
+              </div>
             </div>
+
+            {/* Difficulty Filter */}
+            <div className="flex items-center space-x-1.5">
+              <span className="text-xs font-semibold text-slate-500">Difficulty:</span>
+              <div className="inline-flex p-1 bg-slate-100/90 rounded-xl border border-slate-200/70 text-xs font-semibold text-slate-600">
+                {["ALL", "EASY", "MEDIUM", "HARD"].map((diff) => (
+                  <button
+                    key={diff}
+                    type="button"
+                    onClick={() => setSelectedDifficulty(diff)}
+                    className={`px-2.5 py-1 rounded-lg text-xs transition-all cursor-pointer ${
+                      selectedDifficulty === diff
+                        ? "bg-white text-blue-700 shadow-xs font-bold border border-slate-200/60"
+                        : "text-slate-600 hover:text-slate-900 hover:bg-white/40 font-medium"
+                    }`}
+                  >
+                    {diff}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Export Filtered CSV */}
+            <button
+              type="button"
+              onClick={handleExportFilteredCsv}
+              disabled={filtered.length === 0}
+              className="px-2.5 py-1.5 rounded-xl text-xs font-semibold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 transition-colors inline-flex items-center cursor-pointer shadow-2xs whitespace-nowrap disabled:opacity-40"
+              title={`Export all ${filtered.length} filtered questions to CSV`}
+            >
+              <Download className="w-3.5 h-3.5 mr-1 text-emerald-600" />
+              <span>Export CSV ({filtered.length})</span>
+            </button>
           </div>
         </div>
 
@@ -465,6 +684,7 @@ export function QuestionsClientView({
         {filtered.length > 0 ? (
           filtered.map((q, index) => {
             const isGeneral = !q.department_id;
+            const isSelected = selectedIds.has(q.id);
             const diffColor =
               q.difficulty === "EASY"
                 ? "bg-emerald-50 text-emerald-700 border-emerald-200"
@@ -475,11 +695,29 @@ export function QuestionsClientView({
             return (
               <div
                 key={q.id}
-                className="bg-white border border-slate-200/90 rounded-2xl p-4 sm:p-5 shadow-xs hover:border-slate-300 hover:shadow-sm transition-all space-y-3.5 group"
+                className={`bg-white border rounded-2xl p-4 sm:p-5 shadow-xs transition-all space-y-3.5 group ${
+                  isSelected
+                    ? "border-blue-400 ring-2 ring-blue-500/25 bg-blue-50/15 shadow-sm"
+                    : "border-slate-200/90 hover:border-slate-300 hover:shadow-sm"
+                }`}
               >
                 {/* Question Header */}
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-2.5 border-b border-slate-100">
                   <div className="flex flex-wrap items-center gap-2">
+                    {/* Selection Checkbox */}
+                    <button
+                      type="button"
+                      onClick={() => toggleSelect(q.id)}
+                      className={`w-6 h-6 rounded-lg flex items-center justify-center transition-all cursor-pointer border flex-shrink-0 ${
+                        isSelected
+                          ? "bg-blue-600 border-blue-600 text-white shadow-2xs"
+                          : "bg-white hover:bg-slate-100 border-slate-300 text-transparent hover:text-slate-300"
+                      }`}
+                      title={isSelected ? "Deselect question" : "Select question"}
+                    >
+                      <Check className="w-3.5 h-3.5 stroke-[3]" />
+                    </button>
+
                     <span className="w-6 h-6 rounded-lg bg-slate-100 text-slate-700 flex items-center justify-center font-mono font-bold text-xs border border-slate-200/80">
                       #{index + 1}
                     </span>
@@ -526,6 +764,15 @@ export function QuestionsClientView({
                     <span className="text-xs font-bold text-blue-700 bg-blue-50 px-2.5 py-1 rounded-lg border border-blue-200 shadow-2xs">
                       1 Mark {q.default_negative_points > 0 && `(-${q.default_negative_points})`}
                     </span>
+                    <button
+                      type="button"
+                      onClick={() => handleDuplicate(q.id)}
+                      disabled={isBulkOperating}
+                      className="p-1.5 rounded-lg text-slate-400 hover:text-slate-800 hover:bg-slate-100 border border-transparent hover:border-slate-200 transition-colors cursor-pointer"
+                      title="Duplicate Question"
+                    >
+                      <Copy className="w-3.5 h-3.5" />
+                    </button>
                     <button
                       type="button"
                       onClick={() => handleOpenEdit(q)}
@@ -644,6 +891,137 @@ export function QuestionsClientView({
         )}
       </div>
 
+      {/* Floating Batch Operations Toolbar */}
+      {selectedIds.size > 0 && (
+        <div className="fixed bottom-5 inset-x-0 mx-auto max-w-4xl z-40 px-4 animate-in slide-in-from-bottom-5">
+          <div className="bg-white/95 backdrop-blur-md border border-slate-300 shadow-2xl rounded-2xl p-2.5 sm:p-3 flex flex-wrap items-center justify-between gap-2.5">
+            {/* Left: Count & Select All */}
+            <div className="flex items-center space-x-2">
+              <span className="inline-flex items-center px-2.5 py-1 rounded-xl text-xs font-bold bg-blue-600 text-white shadow-xs">
+                <CheckCheck className="w-3.5 h-3.5 mr-1" />
+                {selectedIds.size} Selected
+              </span>
+              <button
+                type="button"
+                onClick={toggleSelectAllFiltered}
+                className="text-xs font-semibold text-slate-700 hover:text-blue-700 px-2 py-1 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
+              >
+                {isAllFilteredSelected ? "Deselect Filtered" : `Select All Filtered (${filtered.length})`}
+              </button>
+            </div>
+
+            {/* Right / Center: Batch Actions */}
+            <div className="flex flex-wrap items-center gap-1.5">
+              {/* Bulk Reassign Scope */}
+              <button
+                type="button"
+                onClick={() => setBulkReassignModalOpen(true)}
+                disabled={isBulkOperating}
+                className="inline-flex items-center px-2.5 py-1.5 rounded-xl text-xs font-semibold text-slate-800 bg-slate-100 hover:bg-slate-200 border border-slate-200 transition-colors cursor-pointer disabled:opacity-50"
+                title="Reassign scope (General Core, Tamil, or Department)"
+              >
+                <ArrowRightLeft className="w-3.5 h-3.5 mr-1.5 text-blue-600" />
+                <span>Move Scope</span>
+              </button>
+
+              {/* Bulk Difficulty Dropdown */}
+              <div className="relative group">
+                <button
+                  type="button"
+                  className="inline-flex items-center px-2.5 py-1.5 rounded-xl text-xs font-semibold text-slate-800 bg-slate-100 hover:bg-slate-200 border border-slate-200 transition-colors cursor-pointer"
+                >
+                  <Sliders className="w-3.5 h-3.5 mr-1.5 text-amber-600" />
+                  <span>Difficulty ▾</span>
+                </button>
+                <div className="absolute bottom-full mb-1 left-0 hidden group-hover:flex flex-col bg-white border border-slate-200 rounded-xl shadow-lg p-1 min-w-[120px] z-50">
+                  <button
+                    type="button"
+                    onClick={() => handleBulkDifficulty("EASY")}
+                    className="text-left px-2.5 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-50 rounded-lg cursor-pointer"
+                  >
+                    Set Easy
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleBulkDifficulty("MEDIUM")}
+                    className="text-left px-2.5 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-50 rounded-lg cursor-pointer"
+                  >
+                    Set Medium
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleBulkDifficulty("HARD")}
+                    className="text-left px-2.5 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-50 rounded-lg cursor-pointer"
+                  >
+                    Set Hard
+                  </button>
+                </div>
+              </div>
+
+              {/* Bulk Format Dropdown */}
+              <div className="relative group">
+                <button
+                  type="button"
+                  className="inline-flex items-center px-2.5 py-1.5 rounded-xl text-xs font-semibold text-slate-800 bg-slate-100 hover:bg-slate-200 border border-slate-200 transition-colors cursor-pointer"
+                >
+                  <CheckCheck className="w-3.5 h-3.5 mr-1.5 text-purple-600" />
+                  <span>Format ▾</span>
+                </button>
+                <div className="absolute bottom-full mb-1 left-0 hidden group-hover:flex flex-col bg-white border border-slate-200 rounded-xl shadow-lg p-1 min-w-[140px] z-50">
+                  <button
+                    type="button"
+                    onClick={() => handleBulkFormat("MCQ_SINGLE")}
+                    className="text-left px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 rounded-lg cursor-pointer"
+                  >
+                    Single Choice
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleBulkFormat("MCQ_MULTIPLE")}
+                    className="text-left px-2.5 py-1.5 text-xs font-semibold text-amber-700 hover:bg-amber-50 rounded-lg cursor-pointer"
+                  >
+                    Multi-Select
+                  </button>
+                </div>
+              </div>
+
+              {/* Export Selected to CSV */}
+              <button
+                type="button"
+                onClick={handleExportSelectedCsv}
+                className="inline-flex items-center px-2.5 py-1.5 rounded-xl text-xs font-semibold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 transition-colors cursor-pointer"
+                title="Export selected questions to CSV"
+              >
+                <Download className="w-3.5 h-3.5 mr-1.5 text-emerald-600" />
+                <span>Export CSV</span>
+              </button>
+
+              {/* Bulk Delete */}
+              <button
+                type="button"
+                onClick={() => setBulkDeleteModalOpen(true)}
+                disabled={isBulkOperating}
+                className="inline-flex items-center px-3 py-1.5 rounded-xl text-xs font-bold text-red-700 bg-red-50 hover:bg-red-100 border border-red-200 transition-colors cursor-pointer disabled:opacity-50"
+                title="Delete selected questions"
+              >
+                <Trash2 className="w-3.5 h-3.5 mr-1.5 text-red-600" />
+                <span>Delete ({selectedIds.size})</span>
+              </button>
+
+              {/* Clear Selection */}
+              <button
+                type="button"
+                onClick={clearSelection}
+                className="p-1.5 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
+                title="Clear Selection"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Modals */}
       <QuestionModal
         isOpen={modalOpen}
@@ -658,6 +1036,23 @@ export function QuestionsClientView({
         isOpen={csvModalOpen}
         onClose={() => setCsvModalOpen(false)}
         validDepartmentCodes={departments.map((d) => d.code)}
+      />
+
+      <BulkDeleteConfirmModal
+        isOpen={bulkDeleteModalOpen}
+        onClose={() => setBulkDeleteModalOpen(false)}
+        selectedQuestions={initialQuestions.filter((q) => selectedIds.has(q.id))}
+        onConfirm={handleBulkDeleteConfirm}
+        isDeleting={isBulkOperating}
+      />
+
+      <BulkReassignScopeModal
+        isOpen={bulkReassignModalOpen}
+        onClose={() => setBulkReassignModalOpen(false)}
+        departments={departments}
+        selectedCount={selectedIds.size}
+        onConfirm={handleBulkReassign}
+        isUpdating={isBulkOperating}
       />
     </div>
   );

@@ -356,3 +356,204 @@ export async function bulkImportQuestionsAction(rows: BulkQuestionCsvRow[]) {
   }
 }
 
+export async function bulkDeleteQuestionsAction(questionIds: string[]) {
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { error: "Unauthorized access" };
+    if (!questionIds || questionIds.length === 0) {
+      return { error: "No questions selected for deletion." };
+    }
+
+    // 1. Delete associated options
+    const { error: optErr } = await supabaseAdmin
+      .from("department_question_options")
+      .delete()
+      .in("question_id", questionIds);
+    if (optErr) console.warn("Options deletion notice:", optErr);
+
+    // 2. Delete the questions
+    const { error: qErr } = await supabaseAdmin
+      .from("department_questions")
+      .delete()
+      .in("id", questionIds);
+
+    if (qErr) throw qErr;
+
+    revalidatePath("/admin/questions");
+    revalidatePath("/questions");
+    revalidatePath("/departments");
+    return { success: true, count: questionIds.length };
+  } catch (err: any) {
+    return { error: err.message || "Failed to bulk delete questions." };
+  }
+}
+
+export async function duplicateQuestionAction(questionId: string) {
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { error: "Unauthorized access" };
+
+    // 1. Fetch original question and its options
+    const { data: original, error: fetchErr } = await supabaseAdmin
+      .from("department_questions")
+      .select(`
+        *,
+        options:department_question_options(*)
+      `)
+      .eq("id", questionId)
+      .single();
+
+    if (fetchErr || !original) {
+      throw fetchErr || new Error("Question to duplicate not found.");
+    }
+
+    // 2. Insert duplicated question
+    const { data: duplicated, error: dupErr } = await supabaseAdmin
+      .from("department_questions")
+      .insert({
+        department_id: original.department_id,
+        topic: original.topic,
+        difficulty: original.difficulty,
+        question_type: original.question_type,
+        prompt: `${original.prompt} (Copy)`,
+        code_snippet: original.code_snippet,
+        default_points: original.default_points || 1.0,
+        default_negative_points: original.default_negative_points || 0.0,
+      })
+      .select("id")
+      .single();
+
+    if (dupErr || !duplicated) {
+      throw dupErr || new Error("Failed to create duplicate question.");
+    }
+
+    // 3. Duplicate options
+    if (original.options && original.options.length > 0) {
+      const clonedOptions = original.options.map((opt: any) => ({
+        question_id: duplicated.id,
+        option_text: opt.option_text,
+        is_correct: opt.is_correct,
+        order_index: opt.order_index,
+      }));
+
+      const { error: optErr } = await supabaseAdmin
+        .from("department_question_options")
+        .insert(clonedOptions);
+
+      if (optErr) throw optErr;
+    }
+
+    revalidatePath("/admin/questions");
+    revalidatePath("/questions");
+    revalidatePath("/departments");
+    return { success: true, newQuestionId: duplicated.id };
+  } catch (err: any) {
+    return { error: err.message || "Failed to duplicate question." };
+  }
+}
+
+export async function bulkUpdateQuestionsScopeAction(
+  questionIds: string[],
+  targetDeptId: string | null,
+  isCommonTamil: boolean = false
+) {
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { error: "Unauthorized access" };
+    if (!questionIds || questionIds.length === 0) {
+      return { error: "No questions selected." };
+    }
+
+    if (isCommonTamil) {
+      // Fetch selected to update their topic with (Tamil) tag if missing
+      const { data: questions } = await supabaseAdmin
+        .from("department_questions")
+        .select("id, topic")
+        .in("id", questionIds);
+
+      for (const q of questions || []) {
+        let topic = q.topic || "General";
+        if (!topic.toLowerCase().includes("tamil") && !/[\u0B80-\u0BFF]/.test(topic)) {
+          topic = `${topic} (Tamil)`;
+        }
+        await supabaseAdmin
+          .from("department_questions")
+          .update({ department_id: null, topic })
+          .eq("id", q.id);
+      }
+    } else {
+      const { error } = await supabaseAdmin
+        .from("department_questions")
+        .update({ department_id: targetDeptId })
+        .in("id", questionIds);
+
+      if (error) throw error;
+    }
+
+    revalidatePath("/admin/questions");
+    revalidatePath("/questions");
+    revalidatePath("/departments");
+    return { success: true, count: questionIds.length };
+  } catch (err: any) {
+    return { error: err.message || "Failed to reassign questions scope." };
+  }
+}
+
+export async function bulkUpdateQuestionsDifficultyAction(
+  questionIds: string[],
+  difficulty: "EASY" | "MEDIUM" | "HARD"
+) {
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { error: "Unauthorized access" };
+    if (!questionIds || questionIds.length === 0) {
+      return { error: "No questions selected." };
+    }
+
+    const { error } = await supabaseAdmin
+      .from("department_questions")
+      .update({ difficulty })
+      .in("id", questionIds);
+
+    if (error) throw error;
+
+    revalidatePath("/admin/questions");
+    revalidatePath("/questions");
+    return { success: true, count: questionIds.length };
+  } catch (err: any) {
+    return { error: err.message || "Failed to update difficulty in bulk." };
+  }
+}
+
+export async function bulkUpdateQuestionsFormatAction(
+  questionIds: string[],
+  questionType: "MCQ_SINGLE" | "MCQ_MULTIPLE"
+) {
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { error: "Unauthorized access" };
+    if (!questionIds || questionIds.length === 0) {
+      return { error: "No questions selected." };
+    }
+
+    const { error } = await supabaseAdmin
+      .from("department_questions")
+      .update({ question_type: questionType })
+      .in("id", questionIds);
+
+    if (error) throw error;
+
+    revalidatePath("/admin/questions");
+    revalidatePath("/questions");
+    return { success: true, count: questionIds.length };
+  } catch (err: any) {
+    return { error: err.message || "Failed to update question format in bulk." };
+  }
+}
+
+
