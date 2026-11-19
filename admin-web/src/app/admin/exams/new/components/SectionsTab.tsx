@@ -16,6 +16,8 @@ import {
   Sparkles,
   HelpCircle,
   Hash,
+  CheckSquare,
+  X,
 } from "lucide-react";
 
 interface SectionsTabProps {
@@ -83,6 +85,22 @@ export function SectionsTab({
       : [...current, deptCode];
     updateActiveSection({ targetDepartments: updated });
   }
+
+  function selectAllDepartments() {
+    if (!activeSection) return;
+    const allCodes = availableDepts.map((d) => d.code);
+    updateActiveSection({ targetDepartments: allCodes });
+  }
+
+  function clearAllDepartments() {
+    if (!activeSection) return;
+    updateActiveSection({ targetDepartments: [] });
+  }
+
+  const selectedDepts = activeSection?.targetDepartments || [];
+  const isAllSelected =
+    availableDepts.length > 0 &&
+    availableDepts.every((dept) => selectedDepts.includes(dept.code));
 
   function moveSection(index: number, direction: "UP" | "DOWN") {
     if (
@@ -305,13 +323,45 @@ export function SectionsTab({
               {/* Department Chips (when Elective): STRICTLY from Supabase Database */}
               {!activeSection.isCommon && (
                 <div className="bg-slate-50/80 border border-slate-200 rounded-xl p-2.5 mt-2 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-bold text-slate-600 uppercase tracking-wider block">
-                      Target Departments ({activeSection.targetDepartments?.length || 0} selected)
-                    </span>
-                    <span className="text-[10px] text-slate-400">
-                      Select from registered database:
-                    </span>
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200/60 pb-2">
+                    <div className="flex items-center space-x-2">
+                      <span className="text-[10px] font-bold text-slate-700 uppercase tracking-wider block">
+                        Target Departments ({selectedDepts.length} of {availableDepts.length} selected)
+                      </span>
+                      {isAllSelected && (
+                        <span className="text-[9px] font-extrabold text-purple-700 bg-purple-100/80 px-2 py-0.5 rounded-full border border-purple-200">
+                          All Selected
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="flex items-center space-x-2">
+                      <button
+                        type="button"
+                        onClick={isAllSelected ? clearAllDepartments : selectAllDepartments}
+                        className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold border transition-all cursor-pointer shadow-2xs ${
+                          isAllSelected
+                            ? "bg-purple-100 text-purple-800 border-purple-300 hover:bg-purple-200"
+                            : "bg-white text-purple-700 border-purple-200 hover:bg-purple-50 hover:border-purple-300"
+                        }`}
+                        title={isAllSelected ? "Deselect all departments" : "Select all available departments in one click"}
+                      >
+                        <CheckSquare className="w-3.5 h-3.5 mr-1 text-purple-700" />
+                        <span>{isAllSelected ? "Deselect All" : `Select All (${availableDepts.length})`}</span>
+                      </button>
+
+                      {selectedDepts.length > 0 && !isAllSelected && (
+                        <button
+                          type="button"
+                          onClick={clearAllDepartments}
+                          className="inline-flex items-center px-2 py-1 rounded-lg text-xs font-semibold text-slate-600 bg-white border border-slate-200 hover:bg-slate-100 hover:text-slate-900 transition-all cursor-pointer shadow-2xs"
+                          title="Clear all selections"
+                        >
+                          <X className="w-3 h-3 mr-1 text-slate-400" />
+                          <span>Clear</span>
+                        </button>
+                      )}
+                    </div>
                   </div>
 
                   {availableDepts.length === 0 ? (
