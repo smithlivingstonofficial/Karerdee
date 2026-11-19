@@ -1501,7 +1501,7 @@ export function LiveProctoringClientView({
                       No active examinees match current criteria.
                     </div>
                   ) : (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-2 2xl:grid-cols-3 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                       {filtered.map((s) => {
                         const sessionInquiries = inquiriesBySession.get(s.id) || [];
                         const unreadCount = sessionInquiries.filter(
@@ -1649,7 +1649,7 @@ export function LiveProctoringClientView({
            ===================================================================== */
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
           {/* Left Column: Scoped Candidate Workstations with Elevated UI/UX */}
-          <div className={`${isSideFeedCollapsed ? "lg:col-span-12" : "lg:col-span-8"} space-y-4 transition-all duration-200`}>
+          <div className={`${isSideFeedCollapsed ? "lg:col-span-12" : "lg:col-span-9"} space-y-4 transition-all duration-200`}>
             <div className="bg-white border border-slate-200/90 rounded-2xl overflow-hidden shadow-xs">
               {/* Filter, Search & View Switcher Bar */}
               <div className="p-4 sm:p-4.5 border-b border-slate-200/90 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -1774,8 +1774,8 @@ export function LiveProctoringClientView({
                 <div
                   className={`p-4 bg-slate-50/50 grid gap-4 ${
                     isSideFeedCollapsed
-                      ? "grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5"
-                      : "grid-cols-1 sm:grid-cols-2 xl:grid-cols-2 2xl:grid-cols-3"
+                      ? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-4"
+                      : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
                   }`}
                 >
                   {filtered.map((s) => {
@@ -2126,7 +2126,7 @@ export function LiveProctoringClientView({
 
           {/* Right Column: Live Infraction Feed (Scoped to this exam) */}
           {!isSideFeedCollapsed && (
-            <div className="lg:col-span-4 space-y-4">
+            <div className="lg:col-span-3 space-y-4">
               <div className="bg-white border border-slate-200/90 rounded-2xl p-4 sm:p-5 shadow-xs space-y-3">
                 <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                   <div className="flex items-center space-x-2">

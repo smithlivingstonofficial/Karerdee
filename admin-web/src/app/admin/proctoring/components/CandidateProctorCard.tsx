@@ -100,24 +100,39 @@ export const CandidateProctorCard = memo(function CandidateProctorCard({
 
   // Determine card outer border & status accent
   const borderStatusClass = isLocked
-    ? "border-red-300 ring-2 ring-red-500/10 shadow-sm"
+    ? "border-red-300 ring-2 ring-red-500/15 shadow-sm"
     : isWarning
-    ? "border-amber-300 ring-1 ring-amber-500/10 shadow-sm"
+    ? "border-amber-300 ring-2 ring-amber-500/15 shadow-sm"
     : isSubmitted
-    ? "border-slate-200 opacity-90"
-    : "border-slate-200 hover:border-blue-400 hover:shadow-md";
+    ? "border-slate-200/90 shadow-2xs"
+    : "border-slate-200/90 hover:border-blue-400 hover:shadow-md";
 
   return (
     <div
       className={`bg-white rounded-2xl border transition-all duration-200 flex flex-col justify-between overflow-hidden group ${borderStatusClass}`}
     >
+      {/* Visual Status Indicator Top Stripe */}
+      <div
+        className={`h-1 w-full ${
+          isLocked
+            ? "bg-red-500"
+            : isWarning
+            ? "bg-amber-500"
+            : session.status === "IN_PROGRESS"
+            ? "bg-emerald-500"
+            : isSubmitted
+            ? "bg-blue-600"
+            : "bg-slate-300"
+        }`}
+      />
+
       {/* 1. Header: Candidate Identity & Realtime Status */}
       <div className="p-3 pb-2.5 flex items-start justify-between gap-2 border-b border-slate-100 bg-white">
         <div className="flex items-center space-x-2.5 min-w-0 flex-1">
           {/* Avatar with dynamic color and status ring */}
           <div className="relative flex-shrink-0">
             <div
-              className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold text-xs border shadow-2xs ${getAvatarColor(
+              className={`w-9 h-9 rounded-xl flex items-center justify-center font-extrabold text-xs border shadow-2xs ${getAvatarColor(
                 session.candidateName
               )}`}
             >
@@ -138,7 +153,7 @@ export const CandidateProctorCard = memo(function CandidateProctorCard({
           <div className="min-w-0 flex-1">
             <div className="flex items-center space-x-1.5">
               <h3
-                className="font-extrabold text-slate-900 text-xs sm:text-sm tracking-tight truncate leading-tight hover:text-blue-700 cursor-pointer"
+                className="font-bold text-slate-900 text-xs sm:text-sm tracking-tight truncate leading-tight group-hover:text-blue-700 transition-colors cursor-pointer"
                 onClick={() => onViewDetailed(session)}
                 title={session.candidateName}
               >
@@ -166,7 +181,7 @@ export const CandidateProctorCard = memo(function CandidateProctorCard({
             </span>
           ) : (
             <span
-              className={`inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-black tracking-wider uppercase border shadow-2xs ${
+              className={`inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-bold tracking-wider uppercase border shadow-2xs ${
                 session.status === "IN_PROGRESS"
                   ? "bg-emerald-50 text-emerald-700 border-emerald-200"
                   : session.status === "LOCKED"
@@ -281,21 +296,21 @@ export const CandidateProctorCard = memo(function CandidateProctorCard({
             </div>
           </>
         ) : (
-          /* Sleek Monitored Camera Placeholder Canvas */
+          /* Sleek Monitored Camera Placeholder Canvas (Dark CCTV style to match live streams) */
           <div
-            className="w-full h-full bg-gradient-to-br from-slate-100 via-slate-50 to-slate-200 flex flex-col items-center justify-center p-3 relative"
+            className="w-full h-full bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex flex-col items-center justify-center p-3 relative select-none"
             onClick={() => onViewDetailed(session)}
           >
             {/* Background radar animation */}
-            <div className="absolute w-24 h-24 rounded-full border border-blue-300/40 animate-ping pointer-events-none" />
-            <div className="w-10 h-10 rounded-2xl bg-white border border-slate-200 flex items-center justify-center shadow-xs mb-1.5 relative z-10">
-              <Camera className="w-5 h-5 text-slate-500" />
+            <div className="absolute w-24 h-24 rounded-full border border-blue-400/20 animate-ping pointer-events-none" />
+            <div className="w-10 h-10 rounded-2xl bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center shadow-xs mb-1.5 relative z-10">
+              <Camera className="w-5 h-5 text-blue-300" />
             </div>
 
-            <p className="text-[11px] font-bold text-slate-700 relative z-10 text-center leading-tight">
+            <p className="text-[11px] font-bold text-white relative z-10 text-center leading-tight">
               Biometric Surveillance Active
             </p>
-            <p className="text-[9px] text-slate-400 relative z-10 text-center mt-0.5">
+            <p className="text-[9px] text-slate-300 relative z-10 text-center mt-0.5">
               Continuous candidate monitoring
             </p>
 
@@ -306,7 +321,7 @@ export const CandidateProctorCard = memo(function CandidateProctorCard({
                 e.stopPropagation();
                 onRequestSnapshot(session.id, session.candidateName);
               }}
-              className="mt-2 px-2.5 py-1 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-bold transition-all shadow-xs flex items-center space-x-1 cursor-pointer disabled:opacity-40 relative z-10"
+              className="mt-2 px-3 py-1 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-bold transition-all shadow-xs flex items-center space-x-1 cursor-pointer disabled:opacity-40 relative z-10"
             >
               <Camera className="w-3 h-3" />
               <span>Capture Snapshot</span>
@@ -388,26 +403,26 @@ export const CandidateProctorCard = memo(function CandidateProctorCard({
       </div>
 
       {/* 4. Action Command Bar: Prominent "View Detailed" + Quick Intervention Suite */}
-      <div className="p-2.5 bg-slate-50/70 border-t border-slate-100 space-y-1.5">
+      <div className="p-3 bg-slate-50/80 border-t border-slate-100 space-y-2">
         {/* Primary Action Button: View in Detailed */}
         <button
           type="button"
           onClick={() => onViewDetailed(session)}
-          className="w-full py-1.5 px-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs tracking-tight transition-all shadow-2xs hover:shadow-sm flex items-center justify-center space-x-1.5 cursor-pointer"
+          className="w-full py-2 px-3 rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-[0.99] text-white font-bold text-xs tracking-tight transition-all shadow-xs hover:shadow-sm flex items-center justify-center space-x-1.5 cursor-pointer"
         >
           <Search className="w-3.5 h-3.5" />
           <span>View in Detailed</span>
         </button>
 
         {/* Secondary Quick Controls Toolbar */}
-        <div className="flex items-center justify-between gap-1">
+        <div className="flex items-center justify-between gap-1.5">
           {/* Late Entry Approve Button if applicable */}
           {session.isPendingLateEntry && isLocked && onGrantLateEntry && (
             <button
               type="button"
               disabled={isLoading}
               onClick={() => onGrantLateEntry(session.id, session.candidateName)}
-              className="px-2 py-1 rounded-lg bg-blue-700 text-white hover:bg-blue-800 text-[10px] font-bold transition-colors cursor-pointer shadow-2xs flex-1"
+              className="px-2.5 py-1.5 rounded-xl bg-blue-700 text-white hover:bg-blue-800 text-[10px] font-bold transition-colors cursor-pointer shadow-2xs flex-1"
               title="Approve Candidate Late Entry"
             >
               Approve Late
@@ -420,10 +435,10 @@ export const CandidateProctorCard = memo(function CandidateProctorCard({
               type="button"
               disabled={isLoading}
               onClick={() => onUnlock(session.id)}
-              className="p-1.5 rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 transition-colors cursor-pointer shadow-2xs flex-1 flex items-center justify-center"
+              className="py-1.5 px-2 rounded-xl bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 transition-colors cursor-pointer shadow-2xs flex-1 flex items-center justify-center space-x-1"
               title="Unlock Workstation"
             >
-              <Unlock className="w-3.5 h-3.5 mr-1" />
+              <Unlock className="w-3.5 h-3.5 text-emerald-600" />
               <span className="text-[10px] font-bold">Unlock</span>
             </button>
           ) : (
@@ -431,10 +446,10 @@ export const CandidateProctorCard = memo(function CandidateProctorCard({
               type="button"
               disabled={isLoading || isSubmitted}
               onClick={() => onLock(session.id)}
-              className="p-1.5 rounded-lg bg-red-50 text-red-700 hover:bg-red-100 border border-red-200 transition-colors cursor-pointer shadow-2xs disabled:opacity-40 flex-1 flex items-center justify-center"
+              className="py-1.5 px-2 rounded-xl bg-red-50 text-red-700 hover:bg-red-100 border border-red-200 transition-colors cursor-pointer shadow-2xs disabled:opacity-40 flex-1 flex items-center justify-center space-x-1"
               title="Freeze Workstation Immediately"
             >
-              <Lock className="w-3.5 h-3.5 mr-1" />
+              <Lock className="w-3.5 h-3.5 text-red-600" />
               <span className="text-[10px] font-bold">Freeze</span>
             </button>
           )}
@@ -444,7 +459,7 @@ export const CandidateProctorCard = memo(function CandidateProctorCard({
             type="button"
             disabled={isLoading || isSubmitted}
             onClick={() => onWarn(session.id, session.candidateName)}
-            className="p-1.5 rounded-lg bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200 transition-colors cursor-pointer shadow-2xs disabled:opacity-40"
+            className="p-2 rounded-xl bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200 transition-colors cursor-pointer shadow-2xs disabled:opacity-40"
             title="Dispatch Warning Notice to Candidate Screen"
           >
             <Bell className="w-3.5 h-3.5" />
@@ -454,7 +469,7 @@ export const CandidateProctorCard = memo(function CandidateProctorCard({
           <button
             type="button"
             onClick={() => onOpenChat(session.id)}
-            className={`p-1.5 rounded-lg border transition-all cursor-pointer relative shadow-2xs ${
+            className={`p-2 rounded-xl border transition-all cursor-pointer relative shadow-2xs ${
               unreadInquiriesCount > 0
                 ? "bg-blue-600 text-white border-blue-700 hover:bg-blue-700 ring-2 ring-blue-400/40"
                 : "bg-blue-50 text-blue-700 hover:bg-blue-100 border-blue-200"
@@ -472,7 +487,7 @@ export const CandidateProctorCard = memo(function CandidateProctorCard({
             type="button"
             disabled={isLoading || isSubmitted || session.status !== "IN_PROGRESS"}
             onClick={() => onRequestSnapshot(session.id, session.candidateName)}
-            className="p-1.5 rounded-lg bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200 transition-colors cursor-pointer shadow-2xs disabled:opacity-40"
+            className="p-2 rounded-xl bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200 transition-colors cursor-pointer shadow-2xs disabled:opacity-40"
             title="Request Instant Webcam Photo Verification"
           >
             <Camera className="w-3.5 h-3.5" />
@@ -483,7 +498,7 @@ export const CandidateProctorCard = memo(function CandidateProctorCard({
             type="button"
             disabled={isLoading || isSubmitted}
             onClick={() => onAddExtraTime(session.id, 5)}
-            className="px-2 py-1 text-[10px] font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg transition-colors cursor-pointer shadow-2xs disabled:opacity-40"
+            className="px-2 py-1.5 text-[10px] font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-xl transition-colors cursor-pointer shadow-2xs disabled:opacity-40"
             title="Add +5 Minutes Compensatory Time"
           >
             +5m
@@ -495,7 +510,7 @@ export const CandidateProctorCard = memo(function CandidateProctorCard({
               type="button"
               disabled={isLoading || isSubmitted}
               onClick={() => onResetStrikes(session.id)}
-              className="p-1.5 rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200 transition-colors cursor-pointer shadow-2xs"
+              className="p-2 rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200 transition-colors cursor-pointer shadow-2xs"
               title="Reset Strikes Counter to 0"
             >
               <RotateCcw className="w-3.5 h-3.5" />
@@ -508,7 +523,7 @@ export const CandidateProctorCard = memo(function CandidateProctorCard({
               type="button"
               disabled={isLoading}
               onClick={() => onRebindPC(session.studentId, session.candidateName)}
-              className="p-1.5 rounded-lg bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200 transition-colors cursor-pointer shadow-2xs"
+              className="p-2 rounded-xl bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200 transition-colors cursor-pointer shadow-2xs"
               title="Reset Hardware Binding (Switch Machine)"
             >
               <Monitor className="w-3.5 h-3.5" />
