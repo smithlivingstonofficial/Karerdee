@@ -360,7 +360,7 @@ export async function saveExamAction(payload: SaveExamPayload) {
     for (const sec of payload.sections) {
       const dbSecId = sectionIdMap.get(sec.id);
       if (!dbSecId) continue;
-      sectionQuotaMap.set(dbSecId, sec.targetQuestionCount || 20);
+      sectionQuotaMap.set(dbSecId, sec.targetQuestionCount || 25);
       sectionIsCommonMap.set(dbSecId, sec.isCommon);
       sectionTargetDeptsMap.set(
         dbSecId,
@@ -460,7 +460,7 @@ export async function saveExamAction(payload: SaveExamPayload) {
       if (!resolvedSectionId) continue;
 
       const isCommon = sectionIsCommonMap.get(resolvedSectionId) ?? true;
-      const quotaLimit = sectionQuotaMap.get(resolvedSectionId) || 20;
+      const quotaLimit = sectionQuotaMap.get(resolvedSectionId) || 25;
 
       // Track key: for common section, key distinguishes between English and Tamil Common Core!
       // For elective section, key is resolvedSectionId + deptCode.
@@ -735,7 +735,7 @@ export async function getExamForEditingAction(examId: string): Promise<{
 
     for (const q of dbQuestions || []) {
       const isCommon = secCommonMap.get(q.section_id) ?? true;
-      const quota = secQuotaMap.get(q.section_id) || 20;
+      const quota = secQuotaMap.get(q.section_id) || 25;
       const deptCode = q.rubric_criteria?.target_department
         ? String(q.rubric_criteria.target_department).trim().toUpperCase()
         : "";

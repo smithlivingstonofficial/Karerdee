@@ -122,7 +122,7 @@ function ExamAuthoringStudioContent() {
       orderIndex: 1,
       navigationMode: "FLEXIBLE",
       timeLimitMinutes: null,
-      targetQuestionCount: 20,
+      targetQuestionCount: 25,
     },
     {
       id: "sec-default-part-b",
@@ -134,7 +134,7 @@ function ExamAuthoringStudioContent() {
       orderIndex: 2,
       navigationMode: "FLEXIBLE",
       timeLimitMinutes: null,
-      targetQuestionCount: 30,
+      targetQuestionCount: 25,
     },
   ]);
 
