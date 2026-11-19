@@ -213,6 +213,9 @@ function CandidateSittingContent() {
   const [lastSyncedTime, setLastSyncedTime] = useState<string>("Just now");
   const [isWorkstationLocked, setIsWorkstationLocked] = useState(false);
   const [lockoutReason, setLockoutReason] = useState("");
+  const [isCheckingUnlockStatus, setIsCheckingUnlockStatus] = useState<boolean>(false);
+  const [unlockCheckNotice, setUnlockCheckNotice] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [isManualSyncing, setIsManualSyncing] = useState<boolean>(false);
 
   // In-Exam Digital Aids Modals
   const [isCalculatorOpen, setIsCalculatorOpen] = useState(false);
@@ -662,6 +665,9 @@ function CandidateSittingContent() {
     if (!isAudit && now - lastViolationTimeRef.current < 3000) return;
     lastViolationTimeRef.current = now;
 
+    // If workstation is already locked, prevent further non-audit violation cascades
+    if (!isAudit && isWorkstationLocked) return;
+
     try {
       // Capture watermarked forensic snapshot
       const snapshotBase64 = captureWatermarkedSnapshot(violationType);
@@ -708,7 +714,7 @@ function CandidateSittingContent() {
 
   // Option A: 10-Second Face Absence Grace Watchdog
   useEffect(() => {
-    if (stage !== "ACTIVE_EXAM" || !isCameraActive) return;
+    if (stage !== "ACTIVE_EXAM" || !isCameraActive || isWorkstationLocked) return;
 
     const faceCheckInterval = setInterval(async () => {
       let faceDetected = true;
@@ -792,7 +798,7 @@ function CandidateSittingContent() {
     }, 1000);
 
     return () => clearInterval(faceCheckInterval);
-  }, [stage, isCameraActive, token, sessionId, strikes, exam, candidate]);
+  }, [stage, isCameraActive, token, sessionId, strikes, exam, candidate, isWorkstationLocked]);
 
   // Fullscreen Watchdog Event Listeners
   useEffect(() => {
@@ -1048,7 +1054,7 @@ function CandidateSittingContent() {
           // 3. Live Strikes Sync
           if (typeof newRow.strikes_count === "number") {
             setStrikes(newRow.strikes_count);
-            if (exam && newRow.strikes_count >= (exam.maxStrikes || 3)) {
+            if (newRow.status !== "IN_PROGRESS" && exam && newRow.strikes_count >= (exam.maxStrikes || 3)) {
               setIsWorkstationLocked(true);
               setLockoutReason(
                 "Infraction Limit Reached. Workstation locked by Safe Exam Watchdog."
@@ -1087,6 +1093,8 @@ function CandidateSittingContent() {
             setIsWorkstationLocked(false);
             setLockoutReason("");
             setProctorWarningMessage(null);
+            setStrikes(0);
+            enterFullscreen().catch(() => {});
           }
         }
       )
@@ -2021,15 +2029,19 @@ function CandidateSittingContent() {
           if (hbData.sessionStatus === "LOCKED") {
             setIsWorkstationLocked(true);
             setLockoutReason("Workstation locked by invigilator or security protocol.");
-          } else if (hbData.sessionStatus === "IN_PROGRESS" && isWorkstationLocked) {
-            setIsWorkstationLocked(false);
-          }
-          if (typeof hbData.strikesCount === "number") {
-            setStrikes(hbData.strikesCount);
-            if (exam && hbData.strikesCount >= (exam.maxStrikes || 3)) {
+          } else if (hbData.sessionStatus === "IN_PROGRESS") {
+            if (typeof hbData.strikesCount === "number") {
+              setStrikes(hbData.strikesCount);
+            }
+            if (exam && typeof hbData.strikesCount === "number" && hbData.strikesCount >= (exam.maxStrikes || 3)) {
               setIsWorkstationLocked(true);
               setLockoutReason("Infraction Limit Reached. Workstation locked by Safe Exam Watchdog.");
+            } else {
+              setIsWorkstationLocked(false);
+              setLockoutReason("");
             }
+          } else if (typeof hbData.strikesCount === "number") {
+            setStrikes(hbData.strikesCount);
           }
           if (
             typeof hbData.extraTimeMinutes === "number" &&
@@ -2056,6 +2068,57 @@ function CandidateSittingContent() {
 
     return () => clearInterval(hbInterval);
   }, [stage, token, sessionId, answers, isOnline, exam, isWorkstationLocked]);
+
+  // Fast Re-check Polling while Workstation is Locked (Every 2.5s)
+  useEffect(() => {
+    if (stage !== "ACTIVE_EXAM" || !isWorkstationLocked || !token || !sessionId) return;
+
+    let isPolling = false;
+    const fastPollInterval = setInterval(async () => {
+      if (isPolling) return;
+      isPolling = true;
+      try {
+        const res = await fetch("/api/telemetry/heartbeat", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            sessionId,
+            hardwareFingerprint: "BROWSER-CLIENT-WEB",
+            questionsAnsweredCount: Object.keys(answers).length,
+          }),
+        });
+
+        if (res.ok) {
+          const hbData = await res.json();
+          if (typeof hbData.strikesCount === "number") {
+            setStrikes(hbData.strikesCount);
+          }
+          if (typeof hbData.serverCalculatedSecondsRemaining === "number") {
+            setSecondsRemaining(hbData.serverCalculatedSecondsRemaining);
+          }
+          const maxAllowed = exam?.maxStrikes || 3;
+          if (
+            hbData.sessionStatus === "IN_PROGRESS" &&
+            (hbData.strikesCount || 0) < maxAllowed
+          ) {
+            setIsWorkstationLocked(false);
+            setLockoutReason("");
+            setUnlockCheckNotice(null);
+            enterFullscreen().catch(() => {});
+          }
+        }
+      } catch (err) {
+        console.warn("Locked workstation fast-poll notice:", err);
+      } finally {
+        isPolling = false;
+      }
+    }, 2500);
+
+    return () => clearInterval(fastPollInterval);
+  }, [stage, isWorkstationLocked, token, sessionId, answers, exam]);
 
   // Periodic Background Answer Sync to /api/exam/sync (Every 15 seconds)
   useEffect(() => {
@@ -2099,6 +2162,120 @@ function CandidateSittingContent() {
       console.warn("Background sync retry queued:", err);
     } finally {
       setIsSyncing(false);
+    }
+  }
+
+  // Manual In-Page Unlock Check & Resume (Accessible from Workstation Lock Modal)
+  async function handleManualUnlockCheck() {
+    if (isCheckingUnlockStatus || !token || !sessionId) return;
+    setIsCheckingUnlockStatus(true);
+    setUnlockCheckNotice(null);
+    try {
+      const res = await fetch("/api/telemetry/heartbeat", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          sessionId,
+          hardwareFingerprint: "BROWSER-CLIENT-WEB",
+          questionsAnsweredCount: Object.keys(answers).length,
+        }),
+      });
+
+      if (!res.ok) {
+        setUnlockCheckNotice({
+          type: "error",
+          text: "Unable to verify status with examination server. Please check your network connection.",
+        });
+        return;
+      }
+
+      const hbData = await res.json();
+      if (typeof hbData.strikesCount === "number") {
+        setStrikes(hbData.strikesCount);
+      }
+      if (typeof hbData.serverCalculatedSecondsRemaining === "number") {
+        setSecondsRemaining(hbData.serverCalculatedSecondsRemaining);
+      }
+
+      const maxAllowed = exam?.maxStrikes || 3;
+      if (
+        hbData.sessionStatus === "IN_PROGRESS" &&
+        (hbData.strikesCount || 0) < maxAllowed
+      ) {
+        setIsWorkstationLocked(false);
+        setLockoutReason("");
+        setUnlockCheckNotice({
+          type: "success",
+          text: "Workstation verified unlocked by invigilator! Resuming exam...",
+        });
+        await enterFullscreen().catch(() => {});
+      } else if (hbData.sessionStatus === "LOCKED") {
+        setUnlockCheckNotice({
+          type: "error",
+          text: "Workstation remains locked by invigilator. Please request an unlock in the chat.",
+        });
+      } else if ((hbData.strikesCount || 0) >= maxAllowed) {
+        setUnlockCheckNotice({
+          type: "error",
+          text: `Strikes counter (${hbData.strikesCount}/${maxAllowed}) is at maximum. Ask the invigilator to reset strikes in the chat.`,
+        });
+      } else {
+        setUnlockCheckNotice({
+          type: "error",
+          text: "Status not cleared yet. Please message the invigilator using the chat button.",
+        });
+      }
+    } catch (err: any) {
+      setUnlockCheckNotice({
+        type: "error",
+        text: err?.message || "Network error checking status. Please retry.",
+      });
+    } finally {
+      setIsCheckingUnlockStatus(false);
+    }
+  }
+
+  // In-Page Refresh & Manual Sync (Header Action)
+  async function handleInPageRefresh() {
+    if (isManualSyncing || !token || !sessionId) return;
+    setIsManualSyncing(true);
+    try {
+      await syncAnswersToServer();
+      const res = await fetch("/api/telemetry/heartbeat", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          sessionId,
+          hardwareFingerprint: "BROWSER-CLIENT-WEB",
+          questionsAnsweredCount: Object.keys(answers).length,
+        }),
+      });
+
+      if (res.ok) {
+        const hbData = await res.json();
+        if (typeof hbData.strikesCount === "number") setStrikes(hbData.strikesCount);
+        if (typeof hbData.serverCalculatedSecondsRemaining === "number") {
+          setSecondsRemaining(hbData.serverCalculatedSecondsRemaining);
+        }
+        const maxAllowed = exam?.maxStrikes || 3;
+        if (hbData.sessionStatus === "LOCKED") {
+          setIsWorkstationLocked(true);
+        } else if (hbData.sessionStatus === "IN_PROGRESS" && (hbData.strikesCount || 0) < maxAllowed) {
+          setIsWorkstationLocked(false);
+          setLockoutReason("");
+        }
+        setLastSyncedTime(formatTime(new Date(), true, true));
+      }
+    } catch (err) {
+      console.warn("In-page refresh error:", err);
+    } finally {
+      setIsManualSyncing(false);
     }
   }
 
@@ -3592,6 +3769,18 @@ function CandidateSittingContent() {
               </button>
             )}
 
+            {/* In-Page Sync & Refresh Button */}
+            <button
+              type="button"
+              onClick={handleInPageRefresh}
+              disabled={isManualSyncing}
+              className="inline-flex items-center space-x-1.5 px-2.5 py-1.5 text-xs font-bold text-slate-700 bg-slate-50 hover:bg-slate-100 hover:text-blue-700 border border-slate-200 rounded-lg shadow-2xs transition-all cursor-pointer disabled:opacity-50"
+              title="Refresh examination status and force save answers to server"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 text-slate-600 ${isManualSyncing ? "animate-spin text-blue-600" : ""}`} />
+              <span className="hidden md:inline">Sync / Refresh</span>
+            </button>
+
             {/* Ask Invigilator / Doubt Button */}
             <button
               type="button"
@@ -4230,8 +4419,40 @@ function CandidateSittingContent() {
               </div>
             )}
 
-            {/* Action Buttons: Chat with Proctor & Quick Appeal */}
+            {/* Action Buttons: Check Unlock Status, Chat with Proctor & Quick Appeal */}
             <div className="pt-1 space-y-2">
+              {/* Check Unlock & Resume Exam (In-page refresh & resume action) */}
+              <button
+                type="button"
+                onClick={handleManualUnlockCheck}
+                disabled={isCheckingUnlockStatus}
+                className="w-full py-2.5 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-xl shadow-xs hover:shadow-md transition-all flex items-center justify-center space-x-2 cursor-pointer active:scale-98 disabled:opacity-75"
+              >
+                {isCheckingUnlockStatus ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin text-white mr-1" />
+                    <span>Verifying Invigilator Unlock...</span>
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw className="w-4 h-4 text-white mr-1" />
+                    <span>Check Unlock &amp; Resume Exam</span>
+                  </>
+                )}
+              </button>
+
+              {unlockCheckNotice && (
+                <div
+                  className={`p-2.5 rounded-xl border text-xs font-semibold text-center ${
+                    unlockCheckNotice.type === "success"
+                      ? "bg-emerald-50 text-emerald-800 border-emerald-200"
+                      : "bg-red-50 text-red-800 border-red-200"
+                  }`}
+                >
+                  {unlockCheckNotice.text}
+                </div>
+              )}
+
               <button
                 type="button"
                 onClick={() => {

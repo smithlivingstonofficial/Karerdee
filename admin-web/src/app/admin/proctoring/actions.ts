@@ -4,6 +4,36 @@ import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { revalidatePath } from "next/cache";
 
+async function broadcastProctorCommand(sessionId: string, command: string, message: string, proctorEmail: string = "proctor@kare.edu") {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!supabaseUrl || !serviceKey) return;
+  try {
+    await fetch(`${supabaseUrl}/realtime/v1/api/broadcast`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${serviceKey}`,
+        apikey: serviceKey,
+      },
+      body: JSON.stringify({
+        messages: [
+          {
+            topic: `exam-session-${sessionId}`,
+            event: "proctor_command",
+            payload: {
+              command,
+              message,
+              proctorEmail,
+              timestamp: new Date().toISOString(),
+            },
+          },
+        ],
+      }),
+    }).catch(() => {});
+  } catch {}
+}
+
 export async function lockWorkstationAction(sessionId: string, reason: string = "Manual freeze by examination invigilator") {
   try {
     const supabase = await createClient();
@@ -27,6 +57,9 @@ export async function lockWorkstationAction(sessionId: string, reason: string = 
       metadata: { action: "PROCTOR_FREEZE", reason, initiatedBy: user.email, timestamp: new Date().toISOString() },
     });
 
+    // Realtime broadcast to freeze candidate workstation immediately
+    broadcastProctorCommand(sessionId, "CMD_TERMINATE", reason, user.email || "proctor@kare.edu");
+
     revalidatePath("/proctoring");
     revalidatePath("/violations");
     return { success: true };
@@ -45,10 +78,14 @@ export async function unlockWorkstationAction(sessionId: string) {
       .from("exam_sessions")
       .update({
         status: "IN_PROGRESS",
+        strikes_count: 0,
       })
       .eq("id", sessionId);
 
     if (updateErr) throw updateErr;
+
+    // Realtime broadcast to unfreeze candidate workstation immediately
+    broadcastProctorCommand(sessionId, "CMD_RESUME", "Workstation unlocked by invigilator.", user.email || "proctor@kare.edu");
 
     revalidatePath("/proctoring");
     revalidatePath("/violations");
@@ -123,6 +160,14 @@ export async function resetStrikesAction(sessionId: string) {
       },
     });
 
+    // Realtime broadcast to unfreeze candidate workstation immediately and clear strikes
+    broadcastProctorCommand(
+      sessionId,
+      "CMD_RESUME",
+      "Infraction strikes reset to 0 by invigilator.",
+      user.email || "proctor@kare.edu"
+    );
+
     revalidatePath("/proctoring");
     revalidatePath("/violations");
     return { success: true };
@@ -180,6 +225,14 @@ export async function grantLateEntryAction(sessionId: string) {
       reason: "Late entry exception approved by invigilator",
       action_payload: { approvedAt: new Date().toISOString(), proctorEmail: user.email },
     });
+
+    // Realtime broadcast to unfreeze candidate workstation immediately
+    broadcastProctorCommand(
+      sessionId,
+      "CMD_RESUME",
+      "Late entry exception approved by invigilator.",
+      user.email || "proctor@kare.edu"
+    );
 
     revalidatePath("/proctoring");
     revalidatePath("/violations");
