@@ -439,6 +439,47 @@ export async function markInquiryResolvedAction(actionId: string) {
   }
 }
 
+export async function requestProctorSnapshotAction(sessionId: string) {
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return { error: "Unauthorized access" };
+
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    if (supabaseUrl && serviceKey) {
+      await fetch(`${supabaseUrl}/realtime/v1/api/broadcast`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${serviceKey}`,
+          apikey: serviceKey,
+        },
+        body: JSON.stringify({
+          messages: [
+            {
+              topic: `exam-session-${sessionId}`,
+              event: "proctor_command",
+              payload: {
+                command: "CMD_REQUEST_SNAP",
+                proctorEmail: user.email,
+                timestamp: new Date().toISOString(),
+              },
+            },
+          ],
+        }),
+      }).catch((err) => console.warn("Broadcast request snap error:", err));
+    }
+
+    return { success: true };
+  } catch (err: any) {
+    return { error: err.message || "Failed to dispatch webcam snapshot request." };
+  }
+}
+
 
 
 

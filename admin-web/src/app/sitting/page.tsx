@@ -302,6 +302,23 @@ function CandidateSittingContent() {
         await instructionsVideoRef.current.play().catch(() => {});
       }
 
+      // Add hardware disconnect and stream mute watchdog listeners
+      stream.getVideoTracks().forEach((track) => {
+        track.onended = () => {
+          setIsCameraActive(false);
+          reportSecurityViolation(
+            "CAMERA_HARDWARE_DISCONNECTED",
+            "Webcam hardware was disconnected or disabled during active examination"
+          );
+        };
+        track.onmute = () => {
+          reportSecurityViolation(
+            "CAMERA_STREAM_MUTED",
+            "Webcam video stream muted or hardware privacy shutter closed"
+          );
+        };
+      });
+
       setIsCameraActive(true);
       setCameraError(null);
     } catch (err: any) {
@@ -431,6 +448,13 @@ function CandidateSittingContent() {
         console.warn("History push error:", histErr);
       }
     }
+    // Ensure background camera stream is wired to off-screen capture video element
+    if (videoRef.current && streamRef.current) {
+      videoRef.current.srcObject = streamRef.current;
+      videoRef.current.play().catch(() => {});
+    } else if (!isCameraActive) {
+      await initializeSecureCamera();
+    }
     setStage("ACTIVE_EXAM");
   }
 
@@ -453,20 +477,23 @@ function CandidateSittingContent() {
       // 2. Draw Forensic Watermark Overlay at bottom 76px
       const barHeight = 76;
       const barY = 480 - barHeight;
+      const isAudit = violationType === "PROCTOR_REQUESTED_SNAPSHOT";
 
       // Semi-transparent deep slate banner
-      ctx.fillStyle = "rgba(15, 23, 42, 0.92)";
+      ctx.fillStyle = "rgba(15, 23, 42, 0.95)";
       ctx.fillRect(0, barY, 640, barHeight);
 
-      // Crimson security accent line
-      ctx.fillStyle = "#DC2626";
+      // Accent line: Emerald for on-demand audit, Crimson for integrity infractions
+      ctx.fillStyle = isAudit ? "#059669" : "#DC2626";
       ctx.fillRect(0, barY, 640, 3);
 
       // Row 1: Header / Watchdog Label
       ctx.font = "bold 10px monospace, sans-serif";
-      ctx.fillStyle = "#38BDF8"; // Sky-400
+      ctx.fillStyle = isAudit ? "#34D399" : "#38BDF8"; // Emerald-400 or Sky-400
       ctx.fillText(
-        "KARE-SES SECURE EXAM INTEGRITY WATCHDOG • FORENSIC AUDIT EVIDENCE",
+        isAudit
+          ? "KARE-SES PROCTOR AUDIT • INSTANT LIVE WEBCAM VERIFICATION"
+          : "KARE-SES SECURE EXAM INTEGRITY WATCHDOG • FORENSIC AUDIT EVIDENCE",
         14,
         barY + 18
       );
@@ -480,25 +507,27 @@ function CandidateSittingContent() {
       const deptStr = `DEPT: ${candidate?.department || "CSE"}`;
       ctx.fillText(`${candidateStr}  •  ${deptStr}`, 14, barY + 36);
 
-      // Row 3: Infraction Type & Strike Counter (Prominent Red)
+      // Row 3: Infraction Type & Strike Counter
       ctx.font = "bold 11px monospace, sans-serif";
-      ctx.fillStyle = "#F87171"; // Red-400
+      ctx.fillStyle = isAudit ? "#6EE7B7" : "#F87171"; // Emerald-300 or Red-400
       const strikeNum = (strikes || 0) + 1;
       const maxStrk = exam?.maxStrikes || 3;
       ctx.fillText(
-        `INFRACTION: ${violationType}  [Strike #${strikeNum} of ${maxStrk}]`,
+        isAudit
+          ? "STATUS: ON-DEMAND PROCTOR VERIFICATION SNAPSHOT [Active Inspection]"
+          : `INFRACTION: ${violationType}  [Strike #${strikeNum} of ${maxStrk}]`,
         14,
         barY + 54
       );
 
-      // Row 4: Hardware Fingerprint & IST Server Timestamp (Slate-400)
+      // Row 4: Session & IST Server Timestamp (Slate-400)
       ctx.font = "9px monospace, sans-serif";
       ctx.fillStyle = "#94A3B8"; // Slate-400
       const istTimeStr = formatDateTime(new Date(), true, true);
-      const hwStr = `HW: ${sessionId ? sessionId.slice(0, 16) : "BROWSER-SIM"}`;
-      ctx.fillText(`TIME: ${istTimeStr}  •  ${hwStr}`, 14, barY + 68);
+      const sessStr = `SESSION: ${sessionId ? sessionId.slice(0, 16) : "WEB-SESSION"}`;
+      ctx.fillText(`TIME: ${istTimeStr}  •  ${sessStr}`, 14, barY + 68);
 
-      return canvas.toDataURL("image/jpeg", 0.75);
+      return canvas.toDataURL("image/jpeg", 0.70);
     } catch (err) {
       console.warn("Watermarked frame grabber exception:", err);
       return null;
@@ -509,9 +538,11 @@ function CandidateSittingContent() {
   async function reportSecurityViolation(violationType: string, reason?: string) {
     if (!token || !sessionId) return;
 
-    // 3-second cooldown to prevent event flood cascades
+    const isProctorSnap = violationType === "PROCTOR_REQUESTED_SNAPSHOT";
+
+    // 3-second cooldown to prevent event flood cascades (bypassed for on-demand proctor snap)
     const now = Date.now();
-    if (now - lastViolationTimeRef.current < 3000) return;
+    if (!isProctorSnap && now - lastViolationTimeRef.current < 3000) return;
     lastViolationTimeRef.current = now;
 
     try {
@@ -532,16 +563,17 @@ function CandidateSittingContent() {
             reason: reason || violationType,
             timestamp: new Date().toISOString(),
             deviceLabel: cameraDeviceLabel,
+            isAudit: isProctorSnap,
           },
         }),
       });
 
       if (res.ok) {
         const data = await res.json();
-        if (typeof data.currentStrikes === "number") {
+        if (typeof data.currentStrikes === "number" && !isProctorSnap) {
           setStrikes(data.currentStrikes);
         }
-        if (data.isLocked) {
+        if (data.isLocked && !isProctorSnap) {
           setIsWorkstationLocked(true);
           setLockoutReason(
             "Security Infraction Threshold Reached. Workstation locked by Safe Exam Watchdog."
@@ -919,6 +951,15 @@ function CandidateSittingContent() {
           } else if (cmd === "CMD_ANNOUNCE") {
             setProctorAnnouncement(msg || "Announcement from Invigilation Desk.");
             setTimeout(() => setProctorAnnouncement(null), 12000);
+          } else if (cmd === "CMD_REQUEST_SNAP") {
+            // Immediate on-demand webcam snapshot capture requested by proctor
+            const snap = captureWatermarkedSnapshot("PROCTOR_REQUESTED_SNAPSHOT");
+            if (snap) {
+              reportSecurityViolation(
+                "PROCTOR_REQUESTED_SNAPSHOT",
+                "On-demand invigilator audit snap"
+              );
+            }
           } else if (cmd === "CMD_TERMINATE") {
             setIsWorkstationLocked(true);
             setLockoutReason(
@@ -3324,9 +3365,36 @@ function CandidateSittingContent() {
         </div>
       )}
 
-      {/* Hidden Video and Off-Screen Canvas for Evidentiary Watermarked Snapshot Synthesis */}
-      <video ref={videoRef} playsInline autoPlay muted className="hidden" />
-      <canvas ref={canvasRef} width={640} height={480} className="hidden" />
+      {/* Off-Screen Video and Canvas for Evidentiary Watermarked Snapshot Synthesis */}
+      <video
+        ref={videoRef}
+        playsInline
+        autoPlay
+        muted
+        style={{
+          position: "fixed",
+          top: -9999,
+          left: -9999,
+          width: 640,
+          height: 480,
+          pointerEvents: "none",
+          opacity: 0,
+        }}
+      />
+      <canvas
+        ref={canvasRef}
+        width={640}
+        height={480}
+        style={{
+          position: "fixed",
+          top: -9999,
+          left: -9999,
+          width: 640,
+          height: 480,
+          pointerEvents: "none",
+          opacity: 0,
+        }}
+      />
     </div>
   );
 }

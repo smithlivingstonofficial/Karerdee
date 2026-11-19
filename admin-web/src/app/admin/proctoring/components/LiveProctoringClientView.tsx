@@ -15,6 +15,7 @@ import {
   sendProctorWarningAction,
   sendProctorReplyAction,
   markInquiryResolvedAction,
+  requestProctorSnapshotAction,
 } from "../actions";
 import { formatTime, formatDate, formatDateTime } from "@/lib/date";
 import {
@@ -239,6 +240,53 @@ export function LiveProctoringClientView({
           type: "success",
           text: `💬 New inquiry from ${newInquiry.candidateName} (${newInquiry.departmentCode}): "${newInquiry.message.slice(0, 45)}..."`,
         });
+      })
+      .on("broadcast", { event: "violation_detected" }, (eventPayload: any) => {
+        const payload = eventPayload?.payload || eventPayload;
+        if (!payload) return;
+
+        const newViol: ViolationFeedItem = {
+          id: payload.violationId || `viol_${Date.now()}`,
+          sessionId: payload.sessionId,
+          violationType: payload.violationType,
+          strikeNumber: payload.strikeNumber ?? 1,
+          snapshotUrl: payload.snapshotUrl || null,
+          createdAt: payload.recordedAt || new Date().toISOString(),
+          candidateName: payload.student?.fullName || "Candidate",
+          applicationNumber: payload.student?.applicationNumber || "N/A",
+          departmentCode: payload.student?.department || "GEN",
+          examTitle: currentExamObj?.title || "Examination",
+        };
+
+        // Prepend to violations feed
+        setViolations((prev) => [newViol, ...prev.filter((v) => v.id !== newViol.id)]);
+
+        // Update candidate session status in grid
+        setSessions((prev) =>
+          prev.map((s) =>
+            s.id === payload.sessionId
+              ? {
+                  ...s,
+                  strikesCount: payload.strikeNumber ?? s.strikesCount,
+                  status: payload.isLocked ? "LOCKED" : s.status,
+                }
+              : s
+          )
+        );
+
+        // If on-demand audit snapshot was requested, open forensic evidence viewer directly
+        if (payload.isAuditSnapshot && payload.snapshotUrl) {
+          setSelectedEvidence(newViol);
+          setNotice({
+            type: "success",
+            text: `📸 Live webcam snapshot received for ${newViol.candidateName}!`,
+          });
+        } else if (!payload.isAuditSnapshot) {
+          setNotice({
+            type: "error",
+            text: `⚠️ Infraction detected: ${newViol.candidateName} (${newViol.departmentCode}) — ${newViol.violationType}`,
+          });
+        }
       })
       .subscribe();
 
@@ -542,6 +590,26 @@ export function LiveProctoringClientView({
       }
     } catch (err: any) {
       setNotice({ type: "error", text: err.message || "Failed to dispatch warning." });
+    } finally {
+      setActionLoadingId(null);
+    }
+  }
+
+  async function handleRequestSnapshot(sessionId: string, candidateName: string) {
+    setActionLoadingId(sessionId);
+    setNotice(null);
+    try {
+      const res = await requestProctorSnapshotAction(sessionId);
+      if (res.error) {
+        setNotice({ type: "error", text: res.error });
+      } else {
+        setNotice({
+          type: "success",
+          text: `📸 Instant snapshot request dispatched to ${candidateName}. Evidence frame will arrive shortly...`,
+        });
+      }
+    } catch (err: any) {
+      setNotice({ type: "error", text: err.message || "Failed to dispatch snapshot request." });
     } finally {
       setActionLoadingId(null);
     }
@@ -1774,6 +1842,17 @@ export function LiveProctoringClientView({
                                   <Bell className="w-3.5 h-3.5" />
                                 </button>
 
+                                {/* On-Demand Webcam Photo Snapshot Request */}
+                                <button
+                                  type="button"
+                                  disabled={isLoading || isSubmitted || s.status !== "IN_PROGRESS"}
+                                  onClick={() => handleRequestSnapshot(s.id, s.candidateName)}
+                                  className="p-1.5 rounded-lg bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200 transition-colors cursor-pointer shadow-2xs disabled:opacity-40"
+                                  title="Request Instant Live Webcam Photo Verification"
+                                >
+                                  <Camera className="w-3.5 h-3.5" />
+                                </button>
+
                                 {/* Add Compensatory Time Button */}
                                 <button
                                   type="button"
@@ -2233,28 +2312,43 @@ export function LiveProctoringClientView({
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="w-full max-w-2xl bg-white border border-slate-200 rounded-2xl p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
             {/* Modal Header */}
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <div className="flex items-center space-x-2.5">
-                <div className="w-8 h-8 rounded-lg bg-red-50 text-red-700 flex items-center justify-center border border-red-200">
-                  <ShieldAlert className="w-4 h-4" />
+            {(() => {
+              const isAudit = selectedEvidence.violationType === "PROCTOR_REQUESTED_SNAPSHOT";
+              return (
+                <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                  <div className="flex items-center space-x-2.5">
+                    <div
+                      className={`w-8 h-8 rounded-lg flex items-center justify-center border ${
+                        isAudit
+                          ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                          : "bg-red-50 text-red-700 border-red-200"
+                      }`}
+                    >
+                      {isAudit ? <Camera className="w-4 h-4" /> : <ShieldAlert className="w-4 h-4" />}
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-bold text-slate-900">
+                        {isAudit
+                          ? "On-Demand Candidate Webcam Verification"
+                          : "Integrity Violation Evidence Inspector"}
+                      </h3>
+                      <p className="text-[11px] text-slate-500">
+                        {isAudit
+                          ? "Instant live camera snapshot captured at invigilator's request"
+                          : "Forensic webcam snapshot captured during active security watchdog trigger"}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedEvidence(null)}
+                    className="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg cursor-pointer"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
                 </div>
-                <div>
-                  <h3 className="text-sm font-bold text-slate-900">
-                    Integrity Violation Evidence Inspector
-                  </h3>
-                  <p className="text-[11px] text-slate-500">
-                    Forensic webcam snapshot captured during active security watchdog trigger
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setSelectedEvidence(null)}
-                className="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
+              );
+            })()}
 
             {/* Snapshot Preview Image */}
             <div className="relative rounded-xl overflow-hidden bg-slate-950 border border-slate-200 shadow-inner aspect-[4/3] flex items-center justify-center">
@@ -2274,10 +2368,17 @@ export function LiveProctoringClientView({
                   </p>
                 </div>
               )}
-              <div className="absolute top-2.5 left-2.5 px-2.5 py-1 rounded-full bg-slate-900/80 text-white border border-white/10 text-[10px] font-mono font-bold backdrop-blur-xs flex items-center space-x-1.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
-                <span>EVIDENTIARY CAPTURE</span>
-              </div>
+              {selectedEvidence.violationType === "PROCTOR_REQUESTED_SNAPSHOT" ? (
+                <div className="absolute top-2.5 left-2.5 px-2.5 py-1 rounded-full bg-emerald-950/80 text-emerald-200 border border-emerald-500/30 text-[10px] font-mono font-bold backdrop-blur-xs flex items-center space-x-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  <span>ON-DEMAND PROCTOR SNAP</span>
+                </div>
+              ) : (
+                <div className="absolute top-2.5 left-2.5 px-2.5 py-1 rounded-full bg-slate-900/80 text-white border border-white/10 text-[10px] font-mono font-bold backdrop-blur-xs flex items-center space-x-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+                  <span>EVIDENTIARY CAPTURE</span>
+                </div>
+              )}
             </div>
 
             {/* Incident Forensics Metadata Card */}
@@ -2301,14 +2402,30 @@ export function LiveProctoringClientView({
 
               <div className="border-t border-slate-200/80 pt-2 flex items-center justify-between">
                 <div className="flex items-center space-x-2">
-                  <span className="text-[10px] uppercase font-bold text-slate-400">Violation:</span>
-                  <span className="font-bold text-red-700 bg-red-50 px-2 py-0.5 rounded border border-red-200 text-[11px]">
-                    {selectedEvidence.violationType}
+                  <span className="text-[10px] uppercase font-bold text-slate-400">
+                    {selectedEvidence.violationType === "PROCTOR_REQUESTED_SNAPSHOT" ? "Event Type:" : "Violation:"}
+                  </span>
+                  <span
+                    className={`font-bold px-2 py-0.5 rounded border text-[11px] ${
+                      selectedEvidence.violationType === "PROCTOR_REQUESTED_SNAPSHOT"
+                        ? "text-emerald-800 bg-emerald-50 border-emerald-200"
+                        : "text-red-700 bg-red-50 border-red-200"
+                    }`}
+                  >
+                    {selectedEvidence.violationType === "PROCTOR_REQUESTED_SNAPSHOT"
+                      ? "PROCTOR_VERIFICATION_SNAP"
+                      : selectedEvidence.violationType}
                   </span>
                 </div>
-                <span className="font-mono text-xs font-black px-2.5 py-0.5 rounded bg-red-100 text-red-800 border border-red-300">
-                  Strike #{selectedEvidence.strikeNumber}
-                </span>
+                {selectedEvidence.violationType === "PROCTOR_REQUESTED_SNAPSHOT" ? (
+                  <span className="font-mono text-xs font-black px-2.5 py-0.5 rounded bg-emerald-100 text-emerald-800 border border-emerald-300">
+                    Non-Punitive Audit ✓
+                  </span>
+                ) : (
+                  <span className="font-mono text-xs font-black px-2.5 py-0.5 rounded bg-red-100 text-red-800 border border-red-300">
+                    Strike #{selectedEvidence.strikeNumber}
+                  </span>
+                )}
               </div>
             </div>
 

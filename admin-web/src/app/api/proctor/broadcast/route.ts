@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "sessionId and command are required." }, { status: 400 });
     }
 
-    const validCommands = ["CMD_WARN", "CMD_ANNOUNCE", "CMD_TERMINATE", "CMD_RESUME"];
+    const validCommands = ["CMD_WARN", "CMD_ANNOUNCE", "CMD_TERMINATE", "CMD_RESUME", "CMD_REQUEST_SNAP"];
     if (!validCommands.includes(command)) {
       return NextResponse.json(
         { error: `Invalid command. Must be one of: ${validCommands.join(", ")}` },
@@ -66,7 +66,14 @@ export async function POST(req: NextRequest) {
       await supabaseAdmin.from("proctor_actions").insert({
         session_id: sessionId,
         proctor_id: user.id,
-        action_type: command === "CMD_TERMINATE" ? "FORCE_SUBMIT" : command === "CMD_WARN" ? "WARN" : "UNLOCK",
+        action_type:
+          command === "CMD_TERMINATE"
+            ? "FORCE_SUBMIT"
+            : command === "CMD_WARN"
+            ? "WARN"
+            : command === "CMD_REQUEST_SNAP"
+            ? "SNAPSHOT_AUDIT"
+            : "UNLOCK",
         reason: message || command,
         action_payload: {
           command,
@@ -149,6 +156,8 @@ function getDefaultMessage(command: string): string {
       return "Your examination has been terminated by the invigilator. Your workstation is now locked.";
     case "CMD_RESUME":
       return "Your workstation has been unlocked by the invigilator. You may continue.";
+    case "CMD_REQUEST_SNAP":
+      return "On-demand invigilator webcam snapshot audit requested.";
     default:
       return "Message from invigilator.";
   }

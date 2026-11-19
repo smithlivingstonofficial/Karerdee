@@ -42,6 +42,7 @@ export async function POST(req: NextRequest) {
       .from("exam_sessions")
       .select(`
         id,
+        status,
         strikes_count,
         exam_id,
         student_id,
@@ -95,18 +96,27 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // 3. Atomically increment strike count on session
-    currentStrikes = (session.strikes_count || 0) + 1;
-    const maxStrikes = (session as any).exams?.max_strikes || 3;
-    isLocked = currentStrikes >= maxStrikes;
+    const isAuditSnapshot =
+      violationType === "PROCTOR_REQUESTED_SNAPSHOT" ||
+      metadata?.isAudit === true;
 
-    await supabaseAdmin
-      .from("exam_sessions")
-      .update({
-        strikes_count: currentStrikes,
-        status: isLocked ? "LOCKED" : "IN_PROGRESS",
-      })
-      .eq("id", sessionId);
+    // 3. Atomically increment strike count on session (unless neutral on-demand proctor audit snap)
+    if (!isAuditSnapshot) {
+      currentStrikes = (session.strikes_count || 0) + 1;
+      const maxStrikes = (session as any).exams?.max_strikes || 3;
+      isLocked = currentStrikes >= maxStrikes;
+
+      await supabaseAdmin
+        .from("exam_sessions")
+        .update({
+          strikes_count: currentStrikes,
+          status: isLocked ? "LOCKED" : "IN_PROGRESS",
+        })
+        .eq("id", sessionId);
+    } else {
+      currentStrikes = session.strikes_count || 0;
+      isLocked = session.status === "LOCKED";
+    }
 
     // 4. Record violation log with snapshot URL
     const { data: insertedViol, error: violInsertErr } = await supabaseAdmin
@@ -123,6 +133,68 @@ export async function POST(req: NextRequest) {
 
     if (violInsertErr) {
       console.warn("Violation log insert error:", violInsertErr.message);
+    }
+
+    // 5. Broadcast to Live Proctoring Console via Supabase Realtime REST API
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (supabaseUrl && serviceKey) {
+      try {
+        await fetch(`${supabaseUrl}/realtime/v1/api/broadcast`, {
+          method: "POST",
+          headers: {
+            apikey: serviceKey,
+            Authorization: `Bearer ${serviceKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            messages: [
+              {
+                topic: "exam-proctor-broadcast",
+                event: "violation_detected",
+                payload: {
+                  sessionId,
+                  violationId: insertedViol?.id,
+                  violationType,
+                  strikeNumber: currentStrikes,
+                  snapshotUrl: snapshotUrl || null,
+                  isLocked,
+                  isAuditSnapshot,
+                  metadata: metadata || {},
+                  recordedAt: insertedViol?.created_at || new Date().toISOString(),
+                  student: {
+                    fullName: (session as any).students?.full_name,
+                    applicationNumber: (session as any).students?.application_number,
+                    department: (session as any).students?.department?.code,
+                  },
+                },
+              },
+              {
+                topic: `exam-telemetry:${resolvedExamId}`,
+                event: "violation_detected",
+                payload: {
+                  sessionId,
+                  violationId: insertedViol?.id,
+                  violationType,
+                  strikeNumber: currentStrikes,
+                  snapshotUrl: snapshotUrl || null,
+                  isLocked,
+                  isAuditSnapshot,
+                  metadata: metadata || {},
+                  recordedAt: insertedViol?.created_at || new Date().toISOString(),
+                  student: {
+                    fullName: (session as any).students?.full_name,
+                    applicationNumber: (session as any).students?.application_number,
+                    department: (session as any).students?.department?.code,
+                  },
+                },
+              },
+            ],
+          }),
+        });
+      } catch (broadcastErr) {
+        console.warn("Realtime broadcast notice:", broadcastErr);
+      }
     }
 
     return NextResponse.json({
