@@ -48,6 +48,7 @@ import {
   MessageSquare,
   MessageCircle,
   Radio,
+  Unlock,
 } from "lucide-react";
 import { MathText } from "@/components/MathText";
 
@@ -279,9 +280,13 @@ function CandidateSittingContent() {
   const [fullscreenGraceCountdown, setFullscreenGraceCountdown] = useState(15);
   const fullscreenTimerRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Upcoming Exam Info for Pre-Exam Candidate Waiting Awareness
+  const [upcomingExamInfo, setUpcomingExamInfo] = useState<any>(null);
+
   // Webcam & Security Watchdog States (Zero-Lag Background Camera + Watermark Engine)
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const instructionsVideoRef = useRef<HTMLVideoElement | null>(null);
+  const waitingRoomVideoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const [isCameraActive, setIsCameraActive] = useState<boolean>(false);
@@ -344,6 +349,12 @@ function CandidateSittingContent() {
         await instructionsVideoRef.current.play().catch(() => {});
       }
 
+      // Attach stream to waiting room diagnostics preview element
+      if (waitingRoomVideoRef.current) {
+        waitingRoomVideoRef.current.srcObject = stream;
+        await waitingRoomVideoRef.current.play().catch(() => {});
+      }
+
       // Add hardware disconnect and stream mute watchdog listeners
       stream.getVideoTracks().forEach((track) => {
         track.onended = () => {
@@ -386,12 +397,15 @@ function CandidateSittingContent() {
     if (instructionsVideoRef.current) {
       instructionsVideoRef.current.srcObject = null;
     }
+    if (waitingRoomVideoRef.current) {
+      waitingRoomVideoRef.current.srcObject = null;
+    }
     setIsCameraActive(false);
   }
 
-  // Pre-initialize camera during INSTRUCTIONS to avoid focus loss during ACTIVE_EXAM
+  // Pre-initialize camera during INSTRUCTIONS & WAITING_ROOM to avoid focus loss during ACTIVE_EXAM
   useEffect(() => {
-    if (stage === "INSTRUCTIONS") {
+    if (stage === "INSTRUCTIONS" || stage === "WAITING_ROOM") {
       initializeSecureCamera();
     } else if (stage === "SUBMITTED") {
       stopSecureCamera();
@@ -403,11 +417,17 @@ function CandidateSittingContent() {
     };
   }, [stage]);
 
-  // Keep instructions preview video wired when stream changes
+  // Keep preview videos wired when stream changes
   useEffect(() => {
-    if (stage === "INSTRUCTIONS" && instructionsVideoRef.current && streamRef.current) {
-      instructionsVideoRef.current.srcObject = streamRef.current;
-      instructionsVideoRef.current.play().catch(() => {});
+    if (streamRef.current) {
+      if (instructionsVideoRef.current) {
+        instructionsVideoRef.current.srcObject = streamRef.current;
+        instructionsVideoRef.current.play().catch(() => {});
+      }
+      if (waitingRoomVideoRef.current) {
+        waitingRoomVideoRef.current.srcObject = streamRef.current;
+        waitingRoomVideoRef.current.play().catch(() => {});
+      }
     }
   }, [stage, isCameraActive]);
 
@@ -516,9 +536,11 @@ function CandidateSittingContent() {
       let video = videoRef.current;
       const canvas = canvasRef.current;
 
-      // Fallback to instructions preview video if primary hidden capture video is not yet loaded
+      // Fallback to preview videos if primary hidden capture video is not yet loaded
       if ((!video || video.readyState < 2) && instructionsVideoRef.current && instructionsVideoRef.current.readyState >= 2) {
         video = instructionsVideoRef.current;
+      } else if ((!video || video.readyState < 2) && waitingRoomVideoRef.current && waitingRoomVideoRef.current.readyState >= 2) {
+        video = waitingRoomVideoRef.current;
       }
 
       // If video element exists but stream is not bound or paused, attempt instant binding
@@ -1257,17 +1279,25 @@ function CandidateSittingContent() {
         .then(async (res) => {
           const data = await res.json();
           if (!res.ok) {
-            if (data.code === "EXAM_NOT_STARTED" && data.exam && data.candidate) {
+            if (data.code === "EXAM_NOT_STARTED" && data.exam) {
               if (typeof data.serverEpochMs === "number") {
                 setClockSkewMs(data.serverEpochMs - Date.now());
               }
+              const cand = data.candidate || {
+                id: "candidate",
+                fullName: "Registered Candidate",
+                email: "",
+                applicationNumber: "",
+                rollNumber: "",
+                department: { name: "Department Specialization Track", code: "GEN" },
+              };
               setWaitingRoomData({
-                candidate: data.candidate,
+                candidate: cand,
                 exam: data.exam,
-                startTimeEpochMs: new Date(data.startTime).getTime(),
+                startTimeEpochMs: new Date(data.startTime || data.exam.startTime).getTime(),
               });
               setStoredAuthCredentials({
-                email: data.candidate.email,
+                email: cand.email || "",
                 password: "",
                 passcode: "",
                 ticket: queryTicket,
@@ -1341,6 +1371,18 @@ function CandidateSittingContent() {
     if (queryCode) setLoginPasscode(queryCode);
   }, [searchParams]);
 
+  // Fetch upcoming scheduled exam info for candidate waiting area notice
+  useEffect(() => {
+    fetch("/api/exam/upcoming")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success && data.upcomingExam) {
+          setUpcomingExamInfo(data.upcomingExam);
+        }
+      })
+      .catch((err) => console.warn("Upcoming exam fetch notice:", err));
+  }, []);
+
   // Check online status
   useEffect(() => {
     function handleOnline() {
@@ -1376,7 +1418,8 @@ function CandidateSittingContent() {
     jwtToken: string,
     sessId: string,
     cand: CandidateData,
-    examData: ExamData
+    examData: ExamData,
+    directToActiveExam: boolean = false
   ) {
     setToken(jwtToken);
     setSessionId(sessId);
@@ -1426,7 +1469,11 @@ function CandidateSittingContent() {
       })
       .catch((err) => console.warn("Answer restore fetch notice:", err));
 
-    setStage("INSTRUCTIONS");
+    if (directToActiveExam) {
+      handleBeginExamination();
+    } else {
+      setStage("INSTRUCTIONS");
+    }
   }
 
   // Candidate Authentication against /api/exam/auth
@@ -1467,11 +1514,19 @@ function CandidateSittingContent() {
         if (typeof data.serverEpochMs === "number") {
           setClockSkewMs(data.serverEpochMs - Date.now());
         }
-        if (data.code === "EXAM_NOT_STARTED" && data.exam && data.candidate) {
+        if (data.code === "EXAM_NOT_STARTED" && data.exam) {
+          const cand = data.candidate || {
+            id: "candidate",
+            fullName: loginEmail.trim(),
+            email: loginEmail.trim(),
+            applicationNumber: loginPassword.trim(),
+            rollNumber: loginPassword.trim(),
+            department: { name: "Department Curricula", code: "GEN" },
+          };
           setWaitingRoomData({
-            candidate: data.candidate,
+            candidate: cand,
             exam: data.exam,
-            startTimeEpochMs: new Date(data.startTime).getTime(),
+            startTimeEpochMs: new Date(data.startTime || data.exam.startTime).getTime(),
           });
           setStoredAuthCredentials({
             email: loginEmail.trim(),
@@ -1510,7 +1565,7 @@ function CandidateSittingContent() {
   }
 
   // Trigger Automatic or Manual Admission from Waiting Room once start time arrives
-  async function triggerAdmission() {
+  async function triggerAdmission(directToExam: boolean = true) {
     if (isAdmittingAutoRef.current) return;
     isAdmittingAutoRef.current = true;
     setIsAdmittingAuto(true);
@@ -1532,7 +1587,14 @@ function CandidateSittingContent() {
         });
         const data = await res.json();
         if (res.ok && data.candidate && data.exam) {
-          initializeSession(data.token, data.sessionId, data.candidate, data.exam);
+          initializeSession(data.token, data.sessionId, data.candidate, data.exam, directToExam);
+          return;
+        } else if (data.code === "EXAM_NOT_STARTED") {
+          // Retry automatically in 1 second in case of slight sub-second clock skew
+          setTimeout(() => {
+            isAdmittingAutoRef.current = false;
+            triggerAdmission(directToExam);
+          }, 1000);
           return;
         }
       } else if (storedAuthCredentials?.email && storedAuthCredentials?.passcode) {
@@ -1550,12 +1612,24 @@ function CandidateSittingContent() {
         });
         const data = await res.json();
         if (res.ok && data.candidate && data.exam) {
-          initializeSession(data.token, data.sessionId, data.candidate, {
-            ...data.exam,
-            serverEpochMs: data.serverEpochMs,
-            endTime: data.endTime,
-            remainingSeconds: data.remainingSeconds,
-          });
+          initializeSession(
+            data.token,
+            data.sessionId,
+            data.candidate,
+            {
+              ...data.exam,
+              serverEpochMs: data.serverEpochMs,
+              endTime: data.endTime,
+              remainingSeconds: data.remainingSeconds,
+            },
+            directToExam
+          );
+          return;
+        } else if (data.code === "EXAM_NOT_STARTED") {
+          setTimeout(() => {
+            isAdmittingAutoRef.current = false;
+            triggerAdmission(directToExam);
+          }, 1000);
           return;
         }
       }
@@ -1581,7 +1655,7 @@ function CandidateSittingContent() {
       setWaitingCountdown(secs);
 
       if (secs <= 0) {
-        triggerAdmission();
+        triggerAdmission(true);
       }
     }
 
@@ -1980,6 +2054,22 @@ function CandidateSittingContent() {
             </p>
           </div>
 
+          {/* Upcoming Examination Banner (Pre-Exam Awareness) */}
+          {upcomingExamInfo && !upcomingExamInfo.isStarted && (
+            <div className="bg-gradient-to-r from-blue-50/90 to-slate-50 border border-blue-200/90 rounded-xl p-3.5 text-xs text-blue-950 flex items-start space-x-2.5 shadow-2xs">
+              <Clock className="w-4 h-4 text-blue-700 shrink-0 mt-0.5" />
+              <div className="text-[11px] leading-relaxed space-y-0.5">
+                <div className="font-bold text-blue-900 flex items-center gap-1.5">
+                  <span>Upcoming Examination:</span>
+                  <span className="text-slate-800">{upcomingExamInfo.title}</span>
+                </div>
+                <div className="text-slate-600">
+                  Scheduled to start at <strong className="text-blue-900 font-bold">{upcomingExamInfo.startTimeIST}</strong>. Login below to enter your Candidate Waiting Area.
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Guidance Banner */}
           <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-3 text-xs text-slate-600 flex items-start space-x-2.5">
             <ShieldCheck className="w-4 h-4 text-blue-700 shrink-0 mt-0.5" />
@@ -2181,7 +2271,7 @@ function CandidateSittingContent() {
 
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center p-3 sm:p-6 font-sans">
-        <div className="w-full max-w-4xl bg-white border border-slate-200/90 rounded-2xl p-6 sm:p-8 shadow-sm space-y-6">
+        <div className="w-full max-w-5xl bg-white border border-slate-200/90 rounded-2xl p-6 sm:p-8 shadow-sm space-y-6">
           {/* Institutional Top Header */}
           <div className="border-b border-slate-100 pb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div className="flex items-center space-x-3.5">
@@ -2193,7 +2283,7 @@ function CandidateSittingContent() {
                   Department of Research and Development
                 </span>
                 <h1 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight">
-                  KARE PhD Entrance Exam • Candidate Waiting Room
+                  KARE PhD Entrance Exam • Candidate Waiting Area
                 </h1>
                 <p className="text-xs text-slate-500">
                   {waitingRoomData.exam.title || "Ph.D Research Eligibility & Entrance Examination"}
@@ -2202,15 +2292,15 @@ function CandidateSittingContent() {
             </div>
             <div className="inline-flex items-center space-x-2 px-3 py-1.5 rounded-full text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 shadow-2xs self-start sm:self-auto">
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              <span>Gateway Armed &amp; Waiting</span>
+              <span>{isZero ? "Examination Active • Commencing" : "Gateway Armed • Waiting for Start Time"}</span>
             </div>
           </div>
 
-          {/* Main Grid: Countdown + Candidate Card */}
+          {/* Main Grid: Countdown & Enter Button + Candidate Profile & Rules */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-            {/* Left Column (7 cols): Big Digital Countdown Clock */}
+            {/* Left Column (7 cols): Big Digital Countdown Clock & Enter Button */}
             <div className="lg:col-span-7 space-y-4">
-              <div className="bg-gradient-to-br from-slate-50 via-blue-50/40 to-slate-50 border border-blue-200/80 rounded-2xl p-6 text-center space-y-4 shadow-2xs">
+              <div className="bg-gradient-to-br from-slate-50 via-blue-50/40 to-slate-50 border border-blue-200/80 rounded-2xl p-6 text-center space-y-5 shadow-2xs">
                 <div className="flex items-center justify-center space-x-2 text-xs font-bold text-blue-900 uppercase tracking-wider">
                   <Clock className="w-4 h-4 text-blue-700" />
                   <span>Time Until Examination Commences</span>
@@ -2245,58 +2335,134 @@ function CandidateSittingContent() {
                 </div>
 
                 {/* Scheduled Start & Synchronized Clock */}
-                <div className="space-y-1 text-xs text-slate-600 pt-1">
-                  <div>
-                    Scheduled Start:{" "}
+                <div className="space-y-1.5 text-xs text-slate-600 pt-1 border-t border-blue-100">
+                  <div className="flex items-center justify-center gap-1.5">
+                    <span className="text-slate-500">Scheduled Start Time:</span>
                     <strong className="text-slate-900 font-bold">
                       {waitingRoomData.exam.startTimeIST || formatDateTime(waitingRoomData.exam.startTime, false, true)}
                     </strong>
                   </div>
                   <div className="text-[11px] text-slate-500 font-mono flex items-center justify-center space-x-1.5">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                    <span>Live Server Clock: {liveEntranceIST || "Synchronized"}</span>
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    <span>Authoritative Server Clock (IST): {liveEntranceIST || "Synchronized"}</span>
                   </div>
                 </div>
 
                 {/* Live Admittance Notification */}
-                <div className="p-3 bg-white border border-blue-200/90 rounded-xl text-xs text-blue-950 font-medium shadow-2xs space-y-1 text-left sm:text-center">
+                <div className="p-3.5 bg-white border border-blue-200/90 rounded-xl text-xs text-blue-950 font-medium shadow-2xs space-y-1 text-center">
                   <div className="font-bold text-blue-900 flex items-center justify-center space-x-1.5">
                     <Radio className="w-3.5 h-3.5 text-blue-700 animate-pulse" />
-                    <span>Automatic Admission Active</span>
+                    <span>Automatic Commencement Watchdog Active</span>
                   </div>
                   <p className="text-[11px] text-slate-600 leading-relaxed">
-                    Please remain on this screen. When the countdown reaches zero, the system will automatically admit you into your examination hall.
+                    Please remain on this screen. When the scheduled start time arrives, the portal will <strong>automatically take you into the examination page</strong>.
                   </p>
                 </div>
 
-                {/* Admission Trigger Button */}
-                <button
-                  type="button"
-                  disabled={!isZero || isAdmittingAuto}
-                  onClick={triggerAdmission}
-                  className={`w-full py-3 px-4 rounded-xl text-xs font-bold transition-all shadow-xs flex items-center justify-center space-x-2 cursor-pointer ${
-                    isZero
-                      ? "bg-blue-700 hover:bg-blue-800 text-white ring-2 ring-blue-500/30 animate-pulse"
-                      : "bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed"
-                  }`}
-                >
-                  {isAdmittingAuto ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin mr-1.5" />
-                      <span>Admitting to Examination Hall...</span>
-                    </>
-                  ) : isZero ? (
-                    <>
-                      <span>Enter Examination Hall Now</span>
-                      <ArrowRight className="w-4 h-4 ml-1" />
-                    </>
+                {/* Enter Examination Button (Locked until scheduled start time) */}
+                <div className="space-y-2 pt-1">
+                  <button
+                    type="button"
+                    disabled={!isZero || isAdmittingAuto}
+                    onClick={() => triggerAdmission(true)}
+                    className={`w-full py-3.5 px-4 rounded-xl text-xs font-bold transition-all shadow-sm flex items-center justify-center space-x-2 select-none ${
+                      isZero
+                        ? "bg-blue-700 hover:bg-blue-800 text-white ring-2 ring-blue-500/30 cursor-pointer animate-pulse"
+                        : "bg-slate-100 text-slate-400 border border-slate-300 cursor-not-allowed opacity-90"
+                    }`}
+                  >
+                    {isAdmittingAuto ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin mr-1.5" />
+                        <span>Admitting to Examination Page...</span>
+                      </>
+                    ) : isZero ? (
+                      <>
+                        <Unlock className="w-4 h-4 mr-1.5" />
+                        <span>Enter Examination Now</span>
+                        <ArrowRight className="w-4 h-4 ml-1.5" />
+                      </>
+                    ) : (
+                      <>
+                        <Lock className="w-4 h-4 mr-1.5 text-slate-400" />
+                        <span>Enter (Locked until Scheduled Start Time)</span>
+                      </>
+                    )}
+                  </button>
+
+                  {/* Lock Status Helper Notice */}
+                  {!isZero ? (
+                    <p className="text-[11px] text-slate-500 flex items-center justify-center gap-1.5 text-center">
+                      <Lock className="w-3 h-3 text-slate-400 shrink-0" />
+                      <span>
+                        The <strong>Enter</strong> button is locked until scheduled start time ({String(hours).padStart(2, "0")}:{String(minutes).padStart(2, "0")}:{String(seconds).padStart(2, "0")}). It will unlock and automatically take you into the exam page at zero.
+                      </span>
+                    </p>
                   ) : (
-                    <>
-                      <Clock className="w-3.5 h-3.5 mr-1 text-slate-400" />
-                      <span>Admitting Automatically at Start Time ({String(minutes).padStart(2, "0")}:{String(seconds).padStart(2, "0")})</span>
-                    </>
+                    <p className="text-[11px] text-emerald-700 font-semibold flex items-center justify-center gap-1.5 text-center">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                      <span>Scheduled time reached! Admitting you automatically, or click above to enter immediately.</span>
+                    </p>
                   )}
-                </button>
+                </div>
+              </div>
+
+              {/* Live Webcam Pre-Calibration Box */}
+              <div className="bg-slate-50 border border-slate-200/90 rounded-xl p-4 space-y-3">
+                <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+                  <span className="text-xs font-bold text-slate-900 flex items-center">
+                    <Camera className="w-4 h-4 mr-1.5 text-blue-700" />
+                    Live Pre-Exam Camera Diagnostics
+                  </span>
+                  <span
+                    className={`text-[10px] font-bold px-2 py-0.5 rounded-full border flex items-center space-x-1 ${
+                      isCameraActive
+                        ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                        : "bg-amber-50 text-amber-800 border-amber-200"
+                    }`}
+                  >
+                    <span
+                      className={`w-1.5 h-1.5 rounded-full ${
+                        isCameraActive ? "bg-emerald-500 animate-pulse" : "bg-amber-500"
+                      }`}
+                    />
+                    <span>{isCameraActive ? "Camera Calibrated & Monitoring Ready" : "Pre-Calibrating Camera..."}</span>
+                  </span>
+                </div>
+                <div className="relative rounded-xl overflow-hidden bg-slate-950 aspect-video border border-slate-200 shadow-inner flex items-center justify-center max-w-sm mx-auto">
+                  <video
+                    ref={waitingRoomVideoRef}
+                    autoPlay
+                    playsInline
+                    muted
+                    className={`w-full h-full object-cover ${isCameraActive ? "block" : "hidden"}`}
+                  />
+                  {!isCameraActive && (
+                    <div className="p-4 text-center text-slate-400 text-xs space-y-2">
+                      <CameraOff className="w-6 h-6 mx-auto text-slate-500" />
+                      <p className="text-[11px] text-slate-400">
+                        {cameraError || "Initializing video stream for proctoring verification..."}
+                      </p>
+                      <button
+                        type="button"
+                        onClick={initializeSecureCamera}
+                        className="px-3 py-1.5 bg-blue-700 text-white rounded-lg text-xs font-bold hover:bg-blue-800 transition-colors cursor-pointer inline-flex items-center space-x-1"
+                      >
+                        <RefreshCw className="w-3 h-3 mr-1" />
+                        <span>Enable Camera Stream</span>
+                      </button>
+                    </div>
+                  )}
+                  {isCameraActive && (
+                    <div className="absolute top-2 left-2 px-2 py-0.5 rounded-full bg-slate-900/80 text-emerald-300 border border-emerald-500/40 text-[9px] font-bold flex items-center space-x-1 backdrop-blur-xs">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                      <span>LIVE PREVIEW • 640x480</span>
+                    </div>
+                  )}
+                </div>
+                <p className="text-[11px] text-slate-500 text-center">
+                  Your camera is pre-warmed so that you transition into the exam seamlessly with zero setup delays.
+                </p>
               </div>
             </div>
 
@@ -2307,15 +2473,15 @@ function CandidateSittingContent() {
                 <div className="flex items-center justify-between border-b border-slate-200/70 pb-2">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-slate-600 flex items-center">
                     <ShieldCheck className="w-3.5 h-3.5 mr-1.5 text-blue-700" />
-                    Verified Candidate
+                    Verified Candidate Pass
                   </span>
-                  <span className="text-[10px] font-mono font-extrabold text-emerald-800 bg-emerald-50 px-2 py-0.2 rounded border border-emerald-200">
-                    Ready
+                  <span className="text-[10px] font-mono font-extrabold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                    Authenticated
                   </span>
                 </div>
-                <div className="space-y-1.5 text-xs">
+                <div className="space-y-2 text-xs">
                   <div>
-                    <span className="text-slate-400 text-[10px] block">Candidate Name</span>
+                    <span className="text-slate-400 text-[10px] block">Full Candidate Name</span>
                     <strong className="text-slate-900 font-bold text-sm block">
                       {waitingRoomData.candidate.fullName}
                     </strong>
@@ -2328,14 +2494,14 @@ function CandidateSittingContent() {
                       </span>
                     </div>
                     <div>
-                      <span className="text-slate-400 text-[10px] block">Department Track</span>
+                      <span className="text-slate-400 text-[10px] block">Department Specialization</span>
                       <span className="font-bold text-blue-700 text-xs truncate block" title={waitingRoomData.candidate.department?.name}>
                         {waitingRoomData.candidate.department?.code || "GEN"} • {waitingRoomData.candidate.department?.name || "Specialization"}
                       </span>
                     </div>
                   </div>
                   <div className="pt-1">
-                    <span className="text-slate-400 text-[10px] block">Registered Email</span>
+                    <span className="text-slate-400 text-[10px] block">Institutional / Registered Email</span>
                     <span className="text-slate-600 font-mono text-[11px] truncate block">
                       {waitingRoomData.candidate.email}
                     </span>
@@ -2344,35 +2510,39 @@ function CandidateSittingContent() {
               </div>
 
               {/* Exam Format Summary */}
-              <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-2xs space-y-2.5 text-xs">
+              <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-2xs space-y-3 text-xs">
                 <h4 className="font-bold text-slate-900 flex items-center">
                   <BookOpen className="w-3.5 h-3.5 mr-1.5 text-blue-700" />
-                  Exam Structure &amp; Guidelines
+                  Examination Structure &amp; Format
                 </h4>
-                <ul className="space-y-1.5 text-[11px] text-slate-600">
-                  <li className="flex items-start space-x-1.5">
+                <ul className="space-y-2 text-[11px] text-slate-600">
+                  <li className="flex items-start space-x-2">
                     <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5" />
-                    <span><strong>50 Total Questions</strong>: 25 in Part A (Common) + 25 in Part B (Specialization).</span>
+                    <span><strong>50 Questions Total:</strong> 25 in Part A (Common Research Aptitude) + 25 in Part B (Department Specialization).</span>
                   </li>
-                  <li className="flex items-start space-x-1.5">
+                  <li className="flex items-start space-x-2">
                     <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5" />
-                    <span><strong>Duration: {waitingRoomData.exam.durationMinutes || 90} Minutes</strong> timed by authoritative server clock.</span>
+                    <span><strong>Timed Window:</strong> {waitingRoomData.exam.durationMinutes || 90} Minutes synchronized with authoritative server IST time.</span>
                   </li>
-                  <li className="flex items-start space-x-1.5">
+                  <li className="flex items-start space-x-2">
                     <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5" />
-                    <span><strong>Anti-Tab Exit Watchdog:</strong> Do not switch tabs or exit fullscreen once admitted.</span>
+                    <span><strong>Academic Blue Theme:</strong> Anti-glare light theme layout conforming to WCAG 2.1 academic ergonomics.</span>
+                  </li>
+                  <li className="flex items-start space-x-2">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5" />
+                    <span><strong>Mandatory Fullscreen:</strong> Tab switching, dev tools, and window exits immediately record infraction strikes.</span>
                   </li>
                 </ul>
               </div>
 
-              {/* Pre-Flight Connectivity Check */}
+              {/* Pre-Flight Connectivity & Status */}
               <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between text-xs">
                 <span className="text-[11px] font-semibold text-slate-600 flex items-center space-x-1.5">
                   <Wifi className="w-3.5 h-3.5 text-emerald-600" />
-                  <span>Network &amp; Server Link</span>
+                  <span>Network Server Link</span>
                 </span>
                 <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-                  Connected (Active)
+                  Active &amp; Ready
                 </span>
               </div>
             </div>

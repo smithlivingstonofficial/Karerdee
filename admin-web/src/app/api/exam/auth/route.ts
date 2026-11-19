@@ -86,24 +86,8 @@ export async function POST(req: NextRequest) {
     const graceBufferMinutes = (exam.config as any)?.late_entry_buffer_minutes ?? 15;
     const graceCutoff = new Date(startTime.getTime() + graceBufferMinutes * 60 * 1000);
 
-    // 1a. Strict Concluded Exam Window Check
-    if (exam.status === "COMPLETED" || exam.status === "ARCHIVED" || serverEpochMs > endTime.getTime()) {
-      if (exam.status !== "COMPLETED" && exam.status !== "ARCHIVED") {
-        await reconcileExamStatuses(exam.id);
-      }
-      return NextResponse.json(
-        {
-          error: `This examination has concluded. The scheduled exam window ended at ${formatDateTime(endTime, false, true)}. Access is strictly closed.`,
-          code: "EXAM_CONCLUDED",
-          serverTime: serverNow.toISOString(),
-          serverTimeIST: formatDateTime(serverNow, true, true),
-          serverEpochMs,
-          endTime: endTime.toISOString(),
-          endTimeIST: formatDateTime(endTime, false, true),
-        },
-        { status: 403 }
-      );
-    }
+    // 10-second skew tolerance buffer for sharp commencement transitions
+    const ADMISSION_TOLERANCE_MS = 10 * 1000;
 
     // 2. Look up Student by Email ID (with fallback to roll number or application number for backwards compatibility)
     let studentQuery = supabaseAdmin
@@ -164,7 +148,8 @@ export async function POST(req: NextRequest) {
     }
 
     // 1b. Scheduled Start Window Check (Waiting Room / Pre-Exam Lobby Mode)
-    if (serverEpochMs < startTime.getTime()) {
+    // If current time is prior to scheduled start time (absorbing up to 10s clock skew), candidate enters Waiting Room
+    if (serverEpochMs + ADMISSION_TOLERANCE_MS < startTime.getTime()) {
       const minutesUntilStart = Math.ceil((startTime.getTime() - serverEpochMs) / 60000);
       const secondsUntilStart = Math.max(0, Math.ceil((startTime.getTime() - serverEpochMs) / 1000));
       return NextResponse.json(
@@ -198,6 +183,25 @@ export async function POST(req: NextRequest) {
             endTimeIST: formatDateTime(endTime, false, true),
             totalQuestions: 50,
           },
+        },
+        { status: 403 }
+      );
+    }
+
+    // 1a. Strict Concluded Exam Window Check (Only if start time has arrived or passed)
+    if (exam.status === "COMPLETED" || exam.status === "ARCHIVED" || serverEpochMs > endTime.getTime()) {
+      if (exam.status !== "COMPLETED" && exam.status !== "ARCHIVED") {
+        await reconcileExamStatuses(exam.id);
+      }
+      return NextResponse.json(
+        {
+          error: `This examination has concluded. The scheduled exam window ended at ${formatDateTime(endTime, false, true)}. Access is strictly closed.`,
+          code: "EXAM_CONCLUDED",
+          serverTime: serverNow.toISOString(),
+          serverTimeIST: formatDateTime(serverNow, true, true),
+          serverEpochMs,
+          endTime: endTime.toISOString(),
+          endTimeIST: formatDateTime(endTime, false, true),
         },
         { status: 403 }
       );
