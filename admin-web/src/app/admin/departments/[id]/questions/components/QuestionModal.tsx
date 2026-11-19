@@ -15,7 +15,8 @@ import {
   Trash2,
   Code,
   CheckCircle2,
-  Check
+  Check,
+  CheckCheck
 } from "lucide-react";
 
 interface QuestionModalProps {
@@ -24,6 +25,7 @@ interface QuestionModalProps {
   departmentId: string;
   departmentCode: string;
   existingTopics?: string[];
+  initialType?: "MCQ_SINGLE" | "MCQ_MULTIPLE";
   question?: {
     id: string;
     topic: string;
@@ -43,6 +45,7 @@ export function QuestionModal({
   departmentId,
   departmentCode,
   existingTopics = [],
+  initialType = "MCQ_SINGLE",
   question,
 }: QuestionModalProps) {
   const [topic, setTopic] = useState("General");
@@ -88,7 +91,7 @@ export function QuestionModal({
     } else {
       setTopic("General");
       setDifficulty("MEDIUM");
-      setQuestionType("MCQ_SINGLE");
+      setQuestionType(initialType);
       setPrompt("");
       setCodeSnippet("");
       setShowCodeSnippet(false);
@@ -102,9 +105,23 @@ export function QuestionModal({
       ]);
     }
     setError(null);
-  }, [question, isOpen]);
+  }, [question, isOpen, initialType]);
 
   if (!isOpen) return null;
+
+  function handleTypeChange(newType: "MCQ_SINGLE" | "MCQ_MULTIPLE") {
+    setQuestionType(newType);
+    if (newType === "MCQ_SINGLE") {
+      const firstCorrectIdx = options.findIndex((o) => o.isCorrect);
+      const targetIdx = firstCorrectIdx >= 0 ? firstCorrectIdx : 0;
+      setOptions(
+        options.map((opt, i) => ({
+          ...opt,
+          isCorrect: i === targetIdx,
+        }))
+      );
+    }
+  }
 
   function handleOptionTextChange(index: number, val: string) {
     const updated = [...options];
@@ -120,8 +137,9 @@ export function QuestionModal({
       }));
       setOptions(updated);
     } else {
-      const updated = [...options];
-      updated[index].isCorrect = !updated[index].isCorrect;
+      const updated = options.map((opt, i) =>
+        i === index ? { ...opt, isCorrect: !opt.isCorrect } : opt
+      );
       setOptions(updated);
     }
   }
@@ -223,8 +241,8 @@ export function QuestionModal({
             </div>
           )}
 
-          {/* Row 1: Topic & Difficulty & Type */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {/* Row 1: Topic & Difficulty */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
                 Topic / Subject Area
@@ -276,19 +294,74 @@ export function QuestionModal({
                 ))}
               </div>
             </div>
+          </div>
 
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
-                Question Type
+          {/* Question Format Selector: Single Choice vs Multiple Choice (Multi-Select) */}
+          <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="block text-xs font-bold text-slate-800 uppercase tracking-wider">
+                Question Format <span className="text-red-500">*</span>
               </label>
-              <select
-                value={questionType}
-                onChange={(e) => setQuestionType(e.target.value as any)}
-                className="w-full px-3 py-1.5 text-xs bg-white border border-slate-300 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-700 cursor-pointer"
+              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                questionType === "MCQ_MULTIPLE"
+                  ? "bg-amber-100 text-amber-800 border-amber-300"
+                  : "bg-blue-100 text-blue-800 border-blue-200"
+              }`}>
+                {questionType === "MCQ_MULTIPLE" ? "Multi-Select (Checkboxes)" : "Single Choice (Radio)"}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              <button
+                type="button"
+                onClick={() => handleTypeChange("MCQ_SINGLE")}
+                className={`flex items-start space-x-3 p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                  questionType === "MCQ_SINGLE"
+                    ? "bg-white border-blue-600 ring-2 ring-blue-600/20 shadow-xs"
+                    : "bg-white/70 border-slate-200 hover:bg-white text-slate-600 hover:border-slate-300"
+                }`}
               >
-                <option value="MCQ_SINGLE">Single Choice (1 Correct)</option>
-                <option value="MCQ_MULTIPLE">Multiple Choice (Checkboxes)</option>
-              </select>
+                <div className={`w-5 h-5 rounded-full flex items-center justify-center mt-0.5 flex-shrink-0 ${
+                  questionType === "MCQ_SINGLE"
+                    ? "bg-blue-600 text-white"
+                    : "border-2 border-slate-300 bg-white"
+                }`}>
+                  {questionType === "MCQ_SINGLE" && <div className="w-2 h-2 rounded-full bg-white" />}
+                </div>
+                <div>
+                  <div className="text-xs font-bold text-slate-900">Single Choice (Radio)</div>
+                  <div className="text-[11px] text-slate-500 mt-0.5 leading-snug">
+                    Standard MCQ with 1 correct answer. Selecting one clears the others.
+                  </div>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleTypeChange("MCQ_MULTIPLE")}
+                className={`flex items-start space-x-3 p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                  questionType === "MCQ_MULTIPLE"
+                    ? "bg-amber-50/50 border-amber-600 ring-2 ring-amber-500/20 shadow-xs"
+                    : "bg-white/70 border-slate-200 hover:bg-white text-slate-600 hover:border-slate-300"
+                }`}
+              >
+                <div className={`w-5 h-5 rounded-md flex items-center justify-center mt-0.5 flex-shrink-0 ${
+                  questionType === "MCQ_MULTIPLE"
+                    ? "bg-amber-600 text-white"
+                    : "border-2 border-slate-300 bg-white"
+                }`}>
+                  {questionType === "MCQ_MULTIPLE" && <Check className="w-3.5 h-3.5 stroke-[3]" />}
+                </div>
+                <div>
+                  <div className="text-xs font-bold text-slate-900 flex items-center space-x-1.5">
+                    <span>Select Multiple (Multi-Select)</span>
+                    <span className="text-[9px] font-extrabold uppercase bg-amber-200 text-amber-900 px-1.5 py-0.2 rounded">Multi</span>
+                  </div>
+                  <div className="text-[11px] text-slate-500 mt-0.5 leading-snug">
+                    Multi-select MCQ. Check multiple options as correct answers (checkboxes).
+                  </div>
+                </div>
+              </button>
             </div>
           </div>
 
@@ -360,37 +433,74 @@ export function QuestionModal({
           {/* Options Section */}
           <div className="space-y-2.5">
             <div className="flex items-center justify-between">
-              <label className="block text-xs font-bold text-slate-800 uppercase tracking-wider">
-                Answer Options (Mark Correct Answer)
-              </label>
-              <span className="text-[11px] text-slate-500">
-                {questionType === "MCQ_SINGLE" ? "Select 1 radio button" : "Check all correct options"}
+              <div>
+                <label className="block text-xs font-bold text-slate-800 uppercase tracking-wider">
+                  Answer Options ({questionType === "MCQ_MULTIPLE" ? "Check All Correct Choices" : "Select Single Correct Answer"})
+                </label>
+                <span className="text-[11px] text-slate-500">
+                  {questionType === "MCQ_SINGLE"
+                    ? "Click the circular radio button to designate the single correct answer."
+                    : "Click square checkbox buttons to designate all valid correct answers."}
+                </span>
+              </div>
+              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                questionType === "MCQ_MULTIPLE"
+                  ? "bg-amber-100 text-amber-800 border-amber-300"
+                  : "bg-emerald-100 text-emerald-800 border-emerald-200"
+              }`}>
+                {questionType === "MCQ_MULTIPLE"
+                  ? `${options.filter(o => o.isCorrect).length} Correct Selected`
+                  : "1 Correct Selected"}
               </span>
             </div>
+
+            {questionType === "MCQ_MULTIPLE" && (
+              <div className="p-3 bg-amber-50/80 border border-amber-200 rounded-xl text-xs text-amber-900 flex items-start space-x-2.5">
+                <CheckCheck className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
+                <div className="leading-snug">
+                  <span className="font-bold">Multi-Select Mode Active:</span> Multiple options can be marked as correct. Candidates will need to select all correct answers on their exam paper to earn credit.
+                </div>
+              </div>
+            )}
 
             <div className="space-y-2">
               {options.map((opt, idx) => {
                 const letter = String.fromCharCode(65 + idx);
+                const isSingle = questionType === "MCQ_SINGLE";
                 return (
                   <div
                     key={idx}
-                    className={`flex items-center space-x-2 p-2 rounded-xl border transition-all ${
+                    className={`flex items-center space-x-2.5 p-2 rounded-xl border transition-all ${
                       opt.isCorrect
-                        ? "bg-emerald-50/60 border-emerald-300 shadow-2xs"
+                        ? isSingle
+                          ? "bg-emerald-50/70 border-emerald-300 shadow-2xs"
+                          : "bg-amber-50/60 border-amber-300 shadow-2xs"
                         : "bg-white border-slate-200"
                     }`}
                   >
                     <button
                       type="button"
                       onClick={() => handleOptionCorrectToggle(idx)}
-                      className={`w-7 h-7 rounded-lg flex items-center justify-center font-bold text-xs transition-colors cursor-pointer ${
+                      className={`w-7 h-7 flex items-center justify-center font-bold text-xs transition-all cursor-pointer flex-shrink-0 ${
+                        isSingle ? "rounded-full" : "rounded-lg"
+                      } ${
                         opt.isCorrect
-                          ? "bg-emerald-600 text-white shadow-2xs"
-                          : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                          ? isSingle
+                            ? "bg-emerald-600 text-white shadow-2xs"
+                            : "bg-amber-600 text-white shadow-2xs"
+                          : "bg-slate-100 text-slate-600 hover:bg-slate-200 border border-slate-200"
                       }`}
-                      title={opt.isCorrect ? "Correct Option" : "Click to mark as correct"}
+                      title={
+                        opt.isCorrect
+                          ? `${isSingle ? "Single" : "Multi"} correct option (click to toggle)`
+                          : `Click to mark ${letter} as correct`
+                      }
                     >
-                      {opt.isCorrect ? <Check className="w-4 h-4 stroke-[3]" /> : letter}
+                      {opt.isCorrect ? (
+                        isSingle ? <Check className="w-3.5 h-3.5 stroke-[3]" /> : <CheckCheck className="w-3.5 h-3.5 stroke-[3]" />
+                      ) : (
+                        letter
+                      )}
                     </button>
 
                     <input
@@ -401,6 +511,16 @@ export function QuestionModal({
                       onChange={(e) => handleOptionTextChange(idx, e.target.value)}
                       className="flex-1 px-3 py-1.5 text-xs bg-white border border-slate-300 rounded-lg text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-700"
                     />
+
+                    {opt.isCorrect && (
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md border flex-shrink-0 ${
+                        isSingle
+                          ? "text-emerald-700 bg-emerald-100/70 border-emerald-300"
+                          : "text-amber-800 bg-amber-100/70 border-amber-300"
+                      }`}>
+                        ✓ Correct Answer
+                      </span>
+                    )}
 
                     {options.length > 2 && (
                       <button

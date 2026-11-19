@@ -202,8 +202,20 @@ export function CsvUploadDrawer({
           const optC = clean(cols[optCIdx !== -1 ? optCIdx : 4]);
           const optD = clean(cols[optDIdx !== -1 ? optDIdx : 5]);
           const correctStr = clean(cols[correctIdx !== -1 ? correctIdx : 6]);
+          const rawCorrect = (correctStr || "A").toUpperCase().trim();
+          let parsedKeys = rawCorrect
+            .split(/[,;\s/]+/)
+            .map((k) => k.trim())
+            .filter(Boolean);
+          if (parsedKeys.length === 1 && parsedKeys[0].length > 1 && /^[A-D]+$/.test(parsedKeys[0])) {
+            parsedKeys = parsedKeys[0].split("");
+          }
 
-          const qTypeStr = typeIdx !== -1 ? clean(cols[typeIdx]) : "MCQ_SINGLE";
+          const qTypeStr = typeIdx !== -1 ? clean(cols[typeIdx]) : "";
+          const isMulti =
+            qTypeStr?.toUpperCase() === "MCQ_MULTIPLE" ||
+            qTypeStr?.toUpperCase().includes("MULTI") ||
+            parsedKeys.length > 1;
           const negStr = negIdx !== -1 ? clean(cols[negIdx]) : "0.0";
 
           // Strict Department Code Validation against target section / department track
@@ -241,7 +253,7 @@ export function CsvUploadDrawer({
             departmentCode: rawDept,
             isDeptMismatch,
             mismatchReason,
-            questionType: qTypeStr?.toUpperCase() === "MCQ_MULTIPLE" ? "MCQ_MULTIPLE" : "MCQ_SINGLE",
+            questionType: isMulti ? "MCQ_MULTIPLE" : "MCQ_SINGLE",
             prompt: prompt || `Imported Question ${i + 1}`,
             optionA: optA || "",
             optionB: optB || "",

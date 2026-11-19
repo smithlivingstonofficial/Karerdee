@@ -262,7 +262,31 @@ export async function bulkImportQuestionsAction(rows: BulkQuestionCsvRow[]) {
         ? (r.difficulty!.toUpperCase() as "EASY" | "MEDIUM" | "HARD")
         : "MEDIUM";
 
-      const qType = (r.questionType || "").toUpperCase() === "MCQ_MULTIPLE"
+      // Parse options & correct answer keys first to determine question type reliably
+      const rawOptions = [
+        { key: "A", text: r.optionA },
+        { key: "B", text: r.optionB },
+        { key: "C", text: r.optionC },
+        { key: "D", text: r.optionD },
+      ].filter((o) => o.text && o.text.trim().length > 0);
+
+      const rawCorrect = (r.correctAnswers || "A").toUpperCase().trim();
+      let correctList = rawCorrect
+        .split(/[,;\s/]+/)
+        .map((k) => k.trim())
+        .filter(Boolean);
+
+      // Support shorthand multi-keys like "AB", "ACD" if letters are A-D
+      if (correctList.length === 1 && correctList[0].length > 1 && /^[A-D]+$/.test(correctList[0])) {
+        correctList = correctList[0].split("");
+      }
+
+      const isExplicitMulti =
+        (r.questionType || "").toUpperCase() === "MCQ_MULTIPLE" ||
+        (r.questionType || "").toUpperCase().includes("MULTI") ||
+        (r.questionType || "").toUpperCase().includes("CHECK");
+
+      const qType = isExplicitMulti || correctList.length > 1
         ? "MCQ_MULTIPLE"
         : "MCQ_SINGLE";
 
@@ -282,19 +306,6 @@ export async function bulkImportQuestionsAction(rows: BulkQuestionCsvRow[]) {
         .single();
 
       if (qError || !question) continue;
-
-      // Parse options
-      const rawOptions = [
-        { key: "A", text: r.optionA },
-        { key: "B", text: r.optionB },
-        { key: "C", text: r.optionC },
-        { key: "D", text: r.optionD },
-      ].filter((o) => o.text && o.text.trim().length > 0);
-
-      const correctList = (r.correctAnswers || "A")
-        .toUpperCase()
-        .split(/[,\s]+/)
-        .map((k) => k.trim());
 
       const optionsPayload = rawOptions.map((opt, idx) => ({
         question_id: question.id,

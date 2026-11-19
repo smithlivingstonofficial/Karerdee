@@ -45,8 +45,10 @@ export function BulkQuestionCsvModal({
     const csvContent =
       "Department Code,Question Prompt,Option A,Option B,Option C,Option D,Correct Option\n" +
       `GENERAL,"Which research design is most appropriate for testing cause-and-effect hypotheses?",Exploratory research,Experimental research,Descriptive study,Historical review,B\n` +
+      `GENERAL,"Which of the following are essential components of an experimental research methodology? (Select Multiple)","Hypothesis formulation","Control group or baseline","Uncontrolled random bias","Measurement of dependent variable","A,B,D"\n` +
       `GENERAL_T,"அறிவியல் ஆராய்ச்சியில் 'கருதுகோள்' (Hypothesis) என்பது யாது?","முன்கூட்டியே கணிக்கப்பட்ட சோதனைக்குரிய கூற்று","மாற்ற முடியாத பொதுவான விதி","ஆய்வு நூலின் இறுதி முடிவுரை","தத்துவார்த்தக் கருத்து",A\n` +
       `AERO,"The critical Mach number of an airfoil is the freestream Mach number at which:","Sonic conditions first appear on the airfoil","The flow is supersonic everywhere","Shock waves detach completely","Lift coefficient reaches zero",A\n` +
+      `AERO,"Which of the following flight surfaces provide primary 3-axis attitude control? (Select Multiple)","Ailerons","Elevators","Pitot Static Tube","Rudder","A,B,D"\n` +
       `TAM,"தொல்காப்பியத்தில் காணப்படும் மொத்த அதிகாரங்களின் எண்ணிக்கை எத்தனை?",3,4,5,6,A\n`;
 
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
@@ -164,6 +166,16 @@ export function BulkQuestionCsvModal({
       const optionD = clean(values[optDIdx !== -1 ? optDIdx : 5]);
       const correctAnswers = clean(values[correctIdx !== -1 ? correctIdx : 6]).toUpperCase() || "A";
 
+      // Detect Multi-Select keys (e.g. "A,C", "A, B", "A;D", "AC")
+      let parsedCorrectKeys = correctAnswers
+        .split(/[,;\s/]+/)
+        .map((k) => k.trim())
+        .filter(Boolean);
+      if (parsedCorrectKeys.length === 1 && parsedCorrectKeys[0].length > 1 && /^[A-D]+$/.test(parsedCorrectKeys[0])) {
+        parsedCorrectKeys = parsedCorrectKeys[0].split("");
+      }
+      const isMultiKey = parsedCorrectKeys.length > 1;
+
       // Optional values with intelligent defaults
       const rawTopic = topicIdx !== -1 ? clean(values[topicIdx]) : "";
       const rawDiff = diffIdx !== -1 ? clean(values[diffIdx]).toUpperCase() : "";
@@ -172,7 +184,12 @@ export function BulkQuestionCsvModal({
         : "MEDIUM";
 
       const rawType = typeIdx !== -1 ? clean(values[typeIdx]).toUpperCase() : "";
-      const questionType = rawType === "MCQ_MULTIPLE" ? "MCQ_MULTIPLE" : "MCQ_SINGLE";
+      const isExplicitMulti =
+        rawType === "MCQ_MULTIPLE" ||
+        rawType.includes("MULTI") ||
+        rawType.includes("CHECK");
+
+      const questionType = isExplicitMulti || isMultiKey ? "MCQ_MULTIPLE" : "MCQ_SINGLE";
 
       const codeSnippet = codeIdx !== -1 ? clean(values[codeIdx]) : "";
       const negativePoints = negIdx !== -1 ? parseFloat(clean(values[negIdx])) || 0.0 : 0.0;
@@ -356,8 +373,8 @@ export function BulkQuestionCsvModal({
               <p className="text-[11px] text-slate-600 font-mono mt-0.5 font-medium">
                 Department Code, Question Prompt, Option A, Option B, Option C, Option D, Correct Option
               </p>
-              <p className="text-[10px] text-slate-400 mt-0.5">
-                All other fields (Topic, Difficulty, Question Type, Code Snippet) are optional and automatically defaulted.
+              <p className="text-[10px] text-slate-500 mt-1">
+                <span className="font-semibold text-slate-700">Multi-Select Support:</span> Specify multiple comma-separated keys in <code className="bg-slate-200/70 px-1 py-0.5 rounded text-[10px] text-slate-800">Correct Option</code> (e.g. <span className="font-mono font-bold text-blue-700">A,C</span> or <span className="font-mono font-bold text-blue-700">A,B,D</span>) to automatically designate multi-select questions.
               </p>
             </div>
             <button
@@ -418,6 +435,7 @@ export function BulkQuestionCsvModal({
                     <tr>
                       <th className="py-2 px-3">#</th>
                       <th className="py-2 px-3">Dept</th>
+                      <th className="py-2 px-3">Format</th>
                       <th className="py-2 px-3">Prompt</th>
                       <th className="py-2 px-3">Option A</th>
                       <th className="py-2 px-3">Option B</th>
@@ -460,6 +478,17 @@ export function BulkQuestionCsvModal({
                             ) : (
                               <span className="text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200 px-1.5 py-0.5 rounded font-mono">
                                 🏢 {r.departmentCode}
+                              </span>
+                            )}
+                          </td>
+                          <td className="py-1.5 px-3 whitespace-nowrap">
+                            {r.questionType === "MCQ_MULTIPLE" ? (
+                              <span className="text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-300 px-1.5 py-0.5 rounded flex items-center w-fit">
+                                Multi-Select
+                              </span>
+                            ) : (
+                              <span className="text-[10px] font-medium bg-slate-100 text-slate-600 border border-slate-200 px-1.5 py-0.5 rounded flex items-center w-fit">
+                                Single
                               </span>
                             )}
                           </td>
