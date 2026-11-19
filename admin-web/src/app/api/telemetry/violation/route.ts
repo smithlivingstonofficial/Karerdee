@@ -112,6 +112,8 @@ export async function POST(req: NextRequest) {
       violationType === "SURVEILLANCE_SNAPSHOT" ||
       violationType === "EXAM_COMMENCED_BASELINE" ||
       violationType === "BASELINE_SURVEILLANCE" ||
+      violationType === "CANDIDATE_ENTRANCE_VERIFICATION" ||
+      violationType === "ENTRANCE_VERIFICATION" ||
       metadata?.isAudit === true ||
       metadata?.isSurveillance === true;
 

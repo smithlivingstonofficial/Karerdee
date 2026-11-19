@@ -543,7 +543,9 @@ function CandidateSittingContent() {
         violationType === "ROUTINE_SURVEILLANCE" ||
         violationType === "SURVEILLANCE_SNAPSHOT" ||
         violationType === "EXAM_COMMENCED_BASELINE" ||
-        violationType === "BASELINE_SURVEILLANCE";
+        violationType === "BASELINE_SURVEILLANCE" ||
+        violationType === "CANDIDATE_ENTRANCE_VERIFICATION" ||
+        violationType === "ENTRANCE_VERIFICATION";
 
       // Semi-transparent deep slate banner
       ctx.fillStyle = "rgba(15, 23, 42, 0.95)";
@@ -609,7 +611,9 @@ function CandidateSittingContent() {
       violationType === "ROUTINE_SURVEILLANCE" ||
       violationType === "SURVEILLANCE_SNAPSHOT" ||
       violationType === "EXAM_COMMENCED_BASELINE" ||
-      violationType === "BASELINE_SURVEILLANCE";
+      violationType === "BASELINE_SURVEILLANCE" ||
+      violationType === "CANDIDATE_ENTRANCE_VERIFICATION" ||
+      violationType === "ENTRANCE_VERIFICATION";
 
     // 3-second cooldown to prevent event flood cascades (bypassed for on-demand proctor snap & routine surveillance)
     const now = Date.now();
@@ -958,7 +962,7 @@ function CandidateSittingContent() {
 
   // Real-Time Invigilator Push Events via Supabase Realtime Channel
   useEffect(() => {
-    if (stage !== "ACTIVE_EXAM" || !sessionId) return;
+    if ((stage !== "ACTIVE_EXAM" && stage !== "INSTRUCTIONS") || !sessionId) return;
 
     const channel = supabaseClient
       .channel(`exam-session-${sessionId}`)
@@ -1073,6 +1077,21 @@ function CandidateSittingContent() {
       supabaseClient.removeChannel(channel);
     };
   }, [stage, sessionId, exam]);
+
+  // Entrance Identity Verification Snapshot (captured when candidate enters INSTRUCTIONS stage and camera activates)
+  useEffect(() => {
+    if (stage !== "INSTRUCTIONS" || !sessionId || !token || !isCameraActive) return;
+
+    // After 2.0s to allow camera auto-exposure and white balance to stabilize
+    const entranceTimer = setTimeout(() => {
+      reportSecurityViolation(
+        "CANDIDATE_ENTRANCE_VERIFICATION",
+        "Candidate entered examination instructions portal - biometric verification photo"
+      );
+    }, 2000);
+
+    return () => clearTimeout(entranceTimer);
+  }, [stage, sessionId, token, isCameraActive]);
 
   // Automated Candidate Biometric Surveillance (Baseline Snapshot on Commencing + Every 60s Routine Check)
   useEffect(() => {
