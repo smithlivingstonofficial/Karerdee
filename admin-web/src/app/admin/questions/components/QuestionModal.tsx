@@ -16,6 +16,7 @@ import {
   Code,
   Building2,
   Sparkles,
+  Globe,
   Check,
   CheckCheck,
   CheckSquare,
@@ -76,7 +77,15 @@ export function QuestionModal({
 
   useEffect(() => {
     if (question) {
-      setDepartmentId(question.department_id || "");
+      if (!question.department_id) {
+        const isTamil = Boolean(
+          (question.prompt && /[\u0B80-\u0BFF]/.test(question.prompt)) ||
+          (question.topic && /tamil|தமிழ்/i.test(question.topic))
+        );
+        setDepartmentId(isTamil ? "GENERAL_TA" : "");
+      } else {
+        setDepartmentId(question.department_id || "");
+      }
       setTopic(question.topic || "General Aptitude");
       setDifficulty(question.difficulty || "MEDIUM");
       setQuestionType(question.question_type || "MCQ_SINGLE");
@@ -265,7 +274,10 @@ export function QuestionModal({
                 className="w-full px-3.5 py-2 text-xs font-semibold bg-white border border-slate-300 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-700 cursor-pointer appearance-none"
               >
                 <option value="">
-                  ⭐ General / Common Core (Applies to all departments & Ph.D entrance)
+                  ⭐ General Core (English) - Universal Research Aptitude (All Departments)
+                </option>
+                <option value="GENERAL_TA">
+                  🇮🇳 Common Core (Tamil) - பொது ஆராய்ச்சி முறைமை (Tamil Department)
                 </option>
                 {departments.map((d) => (
                   <option key={d.id} value={d.id}>
@@ -274,13 +286,21 @@ export function QuestionModal({
                 ))}
               </select>
               <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-slate-400">
-                {departmentId ? <Building2 className="w-4 h-4" /> : <Sparkles className="w-4 h-4 text-purple-600" />}
+                {departmentId === "GENERAL_TA" ? (
+                  <Globe className="w-4 h-4 text-indigo-600" />
+                ) : departmentId ? (
+                  <Building2 className="w-4 h-4" />
+                ) : (
+                  <Sparkles className="w-4 h-4 text-purple-600" />
+                )}
               </div>
             </div>
             <p className="text-[11px] text-slate-500">
-              {departmentId
+              {departmentId === "GENERAL_TA"
+                ? "This question is delivered to Tamil Department candidates for the Common Core section."
+                : departmentId
                 ? "This question will be stored specifically for this department."
-                : "General questions can be included in Common Core sections (Research Methodology, General Aptitude) for all students."}
+                : "General English questions are included in Common Core sections for all departments."}
             </p>
           </div>
 

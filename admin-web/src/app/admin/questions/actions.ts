@@ -40,12 +40,23 @@ export async function createQuestionAction(data: QuestionInput) {
       return { error: "At least one option must be marked as correct." };
     }
 
+    const isTamilCommon =
+      data.departmentId === "GENERAL_TA" ||
+      data.departmentId === "GENERAL_TAMIL" ||
+      data.departmentId === "COMMON_TAMIL";
+
+    const targetDeptId = isTamilCommon || !data.departmentId ? null : data.departmentId.trim();
+    let targetTopic = data.topic?.trim() || "General";
+    if (isTamilCommon && !targetTopic.toLowerCase().includes("tamil") && !/[\u0B80-\u0BFF]/.test(targetTopic)) {
+      targetTopic = `${targetTopic} (Tamil)`;
+    }
+
     // 1. Insert question (department_id is null for General / Common Core)
     const { data: question, error: qError } = await supabaseAdmin
       .from("department_questions")
       .insert({
-        department_id: data.departmentId ? data.departmentId.trim() : null,
-        topic: data.topic?.trim() || "General",
+        department_id: targetDeptId,
+        topic: targetTopic,
         difficulty: data.difficulty || "MEDIUM",
         question_type: data.questionType || "MCQ_SINGLE",
         prompt: data.prompt.trim(),
@@ -102,12 +113,23 @@ export async function updateQuestionAction(
       return { error: "At least one option must be marked as correct." };
     }
 
+    const isTamilCommon =
+      data.departmentId === "GENERAL_TA" ||
+      data.departmentId === "GENERAL_TAMIL" ||
+      data.departmentId === "COMMON_TAMIL";
+
+    const targetDeptId = isTamilCommon || !data.departmentId ? null : data.departmentId.trim();
+    let targetTopic = data.topic?.trim() || "General";
+    if (isTamilCommon && !targetTopic.toLowerCase().includes("tamil") && !/[\u0B80-\u0BFF]/.test(targetTopic)) {
+      targetTopic = `${targetTopic} (Tamil)`;
+    }
+
     // 1. Update question
     const { error: qError } = await supabaseAdmin
       .from("department_questions")
       .update({
-        department_id: data.departmentId ? data.departmentId.trim() : null,
-        topic: data.topic?.trim() || "General",
+        department_id: targetDeptId,
+        topic: targetTopic,
         difficulty: data.difficulty || "MEDIUM",
         question_type: data.questionType || "MCQ_SINGLE",
         prompt: data.prompt.trim(),

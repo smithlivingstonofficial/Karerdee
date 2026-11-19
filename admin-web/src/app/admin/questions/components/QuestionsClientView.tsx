@@ -21,6 +21,7 @@ import {
   HelpCircle,
   Check,
   CheckCheck,
+  Globe,
   ChevronRight
 } from "lucide-react";
 
@@ -46,6 +47,16 @@ export function QuestionsClientView({
   // Extract unique topics
   const topics = Array.from(new Set(initialQuestions.map((q) => q.topic || "General"))).sort();
 
+  // Helper: detect Tamil research methodology question
+  function isTamilQuestion(q: DepartmentQuestion): boolean {
+    return Boolean(
+      (q as any).language === "TA" ||
+      (q.prompt && /[\u0B80-\u0BFF]/.test(q.prompt)) ||
+      (q.topic && /tamil|தமிழ்/i.test(q.topic)) ||
+      (q.department?.code === "TAM" || q.department?.code === "TAMIL")
+    );
+  }
+
   // Filter questions
   const filtered = initialQuestions.filter((q) => {
     const matchesSearch =
@@ -56,7 +67,11 @@ export function QuestionsClientView({
       (q.options && q.options.some((o) => o.option_text.toLowerCase().includes(searchTerm.toLowerCase())));
 
     let matchesScope = true;
-    if (selectedScope === "GENERAL") {
+    if (selectedScope === "GENERAL" || selectedScope === "GENERAL_EN") {
+      matchesScope = !q.department_id && !isTamilQuestion(q);
+    } else if (selectedScope === "GENERAL_TA" || selectedScope === "COMMON_TAMIL") {
+      matchesScope = !q.department_id && isTamilQuestion(q);
+    } else if (selectedScope === "GENERAL_ALL") {
       matchesScope = !q.department_id;
     } else if (selectedScope !== "ALL") {
       matchesScope = q.department_id === selectedScope;
@@ -68,6 +83,8 @@ export function QuestionsClientView({
     return matchesSearch && matchesScope && matchesDifficulty && matchesFormat;
   });
 
+  const commonTamilCount = initialQuestions.filter((q) => !q.department_id && isTamilQuestion(q)).length;
+  const commonEnglishCount = initialQuestions.filter((q) => !q.department_id && !isTamilQuestion(q)).length;
   const generalCount = initialQuestions.filter((q) => !q.department_id).length;
   const deptSpecificCount = initialQuestions.filter((q) => !!q.department_id).length;
   const singleChoiceCount = initialQuestions.filter((q) => q.question_type === "MCQ_SINGLE").length;
@@ -185,14 +202,37 @@ export function QuestionsClientView({
                 General / Common Core
               </span>
               <span className="font-bold px-1.5 py-0.2 rounded-full border text-[9px] bg-purple-50 text-purple-700 border-purple-200">
-                Universal Core
+                {generalCount} Core Items
               </span>
             </div>
-            <div className="mt-2 flex items-baseline space-x-1.5">
-              <span className="text-2xl font-black text-purple-700 tracking-tight">
-                {generalCount}
-              </span>
-              <span className="text-xs text-slate-400">aptitude &amp; research</span>
+            <div className="mt-2 flex items-baseline space-x-2">
+              <button
+                type="button"
+                onClick={() => setSelectedScope(selectedScope === "GENERAL_EN" || selectedScope === "GENERAL" ? "ALL" : "GENERAL_EN")}
+                className={`text-xs font-bold px-2 py-0.5 rounded-lg border transition-all cursor-pointer inline-flex items-center ${
+                  selectedScope === "GENERAL_EN" || selectedScope === "GENERAL"
+                    ? "bg-purple-100 text-purple-900 border-purple-300 ring-2 ring-purple-500/20 shadow-2xs font-extrabold"
+                    : "text-purple-700 hover:bg-purple-50 border-purple-200"
+                }`}
+                title="Filter by English General Core"
+              >
+                <Sparkles className="w-3.5 h-3.5 mr-1" />
+                {commonEnglishCount} English
+              </button>
+              <span className="text-slate-300">•</span>
+              <button
+                type="button"
+                onClick={() => setSelectedScope(selectedScope === "GENERAL_TA" ? "ALL" : "GENERAL_TA")}
+                className={`text-xs font-bold px-2 py-0.5 rounded-lg border transition-all cursor-pointer inline-flex items-center ${
+                  selectedScope === "GENERAL_TA"
+                    ? "bg-indigo-100 text-indigo-900 border-indigo-300 ring-2 ring-indigo-500/20 shadow-2xs font-extrabold"
+                    : "text-indigo-700 hover:bg-indigo-50 border-indigo-200"
+                }`}
+                title="Filter by Common Tamil"
+              >
+                <Globe className="w-3.5 h-3.5 mr-1 text-indigo-600" />
+                {commonTamilCount} Tamil
+              </button>
             </div>
           </div>
 
@@ -374,15 +414,30 @@ export function QuestionsClientView({
 
           <button
             type="button"
-            onClick={() => setSelectedScope("GENERAL")}
+            onClick={() => setSelectedScope("GENERAL_EN")}
             className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer flex items-center space-x-1 ${
-              selectedScope === "GENERAL"
+              selectedScope === "GENERAL_EN" || selectedScope === "GENERAL"
                 ? "bg-purple-600 text-white shadow-2xs"
                 : "bg-purple-50 text-purple-700 border border-purple-200 hover:bg-purple-100"
             }`}
+            title="Filter by Universal General Core questions (English)"
           >
             <Sparkles className="w-3.5 h-3.5" />
-            <span>General Core ({generalCount})</span>
+            <span>General Core ({commonEnglishCount})</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setSelectedScope("GENERAL_TA")}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer flex items-center space-x-1.5 ${
+              selectedScope === "GENERAL_TA"
+                ? "bg-indigo-600 text-white shadow-2xs"
+                : "bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100"
+            }`}
+            title="Filter by Common Tamil research methodology questions (Tamil Dept)"
+          >
+            <Globe className="w-3.5 h-3.5 text-indigo-600" />
+            <span>Common Tamil ({commonTamilCount})</span>
           </button>
 
           {departments.map((d) => {
@@ -431,10 +486,17 @@ export function QuestionsClientView({
 
                     {/* Scope Badge */}
                     {isGeneral ? (
-                      <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200">
-                        <Sparkles className="w-3 h-3 mr-1" />
-                        General Core
-                      </span>
+                      isTamilQuestion(q) ? (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200 shadow-2xs">
+                          <Globe className="w-3 h-3 mr-1 text-indigo-600" />
+                          Common Tamil
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200">
+                          <Sparkles className="w-3 h-3 mr-1" />
+                          General Core
+                        </span>
+                      )
                     ) : (
                       <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
                         {q.department?.code || "DEPT"}
