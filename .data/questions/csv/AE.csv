@@ -1,0 +1,26 @@
+﻿Department Code,Question Prompt,Option A,Option B,Option C,Option D,Correct Option
+AE,Which mathematical model is commonly used to describe the thin-layer drying behaviour of agricultural products?,Darcy model,Page model,Mohr–Coulomb model,Manning model,B
+AE,The effective moisture diffusivity during drying is primarily determined using which approach?,Fourier’s law of heat conduction,Fick’s second law of diffusion,Bernoulli’s equation,Newton’s law of viscosity,B
+AE,Which drying technique uses electromagnetic radiation to generate heat within a material?,Natural convection drying,Microwave drying,Solar cabinet drying only,Freeze storage,B
+AE,Water activity in food products is primarily associated with which property?,Total mineral content,Availability of water for microbial growth and chemical reactions,Total carbohydrate content,Bulk density alone,B
+AE,Which instrument is most suitable for non-destructive internal quality assessment of agricultural produce using spectral information?,Penetrometer,Hyperspectral imaging system,Sieving apparatus,Soxhlet extractor,B
+AE,"In food extrusion, the material undergoes processing mainly due to the combined effects of:","Pressure, temperature and shear",Gravity and sedimentation only,Filtration and evaporation only,Freezing and sublimation only,A
+AE,Which parameter is commonly used to evaluate the energy efficiency of a drying system?,Specific energy consumption,Soil porosity,Crop coefficient,Infiltration rate,A
+AE,The coefficient of variation of seed spacing in a precision planter is primarily used to evaluate:,Tractor engine power,Uniformity of seed placement,Fuel calorific value,Soil water-holding capacity,B
+AE,Which parameter is most directly used to quantify the fraction of theoretical field capacity achieved during field operations?,Drawbar power,Field efficiency,Specific gravity,Torque coefficient,B
+AE,The primary function of a continuously variable transmission (CVT) in agricultural tractors is to:,Eliminate the need for an engine,Provide continuously adjustable speed ratios,Increase soil moisture content,Eliminate transmission losses completely,B
+AE,Which sensor is most appropriate for measuring the draft force of a tillage implement during field experiments?,Anemometer,Pyranometer,Hygrometer,load cell,D
+AE,"In precision agriculture, GNSS technology is primarily used in autonomous farm machinery for:",Measuring grain moisture directly,Determining soil texture directly,Positioning and navigation,Measuring engine temperature,C
+AE,The specific fuel consumption of an agricultural tractor is generally expressed as:,kg/kWh,kW/m²,m³/s,N/m²,A
+AE,Which equation is widely used to describe water infiltration into soil as a function of time?,Rankine equation,Bernoulli equation,Kostiakov equation,Euler turbomachinery equation,C
+AE,The main objective of drip irrigation is to:,Maximize surface runoff,Apply water near the crop root zone,Increase evaporation from bare soil,Eliminate the need for irrigation scheduling,B
+AE,Which remote-sensing index is commonly used to assess vegetation greenness and crop vigour?,Froude number,Reynolds number,Darcy friction factor,NDVI,D
+AE,"In the Darcy–Weisbach equation, the friction factor represents the effect of:",Soil nutrient concentration,Rainfall interception,Crop transpiration,Flow resistance in a pipe,D
+AE,Which parameter represents the ratio of actual crop evapotranspiration to reference evapotranspiration under standard crop-coefficient methodology?,Runoff coefficient,Infiltration coefficient,Hydraulic conductivity,Crop coefficient,D
+AE,Which practice is most effective for reducing soil erosion on sloping agricultural land?,Up-and-down-slope cultivation,Removal of all crop residues,Contour farming,Increasing bare-soil exposure,C
+AE,The equivalence ratio in biomass gasification is defined as the ratio of:,Actual fuel-to-air ratio to stoichiometric fuel-to-air ratio,Ash content to moisture content,Producer-gas volume to biomass volume,Actual air supplied to stoichiometric air required,D
+AE,Which microorganism group plays a direct role in the final methane-forming stage of anaerobic digestion?,Methanogenic archaea,Nitrifying bacteria,Photosynthetic algae only,Sulphur-oxidizing bacteria only,A
+AE,The principal energy-conversion device in a solar photovoltaic system is the:,Solar collector,Steam condenser,Heat exchanger,Photovoltaic cell,D
+AE,Which parameter is commonly used to evaluate the performance of a solar photovoltaic module?,Fill factor,Atterberg limit,Coefficient of uniformity of seed spacing,Soil infiltration capacity,A
+AE,The main purpose of transesterification in biodiesel production is to convert triglycerides into:,Hydrogen and carbon monoxide,Methane and carbon dioxide,Fatty acid alkyl esters and glycerol,Cellulose and lignin,C
+AE,Which indicator is most appropriate for comparing the greenhouse-gas impacts of renewable and conventional energy systems over their lifecycles?,Lifecycle greenhouse-gas emissions per unit of energy delivered,Maximum equipment weight,Initial installation cost alone,Fuel moisture content alone,A

@@ -6,6 +6,7 @@ import { QuestionModal } from "./QuestionModal";
 import { BulkQuestionCsvModal } from "./BulkQuestionCsvModal";
 import { BulkDeleteConfirmModal } from "@/app/admin/questions/components/BulkDeleteConfirmModal";
 import { exportQuestionsToCsv } from "@/lib/exportQuestionsCsv";
+import { MathText } from "@/components/MathText";
 import {
   deleteDepartmentQuestionAction,
   bulkDeleteDepartmentQuestionsAction,
@@ -754,7 +755,7 @@ export function DepartmentQuestionsClientView({
 
                 {/* Question Prompt */}
                 <div className="text-sm font-semibold text-slate-900 leading-relaxed whitespace-pre-line">
-                  {q.prompt}
+                  <MathText text={q.prompt} />
                 </div>
 
                 {/* Code Snippet */}
@@ -797,7 +798,7 @@ export function DepartmentQuestionsClientView({
                             letter
                           )}
                         </span>
-                        <span className="flex-1 leading-snug">{opt.option_text}</span>
+                        <MathText className="flex-1 leading-snug" text={opt.option_text} />
                         {opt.is_correct && (
                           <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${
                             isMulti

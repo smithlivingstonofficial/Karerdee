@@ -1,0 +1,34 @@
+﻿Department Code,Question Prompt,Option A,Option B,Option C,Option D,Correct Option
+CSE,Which of the following problems is undecidable?,Determining if a DFA accepts a given string,Determining if a CFG is empty,Determining if two DFAs accept the same language,Determining if a Turing Machine halts on all inputs,D
+CSE,What is the time complexity to find the shortest path from a single source to all other vertices in a directed graph with negative edge weights but no negative cycles?,O(V + E),O(E log V),O(V * E),O(V³),C
+CSE,"A language L
+is recursively enumerable but not recursive if and only if:",Both L and its complement are recursive,L is accepted by a TM that halts on all inputs,"L is accepted by a TM, but its complement is not recursively enumerable",Both L and its complement are context-free,C
+CSE,"Consider a relation 𝑅(𝐴,𝐵,𝐶,𝐷)
+with functional dependencies 𝐴→𝐵
+and 𝐵→𝐶. What is the highest normal form satisfied by R?",1NF,2NF,3NF,BCNF,A
+CSE,"In an IP packet with a fragmentation offset value of 100, what is the byte index of the first byte of payload data in this fragment?",100,400,800,1600,C
+CSE,Which of the following scheduling algorithms can lead to starvation?,Round Robin,Shortest Job First,First Come First Served,FIFO,B
+CSE,"Let G be a connected undirected graph with V vertices and E edges. If the weights of all edges are distinct, which of the following statements is TRUE?","Gcap G
+𝐺
+has a unique minimum spanning tree","Gcap G
+𝐺
+can have multiple minimum spanning trees",The shortest path between any two vertices is unique,The maximum spanning tree is the same as the minimum spanning tree,A
+CSE,"What is the maximum number of reduce moves a bottom-up parser can make while parsing a string of length n using a grammar with no ϵepsilon
+𝜖-productions or unit productions?",n,2n,2𝑛−1,n*n,C
+CSE,Which of the following concurrency control protocols ensures both conflict serializability and freedom from deadlock?,Two-Phase Locking (2PL),Strict 2PL,Time-Stamp Ordering Protocol,Conservative 2PL,C
+CSE,"A system uses 32-bit virtual addresses and a page size of 4 KB. If each page table entry takes 4 bytes, how many levels of page tables are required if the page table must fit within a single page?",1,2,3,4,B
+CSE,Let 𝐿1 be a regular language and 𝐿2 be a context-free language. Which of the following languages is NOT necessarily context-free?,𝐿1 ∩ 𝐿2,𝐿1 ∪ 𝐿2,𝐿1 ⋅ 𝐿2,𝐿2 ∪ 𝐿1,A
+CSE,What is the maximum number of keys that can be accommodated in a B+ tree of order 𝑚 and height ℎ (where root is at height 1)?,,,,,A
+CSE,"In a transport layer protocol like TCP, what mechanism is primarily used to handle congestion control?",Three-way handshake,Sliding Window with Additive Increase Multiplicative Decrease (AIMD),CRC checksums,Token Bucket framework,B
+CSE,"Given a max-heap represented as an array, where is the third largest element guaranteed to reside (assuming all elements are distinct)?",At index 2 or 3,In the first three levels,Anywhere in the upper half,Only at the leaf nodes,B
+CSE,Which data structure is most efficient to check whether an element belongs to a set when memory constraint is extreme and false positives are acceptable?,Hash Table,Trie,Bloom Filter,Balanced Binary Search Tree,C
+CSE,What is the count of non-isomorphic trees possible with 4 vertices?,2,4,16,24,A
+CSE,"If a pipeline has 5 stages with delays 10ns, 12ns, 15ns, 11ns, and 10ns, and the interface latch delay is 1ns, what is the maximum clock frequency of this pipeline?",62.5 MHz,66.6 MHz,100 MHz,90.9 MHz,A
+CSE,Which of the following statements is FALSE regarding public key cryptography?,RSA relies on the difficulty of factoring large composite primes,Digital signatures provide non-repudiation,The same key is used for encryption and decryption,Diffie-Hellman is used for secure key exchange,C
+CSE,A dynamic programming algorithm guarantees an optimal solution by exploiting which of the following properties?,Greedy choices,Overlapping subproblems and optimal substructure,Divide and conquer independently,Randomized pivot selections,B
+CSE,What is the language accepted by the regular expression (𝑎+𝑏)*𝑎(𝑎+𝑏)?,All strings starting with 𝑎,All strings ending with 𝑎,All strings where the second element from the end is 𝑎,All strings containing substring 𝑎𝑎,C
+CSE,"Consider a system with five processes (P₀, P₁, P₂, P₃, P₄) and four resource types (A, B, C, D). Total resources existing in the system: A = 10, B = 7, C = 11, D = 9. Allocation : P0(1, 0, 2, 1), P1(2, 1, 3, 0), P2(3, 0, 1, 2), P3(0, 2, 0, 3), P4(1, 1, 2, 1). Max Demand: P0(6, 4, 3, 2), P1(3, 2, 4, 2), P2(9, 1, 2, 4), P3(2, 2, 2, 4), P4(4, 3, 3, 2). Suppose process P₁ makes an immediate request Request₁ = (1, 0, 1, 2). Which of the following statements is TRUE?","The request can be granted immediately because the system remains in a safe state with a unique execution sequence <P1, P3, P4, P0, P2>",The request cannot be granted because the remaining available resources are insufficient to satisfy this immediate request,"The request can be granted immediately because the system remains in a safe state, and <P3, P1, P4, P0, P2> is a valid safe sequence","The request can be granted because available resources are sufficient, but doing so leaves the system in an unsafe state (potential deadlock)",D
+CSE,Suppose we use the Dijkstra's algorithm on a graph with negative edge weights but no negative cycles. Which of the following is true?,⟨,It may output incorrect shortest path distances,⟨,It will automatically fix the negative weight edges,B
+CSE,"What is the propagation delay of a ripple carry adder proportional to, where 𝑛 represents the total number of bits?",𝑃1,𝑂(log𝑛),𝑃3,𝑂(𝑛log𝑛),C
+CSE,Which of the following testing techniques is categorized as a structural or behavioral White-Box testing approach?,",",Equivalence Partitioning,",",Syntax Testing,C
+CSE,The worst-case running time of the QuickSort algorithm on an array of size 𝑛 occurs when the elements are:,𝑃3,Already sorted in ascending or descending order,𝑃1,Perfectly balanced around the median,B

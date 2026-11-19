@@ -81,3 +81,25 @@ code, kbd, samp, pre {
 ::-webkit-scrollbar-thumb:hover {
   background: #94A3B8;
 }
+
+/* Academic Math Typography & KaTeX Refinements */
+.katex {
+  font-size: 1.05em;
+  color: var(--text-primary);
+  text-rendering: auto;
+}
+
+.katex-html {
+  white-space: nowrap;
+}
+
+.katex .mathnormal {
+  font-family: KaTeX_Math, "Times New Roman", Times, serif;
+}
+
+.katex-display {
+  margin: 0.5em 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 0.25em 0;
+}

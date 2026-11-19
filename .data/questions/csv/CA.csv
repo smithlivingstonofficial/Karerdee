@@ -1,0 +1,26 @@
+﻿Department Code,Question Prompt,Option A,Option B,Option C,Option D,Correct Option
+CA,Which of the following is the most appropriate data structure for implementing Dijkstra’s shortest path algorithm efficiently on a sparse graph?,Stack,Binary Search Tree,Priority Queue using a Min-Heap,Circular Queue,C
+CA,Consider an algorithm whose recurrence relation is given by T(n) = 2T(n/2) + n. What is its asymptotic time complexity?,O(log n),O(n),O(n log n),O(n²),C
+CA,Which page replacement algorithm can exhibit Belady’s anomaly?,Least Recently Used (LRU),Optimal Page Replacement,First-In-First-Out (FIFO),Most Recently Used (MRU),C
+CA,"In a system using virtual memory, a high rate of page faults causing significant degradation in system performance is known as:",Fragmentation,Thrashing,Deadlock,Starvation,B
+CA,Which normal form specifically eliminates transitive functional dependencies of non-key attributes on a candidate key?,First Normal Form (1NF),Second Normal Form (2NF),Third Normal Form (3NF),Fourth Normal Form (4NF),C
+CA,Which concurrency control technique guarantees conflict serializability by assigning timestamps to transactions?,Two-Phase Locking,Timestamp Ordering,Deadlock Detection,Checkpointing,B
+CA,"Which protocol is primarily responsible for reliable, connection-oriented communication at the transport layer?",IP,UDP,TCP,ARP,C
+CA,"In a TCP connection, which mechanism primarily controls the amount of data that can be sent before receiving an acknowledgment?",DNS,Sliding Window,ARP,Routing Table,B
+CA,Which cache mapping technique allows a main-memory block to be placed in any available cache line?,Direct Mapping,Fully Associative Mapping,Set Associative Mapping,Sequential Mapping,B
+CA,Which OOP principle allows an object to take different forms depending on the context in which it is used?,Encapsulation,Inheritance,Polymorphism,Abstraction,C
+CA,Which software development model is most appropriate when requirements are expected to evolve continuously through iterative customer feedback?,Waterfall Model,Agile Model,V-Model,Big Bang Model,B
+CA,"In software testing, which technique examines the internal logic, control flow, and structure of a program?",Black-Box Testing,Acceptance Testing,White-Box Testing,Usability Testing,C
+CA,"In the A* search algorithm, the evaluation function is generally represented as:",f(n) = h(n) − g(n),f(n) = g(n) + h(n),f(n) = g(n) × h(n),f(n) = g(n) / h(n),B
+CA,"For an admissible heuristic function in A* search, which condition must hold?",It must always overestimate the actual cost,It must always underestimate or equal the actual cost,It must be equal to the actual cost,It must be independent of the goal state,B
+CA,Which of the following techniques is primarily used to reduce overfitting in a neural network?,Increasing model complexity indefinitely,Removing the training dataset,Regularization,Increasing the learning rate indefinitely,C
+CA,"In Principal Component Analysis (PCA), the principal components are determined primarily using:",Decision trees,Eigenvectors of the covariance matrix,Support vectors,Association rules,B
+CA,Which activation function is most commonly associated with mitigating the vanishing-gradient problem in deep neural networks?,ReLU,Sigmoid,Linear,Binary Step,A
+CA,"In NLP, the primary purpose of TF-IDF is to:",Generate syntactic parse trees,Measure the importance of a term within a document relative to a collection of documents,Translate text between languages,Identify speech signals,B
+CA,Which cryptographic approach uses the same secret key for both encryption and decryption?,Asymmetric Cryptography,Symmetric Cryptography,Hashing,Digital Signature,B
+CA,Which security property is primarily ensured by a cryptographic hash function when used for data integrity verification?,Confidentiality,Availability,Integrity,Non-repudiation,C
+CA,"Which cloud service model provides a platform containing the operating system, runtime environment, and development tools while allowing users to deploy applications?",IaaS,PaaS,SaaS,DaaS,B
+CA,Which of the following is a fundamental challenge in distributed systems due to the absence of a single global clock?,Memory allocation,Global synchronization,CPU instruction execution,Compiler optimization,B
+CA,"Which characteristic of Big Data refers to the speed at which data is generated, processed, and analyzed?",Volume,Variety,Velocity,Veracity,C
+CA,Which communication protocol is specifically designed as a lightweight publish-subscribe messaging protocol and is widely used in IoT applications?,FTP,MQTT,SMTP,Telnet,B
+CA,Which architecture forms the fundamental basis of many modern Large Language Models (LLMs) by using self-attention mechanisms?,Convolutional Neural Network,Recurrent Neural Network,Transformer,Decision Tree,C

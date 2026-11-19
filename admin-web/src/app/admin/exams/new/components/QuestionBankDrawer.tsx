@@ -3,6 +3,7 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { QuestionBankItem, QuestionState } from "../types";
 import { Department } from "@/types/database.types";
+import { MathText } from "@/components/MathText";
 import {
   X,
   Search,
@@ -645,7 +646,7 @@ export function QuestionBankDrawer({
                   {/* Question Prompt */}
                   <div className="pl-8">
                     <p className="text-xs sm:text-[13px] font-bold text-slate-900 leading-relaxed">
-                      {q.prompt}
+                      <MathText text={q.prompt} />
                     </p>
 
                     {/* Monospace Code Snippet */}
@@ -676,7 +677,7 @@ export function QuestionBankDrawer({
                             {String.fromCharCode(65 + optIndex)}
                           </span>
 
-                          <span className="truncate flex-1">{opt.option_text}</span>
+                          <MathText className="truncate flex-1" text={opt.option_text} />
 
                           {opt.is_correct && (
                             <span className="inline-flex items-center text-[10px] font-black text-emerald-800 bg-emerald-100 px-1.5 py-0.5 rounded-md flex-shrink-0 border border-emerald-200">

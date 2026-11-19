@@ -1,0 +1,26 @@
+﻿Department Code,Question Prompt,Option A,Option B,Option C,Option D,Correct Option
+EEE,Power factor of a purely resistive AC circuit is,Zero,0.5,Unity,Leading,C
+EEE,Kirchhoff’s Voltage Law states that the algebraic sum of voltages in a closed loop is,One,Infinite,Zero,Maximum,C
+EEE,A transformer operates on the principle of,Electrostatic induction,Mutual induction,Chemical reaction,Photoelectric effect,B
+EEE,Increasing transmission voltage mainly reduces,Frequency,I²R losses,Power factor to zero,System inertia,B
+EEE,Ferranti effect is prominent in a,"Short, heavily loaded line","Long, lightly loaded line",DC circuit only,Transformer core,B
+EEE,A CT secondary should not be,Grounded at one point,Short-circuited,Open-circuited while energized,Connected to a relay,C
+EEE,The equal-area criterion is used for,Transformer cooling,Transient stability,Battery charging,Harmonic filtering,B
+EEE,A slack bus specifies voltage magnitude and,Active power and reactive power,Voltage angle,Conductor length,Load factor only,B
+EEE,Wind power is proportional to wind speed raised to,First power,Second power,Third power,Fourth power,C
+EEE,Increasing PV cell temperature generally decreases,Open-circuit voltage,Solar irradiance,Sunlight duration,Panel area,A
+EEE,Perturb and Observe MPPT measures changes in,Power,Transformer oil,Cable diameter,Mechanical torque only,A
+EEE,Tip-speed ratio is the ratio of blade tip speed to,Rotor mass,Wind speed,Generator voltage,Air density,B
+EEE,Which is a rechargeable battery technology?,Lithium-ion,Primary zinc-carbon only,Dry sand,Glass cell,A
+EEE,An SCR is triggered into conduction using its,Gate,Collector only,Drain,Rotor,A
+EEE,"For an ideal boost converter, output voltage is generally",Lower than input,Higher than input,Always zero,Equal to frequency,B
+EEE,SPWM uses a reference signal and a,Triangular carrier,Battery electrolyte,Transformer oil,Rotor winding,A
+EEE,Unintended islanding occurs when a distributed generator,Stops immediately,Continues energizing an isolated grid section,Operates without a battery,Reduces all loads,B
+EEE,Grid-forming inverters primarily,Establish voltage and frequency,Measure cable length,Remove all harmonics,Replace every relay,A
+EEE,Demand response modifies the,Consumer demand,Transformer core material,Tower height,Cable color,A
+EEE,Derivative control responds to,Rate of change of error,Error only at zero time,Resistance only,Frequency of supply only,A
+EEE,Multi-objective optimization considers,Multiple objectives,No constraints,One fixed variable only,Only electrical resistance,A
+EEE,Differential Evolution uses vector differences mainly for,Mutation,Earthing,Cooling,Meter calibration,A
+EEE,Persistence forecasting assumes future conditions are related to,Recent observed conditions,Transformer mass,Cable length,Rotor color,A
+EEE,The main energy storage unit in most modern EVs is the,Battery pack,Steam boiler,Diesel tank,Flywheel only,A
+EEE,A transducer generally converts a physical quantity into,A usable signal,Mechanical noise only,Fuel,Insulation,A

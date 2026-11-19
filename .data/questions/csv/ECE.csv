@@ -1,0 +1,26 @@
+﻿Department Code,Question Prompt,Option A,Option B,Option C,Option D,Correct Option
+ECE,"A silicon diode has a forward current of 1 mA at 25°C. Assuming an ideality factor of 1 and VT = 25 mV, what is the approximate change in forward voltage when the current increases to 10 mA?",25 mV,57.6 mV,75 mV,100 mV,B
+ECE,An NPN transistor has β = 99 and collector current IC = 4.95 mA. What is the corresponding base current?,25 μA,50 μA,100 μA,150 μA,B
+ECE,"An inverting op-amp has Rin=10 kΩ and Rf=100 kΩ. If the input voltage is 0.2 V, what is the output voltage?",−0.2 V,−1 V,−2 V,+2 V,C
+ECE,"A second-order RLC circuit has resonant frequency f0=10 kHz. If both L and C are increased by a factor of 4, the new resonant frequency will be",2.5 kHz,5 kHz,10 kHz,20 kHz,A
+ECE,A 4-bit successive-approximation ADC has an input range of 0–16 V. What is its ideal resolution?,0.5 V,1 V,2 V,4 V,B
+ECE,"A 3-bit binary counter is initially at 000. After 17 clock pulses, its output will be",0,1,10,111,B
+ECE,"The Boolean function F(A,B,C)=Σm(1,3,5,7) represents",A,B,C,A+B,C
+ECE,A signal x(t) is band-limited to 6 kHz. It is sampled at 8 kHz. The minimum frequency at which aliasing occurs is,2 kHz,4 kHz,6 kHz,8 kHz,A
+ECE,The signal x(t)=cos(2π5t) is sampled at fs=8Hz. The resulting discrete-time sinusoid has an equivalent frequency of,1 Hz,3 Hz,5 Hz,8 Hz,B
+ECE,"For the discrete-time system y[n]=0.5x[n]+0.5x[n−1], the frequency response magnitude at ω=π is",0,0.5,1,2,A
+ECE,A sinusoidal signal x(t) = cos(2π × 5 kHz × t) is multiplied by cos(2π × 10 kHz × t). What are the frequencies present in the resulting signal?,5 kHz and 10 kHz,5 kHz and 15 kHz,5 kHz and 15 kHz with amplitudes 1/2 each,10 kHz and 15 kHz,C
+ECE,A causal LTI system has transfer function H(z)=1/(1−0.8z−1). The system is,Stable and causal,Unstable and causal,Stable and non-causal,Unstable and non-causal,A
+ECE,An AM wave has a carrier power of 100 W and modulation index 0.8. What is the total transmitted power?,116 W,132 W,148 W,164 W,B
+ECE,"An FM system has a maximum frequency deviation of 50 kHz and a maximum modulating frequency of 10 kHz. According to Carson's rule, the approximate transmission bandwidth is",50 kHz,100 kHz,120 kHz,150 kHz,C
+ECE,A DSB-SC signal has a message bandwidth of 5 kHz. What is the minimum channel bandwidth required for transmission?,2.5 kHz,5 kHz,10 kHz,20 kHz,C
+ECE,"A superheterodyne receiver receives a signal at 1 MHz with an IF of 455 kHz. If high-side injection is used, what is the local oscillator frequency?",455 kHz,545 kHz,1.455 MHz,2.455 MHz,C
+ECE,A lossless transmission line has L=1 μH/m and C=100 pF/m. What is its characteristic impedance?,10 Ω,50 Ω,100 Ω,200 Ω,C
+ECE,A 50 Ω transmission line is terminated with a 100 Ω load. What is the magnitude of the voltage reflection coefficient?,0.2,0.33,0.5,0.67,B
+ECE,A feedback amplifier has an open-loop gain of 200 and feedback factor β=0.04. What is its closed-loop gain?,4,20,40,80,C
+ECE,"The open-loop transfer function of a unity-feedback system is G(s)=K/[s(s+4)]. For K=8, the damping ratio of the closed-loop system is",0.25,0.5,0.707,1,C
+ECE,"For a unity-feedback Type-1 system, the steady-state error for a unit-step input is",0,1,1/K,Infinite,A
+ECE,"A CMOS inverter operates with VDD=1.2V and switches at a frequency of 100 MHz. If the effective switched capacitance is 10 pF, the dynamic power consumption is approximately",0.12 mW,0.72 mW,1.44 mW,12 mW,C
+ECE,"A 5-stage ring oscillator is implemented using identical CMOS inverters. If the propagation delay of each inverter is 10 ns, the approximate oscillation frequency is",5 MHz,10 MHz,20 MHz,50 MHz,B
+ECE,An ideal 8-bit ADC has an input range of 0–2.56 V. What is the digital output code for an input voltage of approximately 1.28 V?,64,96,128,192,C
+ECE,"A communication channel has a bandwidth of 1 MHz and an SNR of 15. According to Shannon's capacity formula, its theoretical maximum capacity is approximately",2 Mbps,3 Mbps,4 Mbps,15 Mbps,C

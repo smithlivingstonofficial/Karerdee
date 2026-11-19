@@ -47,6 +47,7 @@ import {
   MessageSquare,
   MessageCircle,
 } from "lucide-react";
+import { MathText } from "@/components/MathText";
 
 interface OptionItem {
   id: string;
@@ -2606,7 +2607,7 @@ function CandidateSittingContent() {
 
                 {/* Prompt Text */}
                 <div className="text-sm font-semibold text-slate-900 leading-relaxed space-y-3">
-                  <p>{activeQuestion.prompt}</p>
+                  <MathText as="p" text={activeQuestion.prompt} />
 
                   {/* Code Snippet if applicable */}
                   {activeQuestion.codeSnippet && (
@@ -2640,7 +2641,7 @@ function CandidateSittingContent() {
                             : "bg-white border-slate-200 text-slate-800 hover:bg-slate-50 hover:border-slate-300"
                         }`}
                       >
-                        <div className="flex items-center space-x-3">
+                        <div className="flex items-center space-x-3 flex-1 min-w-0 pr-2">
                           <span
                             className={`w-6 h-6 rounded-md flex items-center justify-center font-bold text-xs flex-shrink-0 ${
                               isSelected
@@ -2650,7 +2651,7 @@ function CandidateSittingContent() {
                           >
                             {letter}
                           </span>
-                          <span className="leading-snug">{opt.text}</span>
+                          <MathText as="span" className="leading-snug flex-1" text={opt.text} />
                         </div>
                         {isSelected && (
                           <div className="w-5 h-5 rounded-full bg-blue-700 text-white flex items-center justify-center flex-shrink-0">

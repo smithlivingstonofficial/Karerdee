@@ -1,0 +1,26 @@
+﻿Department Code,Question Prompt,Option A,Option B,Option C,Option D,Correct Option
+BM,Identify the primary goal of rehabilitation engineering?,To diagnose diseases,To improve the functional abilities of persons with disabilities,To develop pharmaceutical drugs,To perform surgical procedures,B
+BM,Name the device is commonly used to assist individuals with lower-limb mobility?,Wheelchair,Spirometer,Glucometer,Otoscope,A
+BM,State a  material is commonly used in modern prosthetic limbs?,Carbon fiber,Glass only,Paper,Wood pulp,A
+BM,Identify the sensor commonly used to measure angular motion in wearable rehabilitation system?,Gyroscope,Thermistor,pH sensor,Pressure cuff,A
+BM,What is the primary purpose of using composites in biomedical applications?,To increase material density,To combine desirable properties of two or more materials,To eliminate mechanical strength,To increase material degradation,B
+BM,Mention a natural fiber is commonly investigated for biodegradable biomedical composites?,Jute,Steel wire,Copper wire,Aluminum foil,A
+BM,Can you identify a commonly used bioceramic reinforcement?,Hydroxyapatite,Polyethylene,Nylon,Silicone rubber,A
+BM,Hydroxyapatite is particularly suitable for bone-related applications because it is:,Highly magnetic,Chemically similar to the mineral component of bone,Electrically conductive,Highly combustible,B
+BM,"In an EMG-based biomechanical study, an increase in EMG amplitude generally indicates:",Increased electrical activity of the monitored muscle,Reduced bone density,Increased joint angle only,Reduced blood pressure,A
+BM,"In finite element analysis of a bone, the primary purpose of applying boundary conditions is to:",Define how the model is constrained and loaded,Determine the patient's blood group,Measure muscle activation,Calculate body temperature,A
+BM,Which instrument is commonly used to measure the range of motion of a joint?,Goniometer,Force plate,EMG electrode,Accelerometer,A
+BM,"In human gait, the phase in which the foot is in contact with the ground is called:",Swing phase,Stance phase,Flight phase,Recovery phase,B
+BM,The DFT of an N-point sequence produces:,N frequency-domain samples,N/2 samples only,2N samples,N squared samples,A
+BM,A notch filter is commonly used in biomedical signal processing to suppress:,Baseline drift,Power-line interference,All high-frequency components,DC components only,B
+BM,"In a PID controller, the integral term primarily helps to:",Increase measurement noise,Eliminate steady-state error,Eliminate all overshoot,Reduce sampling frequency,B
+BM,"In MRI image segmentation, the Otsu method determines the optimal threshold by:",Maximizing within-class variance,Minimizing between-class variance,Maximizing between-class variance,Maximizing image entropy only,C
+BM,"In a 2-D discrete Fourier transform, a sudden sharp edge in an image generally contributes:",Only low-frequency components,Significant high-frequency components,Only the DC component,No frequency-domain energy,B
+BM,"For a linear-phase FIR filter of length N=21, the group delay is:",5 samples,10 samples,10.5 samples,21 samples,B
+BM,"In a negative-feedback physiological control system, increasing loop gain generally reduces steady-state error but may:",Always improve stability,Reduce bandwidth,Reduce stability margins,Eliminate sensor dynamics,C
+BM,Which of the following is an example of positive feedback in physiology?,Body-temperature regulation,Blood glucose regulation,Blood pressure regulation,Oxytocin-mediated uterine contractions during childbirth,D
+BM,"In a closed-loop insulin delivery system, continuous glucose measurement acts as:",Actuator,Sensor,Controller,Disturbance,B
+BM,A control system with an actuator that cannot provide more than its maximum available output is experiencing:,Saturation,Sampling,Registration,Calibration,A
+BM,The normal resting heart rate in a healthy adult is approximately:,20–40 bpm,40–60 bpm,60–100 bpm,120–160 bpm,C
+BM,A pulse oximeter commonly uses light of:,X-ray and gamma-ray wavelengths,Red and infrared wavelengths,UV and microwave wavelengths,Green and blue wavelengths only,B
+BM,An ideal operational amplifier has:,Zero input impedance,Infinite input impedance,Infinite output impedance,Zero voltage gain,B

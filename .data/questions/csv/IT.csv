@@ -1,0 +1,26 @@
+﻿Department Code,Question Prompt,Option A,Option B,Option C,Option D,Correct Option
+IT,"To perform breadth-first search (BFS) on a graph, which data structure is most appropriate?",Stack,Queue,Heap,Hash Table,B
+IT,"Given a weighted graph with non-negative edge weights, the appropriate algorithm for finding shortest paths from a single source is:",Prim's Algorithm,Kruskal's Algorithm,Dijkstra's Algorithm,Floyd-Warshall Algorithm,C
+IT,An application requires average O(1) key-value lookup. Which data structure best satisfies this requirement?,Linked List,Binary Tree,Hash Table,Stack,C
+IT,"Within the ACID properties of a transaction, the property that guarantees either all operations are completed or none are is:",Consistency,Isolation,Atomicity,Durability,C
+IT,"When two transactions wait indefinitely for one another to release resources, the situation is known as:",Starvation,Deadlock,Dirty Read,Lost Update,B
+IT,"In a priority-based CPU scheduling system, which scheduling approach can lead to starvation of lower-priority processes?",FCFS,Round Robin,Priority Scheduling,FIFO,C
+IT,Virtual memory primarily provides an operating system with the ability to:,Increase CPU speed,Provide an abstraction of larger memory,Reduce instruction size,Eliminate secondary storage,B
+IT,Packet routing between different networks is primarily handled by which layer of the OSI model?,Data Link,Network,Transport,Session,B
+IT,"In a fully associative cache, a memory block can be placed:",Direct Mapping,Fully Associative Mapping,Set Associative Mapping,Sequential Mapping,B
+IT,The CPU component responsible for arithmetic and logical operations is the:,Control Unit,ALU,Register Unit,Cache,B
+IT,Instruction pipelining improves processor performance primarily by:,Increase memory capacity,Overlap instruction execution stages,Reduce storage capacity,Encrypt instructions,B
+IT,An organization wants a software development approach based on iterative development and frequent customer feedback. The most suitable approach is:,Waterfall,Agile,V-Model,Big Bang,B
+IT,"For a program containing multiple independent execution paths, the metric used to measure the number of such paths is:",Coupling,Cohesion,Cyclomatic Complexity,Lines of Code,C
+IT,A software system exhibits high cohesion and low coupling. This characteristic generally indicates:,Poor modularity,Strong modular design,High redundancy,Increased complexity,B
+IT,A machine-learning model achieves very high accuracy on training data but performs poorly on unseen data. This phenomenon is called:,Poor performance on training data,Good training performance but poor unseen-data performance,Too few model parameters,A dataset without noise,B
+IT,"To improve the generalization of a machine-learning model and reduce overfitting, which technique is commonly applied?",Increase model complexity indefinitely,Regularization,Remove validation data,Increase noise,B
+IT,"When evaluating a classification model, a confusion matrix is primarily used to:",Measure database size,Evaluate classification performance,Generate training data,Reduce dimensionality,B
+IT,A dataset contains many correlated features and needs dimensionality reduction while preserving maximum variance. The appropriate technique is:,PCA,K-Means,Apriori,Random Forest,A
+IT,An attacker sends an excessive number of requests to a service in an attempt to make it unavailable. This attack is classified as:,Phishing,Denial-of-Service,SQL Injection,Privilege Escalation,B
+IT,The cryptographic process that converts plaintext into ciphertext is:,Hashing,Encryption,Compression,Encoding,B
+IT,A cryptographic system uses the same secret key for both encryption and decryption. This approach is known as:,Asymmetric Cryptography,Symmetric Cryptography,Hashing,Digital Signature,B
+IT,A digital signature is primarily used to provide:,Compress a file,Provide authentication and integrity,Increase bandwidth,Hide an IP address,B
+IT,"A cloud customer requires virtual machines, storage, and networking resources. Which cloud service model provides these capabilities?",SaaS,PaaS,IaaS,FaaS,C
+IT,A cloud platform automatically increases or decreases computing resources according to workload demand. This characteristic is known as:,Virtualization,Elasticity,Encryption,Multitenancy,B
+IT,"In a distributed system, the ability to continue providing service despite failures of individual components is known as:",Scalability,Fault Tolerance,Transparency,Serialization,B

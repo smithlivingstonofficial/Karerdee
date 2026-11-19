@@ -1,0 +1,26 @@
+﻿Department Code,Question Prompt,Option A,Option B,Option C,Option D,Correct Option
+BT,The type of nucleic acid present in λ-phage is,Double stranded DNA,Single stranded circular DNA,Single stranded DNA,Single stranded RNA,A
+BT,Which of the following are CORRECT about protein structure? P. Secondary structure is formed by a repeating pattern of interactions among the polypeptide backbone atoms Q. Tertiary structure is the three-dimensional arrangement of the polypeptide backbone atoms only R. Quaternary structure refers to an assembly of multiple polypeptide subunits,P and Q only,P and R only,Q and R only,"P, Q and R",B
+BT,"Adenine can undergo a spontaneous change to hypoxanthine in a cell, leading to a DNA base pair mismatch. The correct combination of enzymes that are involved in repairing this damage is","Nuclease, DNA polymerase, DNA ligase","Nuclease, DNA ligase, helicase","Primase, DNA polymerase, DNA ligase","Primase, helicase, DNA polymerase",A
+BT,Which of the following is (are) common feature(s) for both aerobic and anerobic bacterial cultures?,Glycolysis and NAD+ is the oxidizing agent,NAD+ is the oxidizing agent,Oxidative phosphorylation,Reduction,"A,B"
+BT,Emerging viruses such as SARS-CoV2 cause epidemics. Which of the following process(es) contribute to the rise of such viruses?,Mutation of existing virus,Jumping of existing virus from current to new hosts,Spread of virus in the new host population,"Option A,B,C",D
+BT,Which of the immune cells listed below are agranular? P. Eosinophils Q. Mast cells R. Monocytes S. T-cells,P and Q only,Q and R only,R and S only,S and P only,C
+BT,Which one of the following enzymes is located in the outer mitochondrial membrane?,Citrate synthase,Fumarase,Monoamine oxidase,Succinate dehydrogenase,C
+BT,Which one of the following leukocytes are present in the largest proportion in healthy human blood?,Neutrophils,Eosinophils,Basophils,Monocytes,A
+BT,The site of photosynthesis in cyanobacteria is,Chloroplast,Chromatophores,Thylakoids,Chlorosomes,C
+BT,The antimicrobial activity of vancomycin is due to,Inhibition of nucleic acid synthesis,Damage to the cytoplasmic membrane,Inhibition of cell wall synthesis,Regulation of DNA supercoiling,C
+BT,Which of the following are present in Gram-negative bacteria?,Lipopolysaccharide,Teichoic acid,Periplasm,Option A & C,D
+BT,Which of the following diseases are caused by family of DNA viruses?,Hepatitis B,Small pox,Influenza,Option A & B,D
+BT,"In the human body, which of the following is/are involved in processing of a foreign antigen?",B-cells,Macrophages,RBC,Option A & B,D
+BT,The action of which class of enzyme inhibitors can be reversed by adding an excess of substrate?,Uncompetitive inhibitors,Competitive inhibitors,Non-specific inhibitors,Allosteric inhibitors,B
+BT,"In angiosperms, normally ‘Exarch Xylem’ occurs in",Dicot stem,Monocot stem,Dicot root,Dicot leaf,C
+BT,Which of the following is the correct statement about hexoses?,D-mannose is C-4 epimer of D-glucose,D-galactose is C-2 epimer of D-glucose,D-glucose and L-glucose are diastereomers,D-glucose and D-galactose are diastereomers,D
+BT,"Among individuals in a human population, minor variations exist in nucleotide sequences of chromosomes. These variations can lead to gain or loss of sites for specific restriction enzymes. Which of the following technique is used to identify such variations?",Polymerase dependent fragment insertion,Real-time polymerase chain reaction,Restriction fragment length polymorphism,Reverse transcriptase polymerase chain reaction,C
+BT,Which of the following is not used for generating an optimal alignment of two nucleotide sequences?,Gap penalties,Match scores,Mismatch scores,Nucleotide composition,D
+BT,"In binomial nomenclature, the name of a bacterial strain is written with the first letter of ------ word(s) being capitalized",First,Second,Neither,First and second,A
+BT,Terpenoids are made of -------- units,Amino acid,Carbohydrate,Isoprene,Triacylglycerol,C
+BT,The recognition sequences of four Type-II restriction enzymes (RE) are given below. The symbol (|) indicates the cleavage site. Identify the RE that generates sticky ends,RE1 – 5’G|GATCC 3’,RE2 - 5’CTG|CAG 3’,RE3 - 5’CCC|GGG 3’,RE4 - 5’SG|CT 3’,A
+BT,Which of the following statement(s) is(are) correct regarding the lac operon in E. coli when grown in the presence of glucose and lactose?,"At low glucose level, the operon is activated","At high glucose level, the operon is activated to enable the utilization of lactose",The lac repressor binds to operator region inactivating the operon,Option A & C,D
+BT,Which of the following method is used for introducing the foreign genes into plant cells,Agrobacterium,CaCl2 mediated plasmid uptake,Electroporation,Gene gun,B
+BT,Coronavirus genome consists of,double-stranded DNA,double-stranded RNA,negative-sense single-stranded RNA,positive-sense single-stranded RNA,D
+BT,Which one of the following statements is incorrect about hybridoma production?,Hybridoma cells can use hypoxanthine and thymidine,DNA synthesis in myeloma cells is blocked by aminopterin,Hybridoma cells are made to produce polyclonal antibodies,Polyethylene glycol is used to fuse myeloma cells to B-cells,C

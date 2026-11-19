@@ -1,0 +1,26 @@
+﻿Department Code,Question Prompt,Option A,Option B,Option C,Option D,Correct Option
+MATHS,"If a sequence (a_n) is convergent in R, which of the following must be true?",It is monotone,It is bounded,It is strictly increasing,It has only positive terms,B
+MATHS,"Let f:[a,b]→R be continuous. Which statement follows from the Extreme Value Theorem?","f is differentiable on [a,b]","f attains both a maximum and a minimum on [a,b]",f is uniformly continuous only if f is bounded,f must be monotone,B
+MATHS,Which condition is sufficient for a series Σa_n to converge absolutely?,Σ|a_n| converges,a_n→0 only,Σa_n is bounded,a_n is monotone,A
+MATHS,"If f_n→f uniformly on E and every f_n is continuous on E, then f is:",Differentiable,Continuous,Monotone,Analytic,B
+MATHS,"Let f_n(x)=n x(1−x^2)^n on [0,1]. Which statement about the pointwise limit of (f_n) is correct?",It converges uniformly to 0,It converges pointwise to 0 but not uniformly,It converges pointwise to 1,"It diverges for every x∈[0,1]",B
+MATHS,Which of the following is a necessary condition for a finite group G to be cyclic?,Every subgroup is normal,G has exactly one identity element,There exists an element whose order is |G|,G is non-abelian,C
+MATHS,The kernel of a group homomorphism φ:G→H is always:,A subgroup of H,A normal subgroup of G,A cyclic subgroup of G,A maximal subgroup of G,B
+MATHS,Which polynomial is irreducible over Q?,x^2−4,x^3−8,x^2+1,x^4−1,C
+MATHS,"If R is a field, then every nonzero element of R has:",An additive inverse only,A multiplicative inverse,A unique square root,Finite order,B
+MATHS,Let G be a finite group of order 21. Which statement is necessarily true?,G must be cyclic,G must be abelian,G has a normal Sylow 7-subgroup,G has no subgroup of order 3,C
+MATHS,A function f(z) is analytic in a domain if it is:,Continuous at one point,Complex differentiable at every point of the domain,Bounded everywhere,Real-valued,B
+MATHS,The Cauchy-Riemann equations are a necessary condition for complex differentiability when the partial derivatives:,Do not exist,Exist and are appropriately continuous,Are always zero,Are unbounded,B
+MATHS,The residue of f(z)=1/[z(z−1)] at z=0 is:,−1,0,1,1/2,A
+MATHS,"If f is entire and bounded on the whole complex plane, then by Liouville's theorem f is:",Periodic,Constant,Polynomial of degree 1,Unbounded,B
+MATHS,"TOUGH: Evaluate ∮|z|=2 e^z/[z^2(z−1)] dz, where the contour is positively oriented.",0,2πi,4πi,6πi,C
+MATHS,"For any finite undirected graph, the sum of the degrees of all vertices equals:",|E|,2|E|,|V|,|V|+|E|,B
+MATHS,A connected graph with n vertices and n−1 edges is necessarily:,Complete,Bipartite,A tree,Eulerian,C
+MATHS,Which graph is always bipartite?,A graph containing a triangle,A graph with an odd cycle,A graph with no odd cycle,Every complete graph,C
+MATHS,A connected graph has an Euler circuit if and only if:,Exactly two vertices have odd degree,Every vertex has even degree,It is complete,It is a tree,B
+MATHS,A simple planar connected graph has 12 vertices and 20 edges. What is the maximum possible number of faces?,8,10,12,14,B
+MATHS,"The general solution of dy/dx = ky, where k is a constant, is:",y=kx+C,y=Ce^(kx),y=C+kx,y=e^x+k,B
+MATHS,The order of the differential equation y''' + 2y' − y = sin x is:,1,2,3,4,C
+MATHS,"For a linear homogeneous second-order ODE with constant coefficients, repeated characteristic root r gives the solution form:",c1e^(rx)+c2e^(rx),c1e^(rx)+c2xe^(rx),c1cos(rx)+c2sin(rx),c1x+c2,B
+MATHS,"The Laplace transform of f'(t), assuming the transform exists, is:",sF(s),F(s)/s,sF(s)−f(0),F(s)−s,C
+MATHS,"For y''−3y'+2y=e^x with y(0)=0 and y'(0)=1, which is the solution?",y=e^x−e^(2x),y=xe^x,y=e^(2x)−e^x,y=xe^x−e^(2x),C

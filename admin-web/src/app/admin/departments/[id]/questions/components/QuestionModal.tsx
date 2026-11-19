@@ -18,6 +18,7 @@ import {
   Check,
   CheckCheck
 } from "lucide-react";
+import { MathText } from "@/components/MathText";
 
 interface QuestionModalProps {
   isOpen: boolean;
@@ -378,6 +379,16 @@ export function QuestionModal({
               placeholder="State the technical question clearly..."
               className="w-full px-3.5 py-2 text-sm bg-white border border-slate-300 rounded-xl text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-700 resize-y"
             />
+            {Boolean(prompt && (/[²³⁴⁰¹⁵⁶⁷⁸⁹πδρṁ√∮∫∞±×÷^$]/.test(prompt) || (prompt.includes("=") && /[a-zA-Z]/.test(prompt)))) && (
+              <div className="mt-2 p-2.5 bg-blue-50/70 border border-blue-200 rounded-xl text-xs text-blue-950 flex items-start space-x-2 animate-in fade-in duration-150">
+                <span className="text-[10px] font-bold text-blue-700 uppercase tracking-wider flex-shrink-0 mt-0.5">
+                  Formula Preview:
+                </span>
+                <div className="flex-1 font-medium leading-relaxed">
+                  <MathText text={prompt} />
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Code Snippet Toggle */}
@@ -511,6 +522,13 @@ export function QuestionModal({
                       onChange={(e) => handleOptionTextChange(idx, e.target.value)}
                       className="flex-1 px-3 py-1.5 text-xs bg-white border border-slate-300 rounded-lg text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-700"
                     />
+
+                    {/* Option Formula Live Preview */}
+                    {Boolean(opt.optionText && (/[²³⁴⁰¹⁵⁶⁷⁸⁹πδρṁ√∮∫∞±×÷^$]/.test(opt.optionText) || (opt.optionText.includes("=") && /[a-zA-Z]/.test(opt.optionText)))) && (
+                      <span className="px-2 py-0.5 bg-blue-50 border border-blue-200 text-blue-900 rounded-md text-xs font-serif font-medium flex-shrink-0" title="Rendered equation preview">
+                        <MathText text={opt.optionText} />
+                      </span>
+                    )}
 
                     {opt.isCorrect && (
                       <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md border flex-shrink-0 ${

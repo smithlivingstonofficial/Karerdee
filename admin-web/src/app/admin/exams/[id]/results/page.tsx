@@ -11,6 +11,7 @@ import {
   CandidateQuestionResult,
 } from "./actions";
 import { formatTime, formatDate, formatDateTime } from "@/lib/date";
+import { MathText } from "@/components/MathText";
 import {
   ArrowLeft,
   Printer,
@@ -850,9 +851,9 @@ export default function ExamResultsGradebookPage() {
                     </td>
 
                     <td className="py-3 px-3 sm:px-4 max-w-md">
-                      <p className="line-clamp-2 leading-relaxed text-slate-900 font-medium">
-                        {q.prompt}
-                      </p>
+                      <div className="line-clamp-2 leading-relaxed text-slate-900 font-medium">
+                        <MathText text={q.prompt} />
+                      </div>
                     </td>
 
                     <td className="py-3 px-3 sm:px-4 text-center font-mono font-bold text-slate-700">
@@ -1082,7 +1083,7 @@ export default function ExamResultsGradebookPage() {
 
                     {/* Prompt */}
                     <div className="text-xs font-semibold text-slate-900 leading-relaxed">
-                      {q.prompt}
+                      <MathText text={q.prompt} />
                     </div>
 
                     {/* Answers Comparison */}
@@ -1094,7 +1095,12 @@ export default function ExamResultsGradebookPage() {
                         </span>
                         {q.selectedOptionTexts.length > 0 ? (
                           <div className="font-semibold text-slate-900 leading-snug">
-                            {q.selectedOptionTexts.join(", ")}
+                            {q.selectedOptionTexts.map((txt, ti) => (
+                              <React.Fragment key={ti}>
+                                {ti > 0 && ", "}
+                                <MathText text={txt} />
+                              </React.Fragment>
+                            ))}
                           </div>
                         ) : (
                           <span className="text-slate-400 italic text-[11px]">
@@ -1109,7 +1115,16 @@ export default function ExamResultsGradebookPage() {
                           Official Correct Option:
                         </span>
                         <div className="font-bold text-emerald-950 leading-snug">
-                          {q.correctOptionTexts.join(", ") || "Answer key not assigned"}
+                          {q.correctOptionTexts.length > 0 ? (
+                            q.correctOptionTexts.map((txt, ti) => (
+                              <React.Fragment key={ti}>
+                                {ti > 0 && ", "}
+                                <MathText text={txt} />
+                              </React.Fragment>
+                            ))
+                          ) : (
+                            "Answer key not assigned"
+                          )}
                         </div>
                       </div>
                     </div>

@@ -5,6 +5,7 @@ import { QuestionState, SectionState, QuestionBankItem } from "../types";
 import { Department } from "@/types/database.types";
 import { QuestionBankDrawer } from "./QuestionBankDrawer";
 import { CsvUploadDrawer } from "./CsvUploadDrawer";
+import { MathText } from "@/components/MathText";
 import {
   Plus,
   Trash2,
@@ -869,6 +870,18 @@ export function QuestionBuilderTab({
                   placeholder="Enter the question prompt here..."
                   className="w-full px-3.5 py-2 text-xs sm:text-sm bg-slate-50/60 border border-slate-200 rounded-xl text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-700 focus:bg-white transition-all font-medium leading-relaxed shadow-2xs"
                 />
+
+                {/* Live Equation / Math Preview */}
+                {Boolean(q.prompt && (/[²³⁴⁰¹⁵⁶⁷⁸⁹πδρṁ√∮∫∞±×÷^$]/.test(q.prompt) || (q.prompt.includes("=") && /[a-zA-Z]/.test(q.prompt)))) && (
+                  <div className="p-2.5 bg-blue-50/60 rounded-xl border border-blue-200/80 text-xs text-blue-950 flex items-start space-x-2 animate-in fade-in duration-150">
+                    <span className="text-[10px] font-bold text-blue-700 uppercase tracking-wider flex-shrink-0 mt-0.5">
+                      Formula Preview:
+                    </span>
+                    <div className="flex-1 font-medium leading-relaxed">
+                      <MathText text={q.prompt} />
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Monospaced Code Snippet Box */}
@@ -950,6 +963,13 @@ export function QuestionBuilderTab({
                         placeholder={`Option ${optionLetters[optIdx] || optIdx + 1} text...`}
                         className="flex-1 px-2.5 py-1 text-xs sm:text-sm bg-transparent border-0 focus:outline-none text-slate-900 placeholder:text-slate-400 font-medium"
                       />
+
+                      {/* Live Equation Preview Badge for Option */}
+                      {Boolean(opt.text && (/[²³⁴⁰¹⁵⁶⁷⁸⁹πδρṁ√∮∫∞±×÷^$]/.test(opt.text) || (opt.text.includes("=") && /[a-zA-Z]/.test(opt.text)))) && (
+                        <span className="px-2 py-0.5 bg-blue-50 border border-blue-200 text-blue-900 rounded-md text-xs font-serif font-medium flex-shrink-0" title="Rendered equation preview">
+                          <MathText text={opt.text} />
+                        </span>
+                      )}
 
                       {/* Correct Badge */}
                       {opt.isCorrect && (

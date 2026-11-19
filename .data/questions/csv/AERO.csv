@@ -1,6 +1,6 @@
 ﻿Department Code,Question Prompt,Option A,Option B,Option C,Option D,Correct Option
 AERO,"For an incompressible, inviscid flow over a circular cylinder of radius R, the maximum velocity on the surface is:",Equal to the freestream velocity V∞,1.5 times V∞,2 times V∞,4 times V∞,C
-AERO,The Kutta condition for a finite airfoil with a sharp trailing edge states that:,The flow separates at the trailing edge,The velocity at the trailing edge is zero,The trailing edge is a stagnation point wi,The pressure at the trailing edge equals freestream pressure,C
+AERO,The Kutta condition for a finite airfoil with a sharp trailing edge states that:,The flow separates at the trailing edge,The velocity at the trailing edge is zero,The trailing edge is a stagnation point with smooth flow leaving it,The pressure at the trailing edge equals freestream pressure,C
 AERO,"For a wing with aspect ratio AR = 8 and Oswald efficiency factor e = 0.8, the induced drag coefficient at CL = 1.0 is approximately:",0.02,0.05,0.08,0.1,B
 AERO,The critical Mach number of an airfoil is the freestream Mach number at which:,The flow becomes supersonic everywhere,Sonic conditions first appear at some point on the airfoil,Shock waves form at the trai,The lift coefficient becomes maximum,B
 AERO,The thrust produced by a turbojet engine is given by:,T = ṁ(Ve − V∞),T = ṁ(Ve + V∞),T = ṁ(Ve × V∞),T = ṁ(V∞ − Ve),A
