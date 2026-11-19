@@ -33,6 +33,8 @@ import {
   CheckCheck,
   Globe,
   ChevronRight,
+  ChevronDown,
+  Filter,
   Copy,
   Download,
   ArrowRightLeft,
@@ -98,6 +100,8 @@ export function QuestionsClientView({
       matchesScope = !q.department_id && isTamilQuestion(q);
     } else if (selectedScope === "GENERAL_ALL") {
       matchesScope = !q.department_id;
+    } else if (selectedScope === "DEPT_ALL") {
+      matchesScope = Boolean(q.department_id);
     } else if (selectedScope !== "ALL") {
       matchesScope = q.department_id === selectedScope;
     }
@@ -114,6 +118,35 @@ export function QuestionsClientView({
   const deptSpecificCount = initialQuestions.filter((q) => !!q.department_id).length;
   const singleChoiceCount = initialQuestions.filter((q) => q.question_type === "MCQ_SINGLE").length;
   const multiChoiceCount = initialQuestions.filter((q) => q.question_type === "MCQ_MULTIPLE").length;
+
+  // Departments with questions vs departments without
+  const departmentsWithQuestions = departments
+    .map((d) => ({
+      ...d,
+      count: initialQuestions.filter((q) => q.department_id === d.id).length,
+    }))
+    .filter((d) => d.count > 0);
+
+  const isDeptScopeSelected = Boolean(
+    selectedScope !== "ALL" &&
+    selectedScope !== "GENERAL" &&
+    selectedScope !== "GENERAL_EN" &&
+    selectedScope !== "GENERAL_TA" &&
+    selectedScope !== "COMMON_TAMIL" &&
+    selectedScope !== "GENERAL_ALL" &&
+    selectedScope !== "DEPT_ALL"
+  );
+
+  const activeDepartment = isDeptScopeSelected
+    ? departments.find((d) => d.id === selectedScope)
+    : null;
+
+  const isFiltered = Boolean(
+    searchTerm.trim() !== "" ||
+    selectedScope !== "ALL" ||
+    selectedDifficulty !== "ALL" ||
+    selectedFormat !== "ALL"
+  );
 
   async function handleDelete(id: string) {
     if (!confirm("Are you sure you want to remove this question from the master repository?")) return;
@@ -498,21 +531,361 @@ export function QuestionsClientView({
         </div>
       )}
 
-      {/* Filter and Search Bar */}
-      <div className="bg-white border border-slate-200/90 rounded-2xl p-3 sm:p-4 shadow-xs space-y-3">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
-          {/* Left: Quick Select & Search Box */}
-          <div className="flex items-center gap-2 flex-1">
-            {/* Quick Multi-Select Filtered Button */}
+      {/* 2-Tier Academic Control Hub: Scope Navigator & Search/Filters */}
+      <div className="bg-white border border-slate-200/90 rounded-2xl shadow-xs overflow-hidden">
+        {/* Tier 1: Academic Scope & Curricula Navigator Bar */}
+        <div className="bg-slate-50/80 border-b border-slate-200/80 px-4 py-2.5 sm:px-5 sm:py-3 flex flex-col md:flex-row md:items-center justify-between gap-2.5">
+          {/* Left: Core Universal Scopes */}
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mr-1 flex items-center">
+              <Layers className="w-3.5 h-3.5 mr-1 text-slate-400" />
+              Scope:
+            </span>
+
+            {/* All Questions */}
+            <button
+              type="button"
+              onClick={() => setSelectedScope("ALL")}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center space-x-1.5 ${
+                selectedScope === "ALL"
+                  ? "bg-blue-600 text-white shadow-2xs"
+                  : "bg-white text-slate-700 border border-slate-200/90 hover:bg-slate-100 hover:text-slate-900"
+              }`}
+            >
+              <span>All Questions</span>
+              <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                selectedScope === "ALL" ? "bg-blue-700 text-white" : "bg-slate-100 text-slate-600"
+              }`}>
+                {initialQuestions.length}
+              </span>
+            </button>
+
+            {/* General Core English */}
+            <button
+              type="button"
+              onClick={() => setSelectedScope("GENERAL_EN")}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center space-x-1.5 ${
+                selectedScope === "GENERAL_EN" || selectedScope === "GENERAL"
+                  ? "bg-purple-600 text-white shadow-2xs"
+                  : "bg-white text-purple-700 border border-purple-200 hover:bg-purple-50"
+              }`}
+              title="Universal Research Methodology & General Core (English)"
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>General Core</span>
+              <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                selectedScope === "GENERAL_EN" || selectedScope === "GENERAL"
+                  ? "bg-purple-700 text-white"
+                  : "bg-purple-100 text-purple-800"
+              }`}>
+                {commonEnglishCount}
+              </span>
+            </button>
+
+            {/* Common Tamil */}
+            <button
+              type="button"
+              onClick={() => setSelectedScope("GENERAL_TA")}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center space-x-1.5 ${
+                selectedScope === "GENERAL_TA"
+                  ? "bg-indigo-600 text-white shadow-2xs"
+                  : "bg-white text-indigo-700 border border-indigo-200 hover:bg-indigo-50"
+              }`}
+              title="Common Research Methodology in Tamil language script"
+            >
+              <Globe className="w-3.5 h-3.5 text-indigo-600" />
+              <span>Common Tamil</span>
+              <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                selectedScope === "GENERAL_TA"
+                  ? "bg-indigo-700 text-white"
+                  : "bg-indigo-100 text-indigo-800"
+              }`}>
+                {commonTamilCount}
+              </span>
+            </button>
+
+            {/* All Departments Tab */}
+            <button
+              type="button"
+              onClick={() => setSelectedScope("DEPT_ALL")}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center space-x-1.5 ${
+                selectedScope === "DEPT_ALL"
+                  ? "bg-emerald-700 text-white shadow-2xs"
+                  : "bg-white text-emerald-800 border border-emerald-200 hover:bg-emerald-50"
+              }`}
+              title="Filter all specialized department questions"
+            >
+              <Building2 className="w-3.5 h-3.5 text-emerald-600" />
+              <span>All Depts</span>
+              <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                selectedScope === "DEPT_ALL"
+                  ? "bg-emerald-800 text-white"
+                  : "bg-emerald-100 text-emerald-800"
+              }`}>
+                {deptSpecificCount}
+              </span>
+            </button>
+          </div>
+
+          {/* Right: Quick Dept Badges + Complete Department Dropdown */}
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* Quick Pills for departments with questions (e.g. AERO) */}
+            {departmentsWithQuestions.map((dept) => (
+              <button
+                key={dept.id}
+                type="button"
+                onClick={() => setSelectedScope(selectedScope === dept.id ? "ALL" : dept.id)}
+                className={`px-2.5 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center space-x-1.5 border shadow-2xs ${
+                  selectedScope === dept.id
+                    ? "bg-blue-600 text-white border-blue-600"
+                    : "bg-white text-slate-800 border-slate-200 hover:border-blue-300 hover:bg-blue-50/50"
+                }`}
+                title={`Filter by ${dept.name} (${dept.count} questions)`}
+              >
+                <span>{dept.code}</span>
+                <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                  selectedScope === dept.id
+                    ? "bg-blue-700 text-white"
+                    : "bg-blue-50 text-blue-700 border border-blue-200"
+                }`}>
+                  {dept.count}
+                </span>
+              </button>
+            ))}
+
+            {/* Complete Department Selector Dropdown */}
+            <div className="relative">
+              <select
+                value={isDeptScopeSelected ? selectedScope : ""}
+                onChange={(e) => {
+                  if (e.target.value) {
+                    setSelectedScope(e.target.value);
+                  } else {
+                    setSelectedScope("ALL");
+                  }
+                }}
+                className="text-xs font-semibold py-1.5 pl-2.5 pr-7 bg-white hover:bg-slate-50 border border-slate-200 rounded-xl text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 transition-all shadow-2xs cursor-pointer"
+              >
+                <option value="">Department Curricula ({departments.length})...</option>
+                {departments.map((dept) => {
+                  const qCount = initialQuestions.filter((q) => q.department_id === dept.id).length;
+                  return (
+                    <option key={dept.id} value={dept.id}>
+                      {dept.code} — {dept.name} ({qCount})
+                    </option>
+                  );
+                })}
+              </select>
+            </div>
+          </div>
+        </div>
+
+        {/* Tier 2: Search Box & Filter Controls */}
+        <div className="px-4 py-3 sm:px-5 sm:py-3.5 bg-white flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+          {/* Prominent Search Input */}
+          <div className="relative flex-1 max-w-xl">
+            <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+            <input
+              type="text"
+              placeholder="Search questions by prompt, topic, option text, or code..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-10 pr-8 py-2 text-xs bg-slate-50 hover:bg-white border border-slate-200 rounded-xl text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 focus:bg-white transition-all shadow-2xs"
+            />
+            {searchTerm && (
+              <button
+                type="button"
+                onClick={() => setSearchTerm("")}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[11px] text-slate-400 hover:text-slate-700 px-1 font-bold cursor-pointer"
+                title="Clear search"
+              >
+                ✕
+              </button>
+            )}
+          </div>
+
+          {/* Right Filters & CSV Export Group */}
+          <div className="flex flex-wrap items-center gap-2.5">
+            {/* Format Segmented Filter */}
+            <div className="flex items-center space-x-1.5">
+              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                Format
+              </span>
+              <div className="inline-flex p-0.5 bg-slate-100 rounded-xl border border-slate-200/90 text-xs shadow-2xs">
+                <button
+                  type="button"
+                  onClick={() => setSelectedFormat("ALL")}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                    selectedFormat === "ALL"
+                      ? "bg-white text-slate-900 shadow-2xs font-bold"
+                      : "text-slate-600 hover:text-slate-900"
+                  }`}
+                >
+                  All
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedFormat("MCQ_SINGLE")}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer inline-flex items-center space-x-1 ${
+                    selectedFormat === "MCQ_SINGLE"
+                      ? "bg-white text-emerald-800 shadow-2xs font-bold"
+                      : "text-slate-600 hover:text-slate-900"
+                  }`}
+                >
+                  <Check className="w-3 h-3 text-emerald-600" />
+                  <span>Single</span>
+                  <span className="text-[10px] text-slate-400 ml-0.5 font-normal">({singleChoiceCount})</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedFormat("MCQ_MULTIPLE")}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer inline-flex items-center space-x-1 ${
+                    selectedFormat === "MCQ_MULTIPLE"
+                      ? "bg-white text-amber-800 shadow-2xs font-bold"
+                      : "text-slate-600 hover:text-slate-900"
+                  }`}
+                >
+                  <CheckCheck className="w-3 h-3 text-amber-600" />
+                  <span>Multi</span>
+                  <span className="text-[10px] text-slate-400 ml-0.5 font-normal">({multiChoiceCount})</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Difficulty Segmented Filter */}
+            <div className="flex items-center space-x-1.5">
+              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                Difficulty
+              </span>
+              <div className="inline-flex p-0.5 bg-slate-100 rounded-xl border border-slate-200/90 text-xs shadow-2xs">
+                {[
+                  { id: "ALL", label: "All" },
+                  { id: "EASY", label: "Easy", activeCls: "text-emerald-700 font-bold" },
+                  { id: "MEDIUM", label: "Med", activeCls: "text-blue-700 font-bold" },
+                  { id: "HARD", label: "Hard", activeCls: "text-red-700 font-bold" },
+                ].map((diff) => (
+                  <button
+                    key={diff.id}
+                    type="button"
+                    onClick={() => setSelectedDifficulty(diff.id)}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                      selectedDifficulty === diff.id
+                        ? `bg-white shadow-2xs ${diff.activeCls || "text-slate-900 font-bold"}`
+                        : "text-slate-600 hover:text-slate-900"
+                    }`}
+                  >
+                    {diff.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Export Filtered CSV */}
+            <button
+              type="button"
+              onClick={handleExportFilteredCsv}
+              disabled={filtered.length === 0}
+              className={`h-8.5 px-3 rounded-xl text-xs font-bold inline-flex items-center space-x-1.5 transition-all shadow-2xs border ${
+                filtered.length > 0
+                  ? "bg-white hover:bg-emerald-50 text-emerald-800 border-slate-200 hover:border-emerald-300 cursor-pointer active:scale-95"
+                  : "bg-slate-50 text-slate-400 border-slate-200 cursor-not-allowed opacity-60"
+              }`}
+              title={filtered.length > 0 ? `Export all ${filtered.length} filtered questions to CSV` : "No questions to export"}
+            >
+              <Download className={`w-3.5 h-3.5 ${filtered.length > 0 ? "text-emerald-600" : "text-slate-400"}`} />
+              <span>Export CSV</span>
+              {filtered.length > 0 && (
+                <span className="text-[10px] bg-emerald-100 text-emerald-800 px-1.5 py-0.2 rounded-full font-bold ml-0.5">
+                  {filtered.length}
+                </span>
+              )}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Stream Subheader & Active Filter Cockpit */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 px-1 py-1">
+        {/* Left: Stream Count & Active Filter Tags */}
+        <div className="flex items-center gap-1.5 flex-wrap text-xs">
+          <span className="font-bold text-slate-800">
+            Showing {filtered.length} {filtered.length === 1 ? "question" : "questions"}
+          </span>
+
+          {isFiltered && (
+            <>
+              <span className="text-slate-300">•</span>
+              {/* Active Filter Chips */}
+              {selectedScope === "GENERAL_EN" && (
+                <span className="inline-flex items-center px-2 py-0.5 rounded-lg text-[11px] font-semibold bg-purple-50 text-purple-800 border border-purple-200">
+                  Scope: General Core
+                  <button type="button" onClick={() => setSelectedScope("ALL")} className="ml-1 hover:text-purple-950 font-bold cursor-pointer">✕</button>
+                </span>
+              )}
+              {selectedScope === "GENERAL_TA" && (
+                <span className="inline-flex items-center px-2 py-0.5 rounded-lg text-[11px] font-semibold bg-indigo-50 text-indigo-800 border border-indigo-200">
+                  Scope: Common Tamil
+                  <button type="button" onClick={() => setSelectedScope("ALL")} className="ml-1 hover:text-indigo-950 font-bold cursor-pointer">✕</button>
+                </span>
+              )}
+              {selectedScope === "DEPT_ALL" && (
+                <span className="inline-flex items-center px-2 py-0.5 rounded-lg text-[11px] font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                  Scope: All Depts
+                  <button type="button" onClick={() => setSelectedScope("ALL")} className="ml-1 hover:text-emerald-950 font-bold cursor-pointer">✕</button>
+                </span>
+              )}
+              {activeDepartment && (
+                <span className="inline-flex items-center px-2 py-0.5 rounded-lg text-[11px] font-semibold bg-blue-50 text-blue-800 border border-blue-200">
+                  Dept: {activeDepartment.code}
+                  <button type="button" onClick={() => setSelectedScope("ALL")} className="ml-1 hover:text-blue-950 font-bold cursor-pointer">✕</button>
+                </span>
+              )}
+              {selectedFormat !== "ALL" && (
+                <span className="inline-flex items-center px-2 py-0.5 rounded-lg text-[11px] font-semibold bg-slate-100 text-slate-800 border border-slate-200">
+                  Format: {selectedFormat === "MCQ_MULTIPLE" ? "Multi-Select" : "Single Choice"}
+                  <button type="button" onClick={() => setSelectedFormat("ALL")} className="ml-1 hover:text-slate-950 font-bold cursor-pointer">✕</button>
+                </span>
+              )}
+              {selectedDifficulty !== "ALL" && (
+                <span className="inline-flex items-center px-2 py-0.5 rounded-lg text-[11px] font-semibold bg-slate-100 text-slate-800 border border-slate-200">
+                  Diff: {selectedDifficulty}
+                  <button type="button" onClick={() => setSelectedDifficulty("ALL")} className="ml-1 hover:text-slate-950 font-bold cursor-pointer">✕</button>
+                </span>
+              )}
+              {searchTerm && (
+                <span className="inline-flex items-center px-2 py-0.5 rounded-lg text-[11px] font-semibold bg-slate-100 text-slate-800 border border-slate-200">
+                  Query: &ldquo;{searchTerm}&rdquo;
+                  <button type="button" onClick={() => setSearchTerm("")} className="ml-1 hover:text-slate-950 font-bold cursor-pointer">✕</button>
+                </span>
+              )}
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedScope("ALL");
+                  setSelectedFormat("ALL");
+                  setSelectedDifficulty("ALL");
+                  setSearchTerm("");
+                }}
+                className="text-[11px] font-bold text-blue-600 hover:text-blue-800 underline decoration-dotted ml-1 cursor-pointer"
+              >
+                Reset All
+              </button>
+            </>
+          )}
+        </div>
+
+        {/* Right: Quick Select All Filtered */}
+        {filtered.length > 0 && (
+          <div className="flex items-center space-x-2">
             <button
               type="button"
               onClick={toggleSelectAllFiltered}
-              className={`px-2.5 py-1.5 rounded-xl text-xs font-semibold transition-all inline-flex items-center cursor-pointer whitespace-nowrap border shadow-2xs ${
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all inline-flex items-center cursor-pointer border shadow-2xs ${
                 isAllFilteredSelected
-                  ? "bg-blue-600 text-white border-blue-600"
+                  ? "bg-blue-600 text-white border-blue-600 shadow-xs"
                   : selectedIds.size > 0
-                  ? "bg-blue-50 text-blue-700 border-blue-300"
-                  : "bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100"
+                  ? "bg-blue-50 text-blue-700 border-blue-200"
+                  : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50 hover:border-slate-300"
               }`}
               title="Select or deselect all visible filtered questions"
             >
@@ -524,159 +897,15 @@ export function QuestionsClientView({
                 <Square className="w-3.5 h-3.5 mr-1.5 text-slate-400" />
               )}
               <span>
-                {selectedIds.size > 0
-                  ? `${selectedIds.size} Selected`
+                {isAllFilteredSelected
+                  ? "Deselect All Filtered"
+                  : selectedIds.size > 0
+                  ? `${selectedIds.size} Selected • Select Rest`
                   : `Select All (${filtered.length})`}
               </span>
             </button>
-
-            {/* Search Box */}
-            <div className="relative flex-1 max-w-md">
-              <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-              <input
-                type="text"
-                placeholder="Search by prompt, topic, code, or option..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-9 pr-7 py-1.5 text-xs bg-slate-50 hover:bg-white border border-slate-200 rounded-xl text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 focus:bg-white transition-all shadow-2xs"
-              />
-              {searchTerm && (
-                <button
-                  type="button"
-                  onClick={() => setSearchTerm("")}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 hover:text-slate-700 px-1 font-bold"
-                >
-                  ✕
-                </button>
-              )}
-            </div>
           </div>
-
-          {/* Right: Filters & Export CSV */}
-          <div className="flex flex-wrap items-center gap-2">
-            {/* Format Filter */}
-            <div className="flex items-center space-x-1.5">
-              <span className="text-xs font-semibold text-slate-500">Format:</span>
-              <div className="inline-flex p-1 bg-slate-100/90 rounded-xl border border-slate-200/70 text-xs font-semibold text-slate-600">
-                {[
-                  { id: "ALL", label: "ALL" },
-                  { id: "MCQ_SINGLE", label: `Single (${singleChoiceCount})` },
-                  { id: "MCQ_MULTIPLE", label: `Multi (${multiChoiceCount})` },
-                ].map((fmt) => (
-                  <button
-                    key={fmt.id}
-                    type="button"
-                    onClick={() => setSelectedFormat(fmt.id as any)}
-                    className={`px-2 py-1 rounded-lg text-xs transition-all cursor-pointer ${
-                      selectedFormat === fmt.id
-                        ? "bg-white text-blue-700 shadow-xs font-bold border border-slate-200/60"
-                        : "text-slate-600 hover:text-slate-900 hover:bg-white/40 font-medium"
-                    }`}
-                  >
-                    {fmt.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Difficulty Filter */}
-            <div className="flex items-center space-x-1.5">
-              <span className="text-xs font-semibold text-slate-500">Difficulty:</span>
-              <div className="inline-flex p-1 bg-slate-100/90 rounded-xl border border-slate-200/70 text-xs font-semibold text-slate-600">
-                {["ALL", "EASY", "MEDIUM", "HARD"].map((diff) => (
-                  <button
-                    key={diff}
-                    type="button"
-                    onClick={() => setSelectedDifficulty(diff)}
-                    className={`px-2.5 py-1 rounded-lg text-xs transition-all cursor-pointer ${
-                      selectedDifficulty === diff
-                        ? "bg-white text-blue-700 shadow-xs font-bold border border-slate-200/60"
-                        : "text-slate-600 hover:text-slate-900 hover:bg-white/40 font-medium"
-                    }`}
-                  >
-                    {diff}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Export Filtered CSV */}
-            <button
-              type="button"
-              onClick={handleExportFilteredCsv}
-              disabled={filtered.length === 0}
-              className="px-2.5 py-1.5 rounded-xl text-xs font-semibold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 transition-colors inline-flex items-center cursor-pointer shadow-2xs whitespace-nowrap disabled:opacity-40"
-              title={`Export all ${filtered.length} filtered questions to CSV`}
-            >
-              <Download className="w-3.5 h-3.5 mr-1 text-emerald-600" />
-              <span>Export CSV ({filtered.length})</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Scope Tabs (All, General, and individual departments) */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pt-2.5 border-t border-slate-100 scrollbar-none text-xs">
-          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mr-1">
-            Scope:
-          </span>
-          <button
-            type="button"
-            onClick={() => setSelectedScope("ALL")}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
-              selectedScope === "ALL"
-                ? "bg-blue-600 text-white shadow-2xs"
-                : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-            }`}
-          >
-            All Questions ({initialQuestions.length})
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setSelectedScope("GENERAL_EN")}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer flex items-center space-x-1 ${
-              selectedScope === "GENERAL_EN" || selectedScope === "GENERAL"
-                ? "bg-purple-600 text-white shadow-2xs"
-                : "bg-purple-50 text-purple-700 border border-purple-200 hover:bg-purple-100"
-            }`}
-            title="Filter by Universal General Core questions (English)"
-          >
-            <Sparkles className="w-3.5 h-3.5" />
-            <span>General Core ({commonEnglishCount})</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setSelectedScope("GENERAL_TA")}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer flex items-center space-x-1.5 ${
-              selectedScope === "GENERAL_TA"
-                ? "bg-indigo-600 text-white shadow-2xs"
-                : "bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100"
-            }`}
-            title="Filter by Common Tamil research methodology questions (Tamil Dept)"
-          >
-            <Globe className="w-3.5 h-3.5 text-indigo-600" />
-            <span>Common Tamil ({commonTamilCount})</span>
-          </button>
-
-          {departments.map((d) => {
-            const count = initialQuestions.filter((q) => q.department_id === d.id).length;
-            return (
-              <button
-                key={d.id}
-                type="button"
-                onClick={() => setSelectedScope(d.id)}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
-                  selectedScope === d.id
-                    ? "bg-blue-600 text-white shadow-2xs"
-                    : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                }`}
-              >
-                {d.code} ({count})
-              </button>
-            );
-          })}
-        </div>
+        )}
       </div>
 
       {/* Questions List */}
