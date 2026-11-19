@@ -87,3 +87,18 @@ export interface QuestionBankItem {
     order_index: number;
   }[];
 }
+
+export interface CandidateStudentItem {
+  id: string;
+  full_name: string;
+  email: string;
+  application_number: string;
+  roll_number?: string | null;
+  is_active: boolean;
+  department_id?: string | null;
+  department?: {
+    id: string;
+    code: string;
+    name: string;
+  } | null;
+}

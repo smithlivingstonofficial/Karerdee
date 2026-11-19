@@ -5,7 +5,7 @@ import path from "path";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { revalidatePath } from "next/cache";
-import { ExamGeneralState, SectionState, QuestionState, QuestionBankItem } from "./types";
+import { ExamGeneralState, SectionState, QuestionState, QuestionBankItem, CandidateStudentItem } from "./types";
 import { Department } from "@/types/database.types";
 import { parseISTDateTime, formatToISTDateTimeLocal } from "@/lib/date";
 import { sanitizeCodeSnippet, isBogusDepartmentSnippet } from "@/lib/snippets";
@@ -15,12 +15,14 @@ export interface SaveExamPayload {
   exam: ExamGeneralState;
   sections: SectionState[];
   questions: QuestionState[];
+  assignedStudentIds?: string[];
   isDraft?: boolean;
 }
 
 export async function getExamAuthoringContextAction(): Promise<{
   departments: Department[];
   questionBank: QuestionBankItem[];
+  students: CandidateStudentItem[];
   error?: string;
 }> {
   try {
@@ -32,7 +34,7 @@ export async function getExamAuthoringContextAction(): Promise<{
 
     if (deptsErr) {
       console.error("Failed to fetch departments:", deptsErr);
-      return { departments: [], questionBank: [], error: deptsErr.message };
+      return { departments: [], questionBank: [], students: [], error: deptsErr.message };
     }
 
     // 2. Fetch question bank with options and department relation from department_questions
@@ -65,7 +67,7 @@ export async function getExamAuthoringContextAction(): Promise<{
 
     if (questionsErr) {
       console.error("Failed to fetch question bank:", questionsErr);
-      return { departments: depts || [], questionBank: [], error: questionsErr.message };
+      return { departments: depts || [], questionBank: [], students: [], error: questionsErr.message };
     }
 
     // Type casting and normalization
@@ -114,13 +116,57 @@ export async function getExamAuthoringContextAction(): Promise<{
       };
     });
 
+    // 3. Fetch candidate students with department relation
+    const { data: studentsData, error: studentsErr } = await supabaseAdmin
+      .from("students")
+      .select(`
+        id,
+        full_name,
+        email,
+        application_number,
+        roll_number,
+        is_active,
+        department_id,
+        department:departments (
+          id,
+          code,
+          name
+        )
+      `)
+      .order("full_name", { ascending: true });
+
+    if (studentsErr) {
+      console.error("Failed to fetch students:", studentsErr);
+    }
+
+    const formattedStudents: CandidateStudentItem[] = (studentsData || []).map((s: any) => {
+      const dept = Array.isArray(s.department) ? s.department[0] : s.department;
+      return {
+        id: s.id,
+        full_name: s.full_name,
+        email: s.email,
+        application_number: s.application_number,
+        roll_number: s.roll_number || null,
+        is_active: Boolean(s.is_active),
+        department_id: s.department_id || null,
+        department: dept
+          ? {
+              id: dept.id,
+              code: String(dept.code || "").toUpperCase(),
+              name: String(dept.name || ""),
+            }
+          : null,
+      };
+    });
+
     return {
       departments: depts || [],
       questionBank: formattedBank,
+      students: formattedStudents,
     };
   } catch (err: any) {
     console.error("Unexpected error in getExamAuthoringContextAction:", err);
-    return { departments: [], questionBank: [], error: err.message };
+    return { departments: [], questionBank: [], students: [], error: err.message };
   }
 }
 
@@ -180,6 +226,7 @@ export async function saveExamAction(payload: SaveExamPayload) {
       enable_scratchpad: Boolean(payload.exam.enableScratchpad),
       enable_question_flagging: Boolean(payload.exam.enableQuestionFlagging),
       randomize_options: Boolean(payload.exam.randomizeOptions),
+      assigned_student_ids: payload.assignedStudentIds || [],
       lockdown_policy: payload.exam.lockdownPolicy || {
         blockKeyboardHooks: true,
         blockDisplayAffinity: true,
@@ -626,6 +673,7 @@ export async function getExamForEditingAction(examId: string): Promise<{
   exam?: ExamGeneralState;
   sections?: SectionState[];
   questions?: QuestionState[];
+  assignedStudentIds?: string[];
   status?: string;
   error?: string;
 }> {
@@ -791,6 +839,7 @@ export async function getExamForEditingAction(examId: string): Promise<{
       exam: examGeneral,
       sections: sections.length > 0 ? sections : undefined,
       questions,
+      assignedStudentIds: Array.isArray(config.assigned_student_ids) ? config.assigned_student_ids : [],
       status: exam.status,
     };
   } catch (err: any) {

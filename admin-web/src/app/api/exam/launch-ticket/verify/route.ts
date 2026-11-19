@@ -132,6 +132,21 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // 2b. Strict Candidate Roster Authorization Gatekeeper
+    // If the exam has an assigned students roster, strictly restrict access to authorized candidates only
+    const assignedStudentIds = (exam.config as any)?.assigned_student_ids;
+    if (Array.isArray(assignedStudentIds) && assignedStudentIds.length > 0) {
+      if (!assignedStudentIds.includes(student.id)) {
+        return NextResponse.json(
+          {
+            error: `Access Denied: You are not authorized or scheduled to sit "${exam.title}". Only candidates explicitly selected on the exam roster may attend. Please contact the Chief Proctor or Exam Administrator if you believe this is an error.`,
+            code: "STUDENT_NOT_ASSIGNED_TO_EXAM",
+          },
+          { status: 403 }
+        );
+      }
+    }
+
     // 3a. Scheduled Start Window Check (Waiting Room / Pre-Exam Lobby Mode)
     // If current time is prior to scheduled start time (absorbing up to 10s clock skew), candidate enters Waiting Room
     if (serverEpochMs + ADMISSION_TOLERANCE_MS < startTime.getTime()) {

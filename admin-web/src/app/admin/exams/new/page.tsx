@@ -8,11 +8,13 @@ import {
   SectionState,
   QuestionState,
   QuestionBankItem,
+  CandidateStudentItem,
 } from "./types";
 import { Department } from "@/types/database.types";
 import { GeneralSetupTab } from "./components/GeneralSetupTab";
 import { SectionsTab } from "./components/SectionsTab";
 import { QuestionBuilderTab } from "./components/QuestionBuilderTab";
+import { CandidateRosterTab } from "./components/CandidateRosterTab";
 import { SecurityLockdownTab } from "./components/SecurityLockdownTab";
 import { CandidateToolsTab } from "./components/CandidateToolsTab";
 import {
@@ -28,6 +30,7 @@ import {
   Settings2,
   Layers,
   HelpCircle,
+  Users,
   CheckCircle2,
   AlertCircle,
   ShieldCheck,
@@ -35,7 +38,7 @@ import {
   Loader2,
 } from "lucide-react";
 
-type TabId = "GENERAL" | "SECTIONS" | "QUESTIONS" | "TOOLS" | "SECURITY";
+type TabId = "GENERAL" | "SECTIONS" | "QUESTIONS" | "CANDIDATES" | "TOOLS" | "SECURITY";
 
 interface TabMeta {
   id: TabId;
@@ -76,9 +79,12 @@ function ExamAuthoringStudioContent() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
-  // Authoring context from Supabase (live departments and question bank)
+  // Authoring context from Supabase (live departments, question bank, and students)
   const [departments, setDepartments] = useState<Department[]>([]);
   const [questionBank, setQuestionBank] = useState<QuestionBankItem[]>([]);
+  const [students, setStudents] = useState<CandidateStudentItem[]>([]);
+  const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
+  const [hasInitializedCandidates, setHasInitializedCandidates] = useState(false);
 
   // 2. Examination Configuration State (100% Customizable)
   const [general, setGeneral] = useState<ExamGeneralState>({
@@ -156,6 +162,9 @@ function ExamAuthoringStudioContent() {
         if (res.questionBank) {
           setQuestionBank(res.questionBank);
         }
+        if (res.students) {
+          setStudents(res.students);
+        }
 
         if (draftRes && draftRes.exam) {
           setGeneral(draftRes.exam);
@@ -164,6 +173,10 @@ function ExamAuthoringStudioContent() {
           }
           if (draftRes.questions) {
             setQuestions(draftRes.questions);
+          }
+          if (draftRes.assignedStudentIds && draftRes.assignedStudentIds.length > 0) {
+            setSelectedStudentIds(draftRes.assignedStudentIds);
+            setHasInitializedCandidates(true);
           }
           setExamId(editId);
           setIsDraftMode(draftRes.status === "DRAFT");
@@ -177,13 +190,42 @@ function ExamAuthoringStudioContent() {
     loadContext();
   }, [editId]);
 
+  // Pre-select students matching selected department tracks for new exams
+  useEffect(() => {
+    if (hasInitializedCandidates || students.length === 0) return;
+
+    // Check if sections have department restrictions
+    const targetDepts = new Set<string>();
+    sections.forEach((sec) => {
+      if (!sec.isCommon && sec.targetDepartments && sec.targetDepartments.length > 0) {
+        sec.targetDepartments.forEach((d) => targetDepts.add(d.trim().toUpperCase()));
+      }
+    });
+
+    if (targetDepts.size > 0) {
+      const matchingIds = students
+        .filter((s) => s.department?.code && targetDepts.has(s.department.code.toUpperCase()))
+        .map((s) => s.id);
+
+      if (matchingIds.length > 0) {
+        setSelectedStudentIds(matchingIds);
+      } else {
+        setSelectedStudentIds(students.map((s) => s.id));
+      }
+    } else {
+      setSelectedStudentIds(students.map((s) => s.id));
+    }
+
+    setHasInitializedCandidates(true);
+  }, [students, sections, hasInitializedCandidates]);
+
   // 4. Computed Metrics for Tab Badges
   const totalQuestions = questions.length;
   const activeLockdownGuardsCount = Object.values(
     general.lockdownPolicy || {}
   ).filter(Boolean).length;
 
-  // Tabs metadata definition
+  // Tabs metadata definition: 01 General -> 02 Sections -> 03 Questions -> 04 Candidates -> 05 Tools -> 06 Security
   const tabsList: TabMeta[] = [
     {
       id: "GENERAL",
@@ -209,15 +251,23 @@ function ExamAuthoringStudioContent() {
       badge: totalQuestions,
     },
     {
-      id: "TOOLS",
+      id: "CANDIDATES",
       step: "04",
+      label: "Candidate Roster",
+      shortLabel: "Candidates",
+      icon: Users,
+      badge: selectedStudentIds.length,
+    },
+    {
+      id: "TOOLS",
+      step: "05",
       label: "Candidate Tools & Rules",
       shortLabel: "Tools",
       icon: Calculator,
     },
     {
       id: "SECURITY",
-      step: "05",
+      step: "06",
       label: "Security & Lockdown",
       shortLabel: "Security",
       icon: ShieldCheck,
@@ -245,6 +295,7 @@ function ExamAuthoringStudioContent() {
         exam: general,
         sections,
         questions,
+        assignedStudentIds: selectedStudentIds,
         isDraft,
       };
 
@@ -457,6 +508,16 @@ function ExamAuthoringStudioContent() {
             departments={departments}
             enableNegativeMarking={general.enableNegativeMarking}
             onQuestionsChange={setQuestions}
+          />
+        )}
+
+        {activeTab === "CANDIDATES" && (
+          <CandidateRosterTab
+            sections={sections}
+            departments={departments}
+            students={students}
+            selectedStudentIds={selectedStudentIds}
+            onSelectionChange={setSelectedStudentIds}
           />
         )}
 

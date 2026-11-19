@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
     // 1. Verify Exam exists
     const { data: exam, error: examError } = await supabaseAdmin
       .from("exams")
-      .select("id, title, status, start_time, end_time")
+      .select("id, title, status, start_time, end_time, config")
       .eq("id", examId)
       .maybeSingle();
 
@@ -48,6 +48,17 @@ export async function POST(req: NextRequest) {
         { error: "Registered candidate not found." },
         { status: 404 }
       );
+    }
+
+    // Check if candidate is assigned to this exam
+    const assignedStudentIds = (exam.config as any)?.assigned_student_ids;
+    if (Array.isArray(assignedStudentIds) && assignedStudentIds.length > 0) {
+      if (!assignedStudentIds.includes(student.id)) {
+        return NextResponse.json(
+          { error: `Candidate "${student.full_name}" is not included on the authorized roster for "${exam.title}".` },
+          { status: 403 }
+        );
+      }
     }
 
     // 3. Issue cryptographically signed one-time direct launch ticket

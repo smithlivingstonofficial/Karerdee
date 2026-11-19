@@ -134,6 +134,20 @@ export async function GET(req: NextRequest) {
       );
     }
 
+    // Candidate Roster Authorization Check
+    const assignedStudentIds = (exam.config as any)?.assigned_student_ids;
+    if (Array.isArray(assignedStudentIds) && assignedStudentIds.length > 0) {
+      if (!assignedStudentIds.includes(student.id)) {
+        return NextResponse.json(
+          {
+            error: `Access Denied: You are not authorized on the roster for "${exam.title}".`,
+            code: "STUDENT_NOT_ASSIGNED_TO_EXAM",
+          },
+          { status: 403 }
+        );
+      }
+    }
+
     // 4. Resolve Applicable Sections for Candidate's Department
     const { data: sections, error: sectionsError } = await supabaseAdmin
       .from("exam_sections")
