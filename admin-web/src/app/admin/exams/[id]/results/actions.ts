@@ -333,6 +333,18 @@ export async function getExamGradebookAction(examId: string): Promise<{
         ? (student as any).department[0]
         : (student as any).department;
       const studentDeptCode = deptObj?.code?.trim()?.toUpperCase() || "";
+      const isTamilStudent = studentDeptCode === "TAM" || studentDeptCode === "TAMIL";
+
+      // Check if the Common Core (Part A) contains dedicated Tamil questions
+      const hasTamilCommonQuestions = (dbQuestions || []).some((q: any) => {
+        const isCommonSection = sectionCommonMap.get(q.section_id) ?? false;
+        if (!isCommonSection) return false;
+        return (
+          q.rubric_criteria?.common_language === "TA" ||
+          q.rubric_criteria?.target_department === "TAM" ||
+          /[\u0B80-\u0BFF]/.test(q.prompt || "")
+        );
+      });
 
       // Candidate's submissions lookup
       const userSubmissions = sess ? submissionsBySession.get(sess.id) || [] : [];
@@ -344,10 +356,10 @@ export async function getExamGradebookAction(examId: string): Promise<{
       // =====================================================================
       // STRICT CANDIDATE QUESTION ALLOCATION:
       // A candidate is ONLY evaluated against:
-      // 1. Common Core questions (is_common = true), OR
+      // 1. Common Core questions (routed by department: Tamil common for Tamil dept, normal common for all other depts), OR
       // 2. Department track questions matching their enrolled department, OR
       // 3. Questions the candidate actually submitted answers for.
-      // Questions from other departments are NEVER allocated or counted against them!
+      // Questions from other departments or tracks are NEVER allocated or counted against them!
       // =====================================================================
       const allocatedQuestions = (dbQuestions || []).filter((q: any) => {
         // If candidate submitted an answer for this question, always include it
@@ -357,24 +369,43 @@ export async function getExamGradebookAction(examId: string): Promise<{
 
         const isCommonSection = sectionCommonMap.get(q.section_id) ?? false;
         if (isCommonSection) {
-          return true;
+          const qIsTamil =
+            q.rubric_criteria?.common_language === "TA" ||
+            q.rubric_criteria?.target_department === "TAM" ||
+            /[\u0B80-\u0BFF]/.test(q.prompt || "");
+
+          if (isTamilStudent && hasTamilCommonQuestions) {
+            return qIsTamil;
+          }
+          return !qIsTamil;
         }
 
         // Check if section restricts by target_departments
         const secTargetDepts = sectionTargetDeptsMap.get(q.section_id) || [];
         if (secTargetDepts.length > 0 && studentDeptCode) {
-          const isDeptInSec = secTargetDepts.some(
-            (d: string) => d.trim().toUpperCase() === studentDeptCode
-          );
+          const isDeptInSec = secTargetDepts.some((d: string) => {
+            const up = d.trim().toUpperCase();
+            if (isTamilStudent) return up === "TAM" || up === "TAMIL";
+            return up === studentDeptCode;
+          });
           if (!isDeptInSec) return false;
         }
 
-        // Check question-level rubric criteria target_department
-        const targetDept = q.rubric_criteria?.target_department?.trim()?.toUpperCase();
+        // Part B - Department Specialization:
+        // Must strictly match candidate's department.
+        // Universal/general/common questions must NEVER leak into Part B!
+        const targetDept = (
+          q.rubric_criteria?.target_department ||
+          q.rubric_criteria?.source_department
+        )?.trim()?.toUpperCase();
+
         if (!targetDept || targetDept === "GENERAL" || targetDept === "COMMON") {
-          return true;
+          return false;
         }
 
+        if (isTamilStudent) {
+          return targetDept === "TAM" || targetDept === "TAMIL";
+        }
         return targetDept === studentDeptCode;
       });
 

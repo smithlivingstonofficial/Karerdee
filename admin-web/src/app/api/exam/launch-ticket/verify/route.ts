@@ -333,6 +333,7 @@ export async function POST(req: NextRequest) {
     if (sectionsError) throw sectionsError;
 
     const cleanStudentDept = studentDeptCode?.trim()?.toUpperCase() || "";
+    const isTamilStudent = cleanStudentDept === "TAM" || cleanStudentDept === "TAMIL";
 
     // Filter: Include if Common Core OR Candidate's Department is explicitly targeted
     const applicableSections = (sections || []).filter((sec: any) => {
@@ -342,6 +343,9 @@ export async function POST(req: NextRequest) {
         .map((d: string) => d?.trim()?.toUpperCase())
         .filter(Boolean);
       if (validDepts.length === 0) return true;
+      if (isTamilStudent) {
+        return validDepts.includes("TAM") || validDepts.includes("TAMIL");
+      }
       return cleanStudentDept ? validDepts.includes(cleanStudentDept) : true;
     });
 
@@ -382,13 +386,47 @@ export async function POST(req: NextRequest) {
       sectionCommonMap.set(sec.id, Boolean(sec.is_common));
     });
 
-    // Filter questions by department track or common
+    // Check if the Common Core (Part A) contains dedicated Tamil questions
+    const hasTamilCommonQuestions = (rawQuestions || []).some((q: any) => {
+      const isCommonSection = sectionCommonMap.get(q.section_id) ?? false;
+      if (!isCommonSection) return false;
+      return (
+        q.rubric_criteria?.common_language === "TA" ||
+        q.rubric_criteria?.target_department === "TAM" ||
+        /[\u0B80-\u0BFF]/.test(q.prompt || "")
+      );
+    });
+
+    // Filter questions: Common core (routed by candidate department language) OR matching department specialization
     const candidateQuestions = (rawQuestions || []).filter((q: any) => {
       const isCommonSection = sectionCommonMap.get(q.section_id) ?? false;
-      if (isCommonSection) return true;
+      if (isCommonSection) {
+        const qIsTamil =
+          q.rubric_criteria?.common_language === "TA" ||
+          q.rubric_criteria?.target_department === "TAM" ||
+          /[\u0B80-\u0BFF]/.test(q.prompt || "");
 
-      const targetDept = q.rubric_criteria?.target_department?.trim().toUpperCase();
-      if (!targetDept || targetDept === "GENERAL" || targetDept === "COMMON") return true;
+        if (isTamilStudent && hasTamilCommonQuestions) {
+          return qIsTamil;
+        }
+        return !qIsTamil;
+      }
+
+      // Part B - Department Specialization:
+      // Must strictly match candidate's department.
+      // Universal/general/common questions must NEVER leak into Part B!
+      const targetDept = (
+        q.rubric_criteria?.target_department ||
+        q.rubric_criteria?.source_department
+      )?.trim().toUpperCase();
+
+      if (!targetDept || targetDept === "GENERAL" || targetDept === "COMMON") {
+        return false;
+      }
+
+      if (isTamilStudent) {
+        return targetDept === "TAM" || targetDept === "TAMIL";
+      }
       return cleanStudentDept ? targetDept === cleanStudentDept : false;
     });
 

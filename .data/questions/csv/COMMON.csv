@@ -1,0 +1,26 @@
+﻿Department Code,Question Prompt,Option A,Option B,Option C,Option D,Correct Option
+GENERAL,What is the first step in the research process?,Data collection,Identification of the research problem,Data analysis,Report preparation,B
+GENERAL,Which type of research focuses on solving practical problems?,Applied research,Basic research,Historical research,Philosophical research,A
+GENERAL,What is a research hypothesis?,A final research conclusion,A proven scientific theory,A testable statement,A research limitation,C
+GENERAL,Which variable is manipulated in an experiment?,Dependent variable,Independent variable,Extraneous variable,Control variable,B
+GENERAL,What is the main objective of a literature review?,To calculate statistical results,To collect experimental data,To prepare research instruments,To understand existing research and identify gaps,D
+GENERAL,Which sampling technique gives every population member an equal probability of selection?,Convenience sampling,Purposive sampling,Simple random sampling,Snowball sampling,C
+GENERAL,Which type of research primarily involves numerical data?,Quantitative research,Qualitative research,Historical research,Philosophical research,A
+GENERAL,What does reliability indicate in research?,Originality of research,Consistency of measurements,Significance of results,Accuracy of conclusions,B
+GENERAL,Which method is commonly used to collect primary data?,Reviewing published articles,Reading textbooks,Examining published reports,Conducting surveys,D
+GENERAL,What is the purpose of a pilot study?,To publish final results,To establish a scientific theory,To test the feasibility of research procedures,To replace the main investigation,C
+GENERAL,Which measure represents the middle value of ordered data?,Median,Mean,Mode,Standard deviation,A
+GENERAL,What is plagiarism in research?,Repeating an experiment,Using another person’s work without proper acknowledgment,Publishing original findings,Citing relevant literature,B
+GENERAL,Which section of a research paper presents the procedures followed?,Abstract,Introduction,Conclusion,Methodology,D
+GENERAL,What is a research gap?,A difference between sample sizes,An error in data collection,An inadequately explored area of research,A delay in completing research,C
+GENERAL,Which research design collects data at a single point in time?,Cross-sectional research,Longitudinal research,Experimental research,Time-series research,A
+GENERAL,Which condition strengthens causal inference in experimental research?,A large number of references,Control of relevant confounding variables,A statistically significant correlation alone,A large number of objectives,B
+GENERAL,What is the nominal Type I error rate of a test conducted at a significance level of 0.05?,0.50,0.95,0.05,0.005,C
+GENERAL,Which sampling technique is best suited to ensure representation of defined population subgroups?,Convenience sampling,Snowball sampling,Purposive sampling,Stratified random sampling,D
+GENERAL,Which test compares the means of three independent groups when standard parametric assumptions hold?,One-way ANOVA,Paired-samples t-test,Chi-square goodness-of-fit test,Pearson correlation test,A
+GENERAL,What does a Pearson correlation coefficient of −0.85 indicate?,A weak positive linear relationship,A strong negative linear relationship,No linear relationship,A perfect positive linear relationship,B
+GENERAL,Which situation indicates high precision but low accuracy?,Measurements widely scattered around the true value,Measurements consistently close to the true value,Measurements closely grouped but far from the true value,Measurements randomly distributed around the true value,C
+GENERAL,"Under independent random sampling, what generally happens to the standard error when sample size increases?",Systematic bias is eliminated,Statistical significance is guaranteed,Measurement errors are eliminated,The standard error decreases,D
+GENERAL,"In a valid test, what does p = 0.03 imply at a 5% significance level?",The result is statistically significant,The null hypothesis has a 3% probability of being true,The alternative hypothesis has a 97% probability of being true,The results are 97% accurate,A
+GENERAL,What is a key limitation of evaluating a predictive model on only one dataset?,Increased sample representativeness,Limited evidence of generalizability,Guaranteed overfitting,Elimination of prediction errors,B
+GENERAL,Which practice supports computational reproducibility?,Reporting only significant results,Increasing citation counts,"Sharing data, code and detailed procedures",Using only recent references,C

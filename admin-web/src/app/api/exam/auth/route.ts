@@ -243,6 +243,7 @@ export async function POST(req: NextRequest) {
     if (sectionsError) throw sectionsError;
 
     const cleanStudentDept = studentDeptCode?.trim()?.toUpperCase() || "";
+    const isTamilStudent = cleanStudentDept === "TAM" || cleanStudentDept === "TAMIL";
 
     // Filter: Include if Common Core OR Candidate's Department is explicitly targeted
     const applicableSections = (sections || []).filter((sec: any) => {
@@ -252,6 +253,9 @@ export async function POST(req: NextRequest) {
         .map((d: string) => d?.trim()?.toUpperCase())
         .filter(Boolean);
       if (validDepts.length === 0) return true;
+      if (isTamilStudent) {
+        return validDepts.includes("TAM") || validDepts.includes("TAMIL");
+      }
       return cleanStudentDept ? validDepts.includes(cleanStudentDept) : true;
     });
 
@@ -292,18 +296,52 @@ export async function POST(req: NextRequest) {
       sectionCommonMap.set(sec.id, Boolean(sec.is_common));
     });
 
+    // Check if the Common Core (Part A) contains dedicated Tamil questions
+    const hasTamilCommonQuestions = (rawQuestions || []).some((q: any) => {
+      const isCommonSection = sectionCommonMap.get(q.section_id) ?? false;
+      if (!isCommonSection) return false;
+      return (
+        q.rubric_criteria?.common_language === "TA" ||
+        q.rubric_criteria?.target_department === "TAM" ||
+        /[\u0B80-\u0BFF]/.test(q.prompt || "")
+      );
+    });
+
     // 4b. Strict Question Delivery by Section & Candidate's Department:
-    // - Common Core section (is_common = true): ALL questions in this section are universal to all candidates
-    // - Department Track section (is_common = false): questions strictly matching candidate's enrolled department
+    // - Common Core section (Part A, is_common = true):
+    //   * If candidate is from Tamil department (TAM/TAMIL): serve ONLY Common Tamil questions (fallback to English if none exist).
+    //   * If candidate is from ANY other department (AERO, CA, CSE, MECH, etc.): serve ONLY the normal English Common questions!
+    // - Department Track section (Part B, is_common = false):
+    //   * Questions must strictly match candidate's enrolled department (cleanStudentDept).
+    //   * Universal or general questions must NEVER leak into Part B!
     const candidateQuestions = (rawQuestions || []).filter((q: any) => {
       const isCommonSection = sectionCommonMap.get(q.section_id) ?? false;
       if (isCommonSection) {
-        return true;
+        const qIsTamil =
+          q.rubric_criteria?.common_language === "TA" ||
+          q.rubric_criteria?.target_department === "TAM" ||
+          /[\u0B80-\u0BFF]/.test(q.prompt || "");
+
+        if (isTamilStudent && hasTamilCommonQuestions) {
+          return qIsTamil;
+        }
+        return !qIsTamil;
       }
 
-      const targetDept = q.rubric_criteria?.target_department?.trim().toUpperCase();
+      // Part B - Department Specialization:
+      // Must strictly match candidate's department.
+      // Universal/general/common questions must NEVER leak into Part B!
+      const targetDept = (
+        q.rubric_criteria?.target_department ||
+        q.rubric_criteria?.source_department
+      )?.trim().toUpperCase();
+
       if (!targetDept || targetDept === "GENERAL" || targetDept === "COMMON") {
-        return true;
+        return false;
+      }
+
+      if (isTamilStudent) {
+        return targetDept === "TAM" || targetDept === "TAMIL";
       }
       return cleanStudentDept ? targetDept === cleanStudentDept : false;
     });
