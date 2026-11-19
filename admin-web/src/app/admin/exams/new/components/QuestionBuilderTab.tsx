@@ -6,6 +6,7 @@ import { Department } from "@/types/database.types";
 import { QuestionBankDrawer } from "./QuestionBankDrawer";
 import { CsvUploadDrawer } from "./CsvUploadDrawer";
 import { MathText } from "@/components/MathText";
+import { bulkImportAllDepartmentQuestionsAction } from "../actions";
 import {
   Plus,
   Trash2,
@@ -27,6 +28,9 @@ import {
   PlusCircle,
   Check,
   Lock,
+  Loader2,
+  X,
+  CheckCheck,
 } from "lucide-react";
 
 interface QuestionBuilderTabProps {
@@ -324,6 +328,62 @@ export function QuestionBuilderTab({
     onQuestionsChange([...questions, ...contextualized]);
   }
 
+  // 1-Click Bulk Department Questions Importer State & Handler
+  const [isBulkImporting, setIsBulkImporting] = useState(false);
+  const [bulkImportBanner, setBulkImportBanner] = useState<{
+    totalImported: number;
+    deptsCount: number;
+    fulfilledCount: number;
+  } | null>(null);
+
+  async function handleBulkImportAllDepartments() {
+    if (isPartCommon || sectionDepts.length === 0) return;
+
+    if (allTracksCompleted) {
+      alert("All selected department tracks already meet the target question quota (100% complete)!");
+      return;
+    }
+
+    setIsBulkImporting(true);
+    try {
+      const res = await bulkImportAllDepartmentQuestionsAction({
+        sectionId: activeSection.id,
+        departmentCodes: sectionDepts,
+        targetQuota,
+        defaultNegativePoints: activeSection.defaultNegativePoints ?? 0.25,
+        existingQuestions: questions.map((q) => ({
+          prompt: q.prompt,
+          targetDepartment: q.targetDepartment,
+          sourceQuestionId: q.sourceQuestionId,
+        })),
+      });
+
+      if (!res.success) {
+        alert(res.error || "Failed to import department questions.");
+        return;
+      }
+
+      if (res.newQuestions.length === 0) {
+        alert("All selected department tracks are already fulfilled. No new questions were needed.");
+        return;
+      }
+
+      // Append all imported questions
+      onQuestionsChange([...questions, ...res.newQuestions]);
+
+      setBulkImportBanner({
+        totalImported: res.stats.totalImported,
+        deptsCount: res.stats.departmentsCount,
+        fulfilledCount: res.stats.departmentsFulfilled.length,
+      });
+    } catch (err: any) {
+      console.error("1-Click Bulk Import failed:", err);
+      alert(err.message || "An unexpected error occurred during bulk import.");
+    } finally {
+      setIsBulkImporting(false);
+    }
+  }
+
   const optionLetters = ["A", "B", "C", "D", "E", "F"];
 
   return (
@@ -387,6 +447,35 @@ export function QuestionBuilderTab({
 
           {/* Action Buttons: Import + Create (Clean single plus icons) */}
           <div className="flex items-center space-x-2 self-start sm:self-center flex-shrink-0 flex-wrap gap-y-1.5">
+            {/* 1-Click Import All Departments Button - STRICTLY FOR PART B (DEPARTMENT ELECTIVES) */}
+            {!isPartCommon && sectionDepts.length > 0 && (
+              <button
+                type="button"
+                onClick={handleBulkImportAllDepartments}
+                disabled={allTracksCompleted || isBulkImporting}
+                title={
+                  allTracksCompleted
+                    ? "All selected department tracks already meet the target question quota!"
+                    : `1-Click: Auto-import questions from question bank for all ${sectionDepts.length} selected department tracks`
+                }
+                className="inline-flex items-center px-3.5 py-2 text-xs font-bold text-white bg-gradient-to-r from-purple-700 via-indigo-700 to-purple-800 hover:from-purple-800 hover:to-indigo-800 rounded-xl shadow-2xs hover:shadow-xs transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed border border-purple-800 ring-1 ring-purple-500/20"
+              >
+                {isBulkImporting ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin text-white" />
+                    <span>Importing {sectionDepts.length} Depts...</span>
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-3.5 h-3.5 mr-1.5 text-amber-300" />
+                    <span>1-Click Import All Depts</span>
+                    <span className="ml-2 px-1.5 py-0.5 rounded-full text-[10px] font-black bg-white/20 text-white border border-white/30">
+                      {totalTracksCount - completedTracksCount > 0 ? `${totalTracksCount - completedTracksCount} Pending` : "100% ✓"}
+                    </span>
+                  </>
+                )}
+              </button>
+            )}
             <button
               type="button"
               onClick={() => setIsBankDrawerOpen(true)}
@@ -491,14 +580,14 @@ export function QuestionBuilderTab({
             ) : (
               <div className="space-y-2">
                 {/* Track Matrix Progress Bar */}
-                <div className="flex items-center justify-between text-xs pr-2">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs pr-2">
                   <div className="flex items-center space-x-2">
                     <Building2 className="w-4 h-4 text-purple-700" />
                     <span className="font-extrabold text-slate-900 text-xs">
                       Specialization Tracks Matrix ({sectionDepts.length} Departments)
                     </span>
                   </div>
-                  <div className="flex items-center space-x-2">
+                  <div className="flex items-center space-x-2 flex-wrap gap-y-1">
                     <span className="text-[11px] font-bold text-slate-500">
                       {completedTracksCount} of {totalTracksCount} Complete
                     </span>
@@ -511,6 +600,22 @@ export function QuestionBuilderTab({
                     >
                       {allTracksCompleted ? "All Tracks Ready ✓" : `${totalTracksCount - completedTracksCount} Pending`}
                     </span>
+                    {!allTracksCompleted && (
+                      <button
+                        type="button"
+                        onClick={handleBulkImportAllDepartments}
+                        disabled={isBulkImporting}
+                        className="inline-flex items-center px-2.5 py-1 text-[11px] font-bold text-purple-700 bg-purple-50 hover:bg-purple-100 border border-purple-300 rounded-lg shadow-2xs transition-all cursor-pointer disabled:opacity-50"
+                        title={`1-Click auto-import questions for all ${sectionDepts.length} departments`}
+                      >
+                        {isBulkImporting ? (
+                          <Loader2 className="w-3 h-3 mr-1 animate-spin text-purple-700" />
+                        ) : (
+                          <Sparkles className="w-3 h-3 mr-1 text-purple-700" />
+                        )}
+                        <span>Auto-Fill All Tracks ({sectionDepts.length})</span>
+                      </button>
+                    )}
                   </div>
                 </div>
 
@@ -635,6 +740,37 @@ export function QuestionBuilderTab({
         </div>
       </div>
 
+      {/* 2. Bulk Import Success / Status Notification Banner */}
+      {bulkImportBanner && (
+        <div className="p-4 rounded-2xl bg-gradient-to-r from-purple-50 via-indigo-50/80 to-blue-50 border border-purple-200/90 text-xs flex items-center justify-between shadow-xs animate-in fade-in">
+          <div className="flex items-center space-x-3.5 text-purple-950">
+            <div className="w-9 h-9 rounded-xl bg-purple-700 text-white flex items-center justify-center flex-shrink-0 shadow-2xs">
+              <Sparkles className="w-5 h-5 text-amber-300" />
+            </div>
+            <div>
+              <div className="font-black text-slate-900 text-sm flex items-center space-x-2">
+                <span>1-Click Department Import Successful!</span>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-800 border border-emerald-300">
+                  {bulkImportBanner.fulfilledCount} / {bulkImportBanner.deptsCount} Fulfilled ✓
+                </span>
+              </div>
+              <div className="text-xs text-slate-600 mt-0.5 font-medium">
+                Successfully imported <strong className="text-purple-800 font-black">{bulkImportBanner.totalImported} verified questions</strong> across{" "}
+                <strong className="text-purple-800 font-black">{bulkImportBanner.deptsCount} department tracks</strong>. Every selected track has been loaded with syllabus-aligned MCQs and correct answer keys.
+              </div>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setBulkImportBanner(null)}
+            className="text-slate-400 hover:text-slate-700 p-1.5 rounded-xl hover:bg-white/80 transition-all cursor-pointer"
+            title="Dismiss notification"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
       {/* 3. Questions List */}
       {sectionQuestions.length === 0 ? (
         <div className="bg-gradient-to-b from-white via-slate-50/50 to-slate-50/80 border border-slate-200/90 rounded-3xl p-8 sm:p-12 text-center shadow-xs space-y-6">
@@ -758,6 +894,46 @@ export function QuestionBuilderTab({
               </div>
             </div>
           </div>
+
+          {/* Quick 1-Click Action Callout inside Empty State for Part B (Department Tracks) */}
+          {!isPartCommon && sectionDepts.length > 0 && !allTracksCompleted && (
+            <div className="max-w-3xl mx-auto p-4 bg-gradient-to-r from-purple-50/80 via-indigo-50/60 to-purple-50/80 border border-purple-200/90 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-3 text-left shadow-2xs">
+              <div className="flex items-center space-x-3">
+                <div className="w-9 h-9 rounded-xl bg-purple-700 text-white flex items-center justify-center flex-shrink-0 shadow-2xs">
+                  <Sparkles className="w-5 h-5 text-amber-300" />
+                </div>
+                <div>
+                  <div className="text-xs font-black text-slate-900 flex items-center space-x-2">
+                    <span>1-Click Bulk Import Available</span>
+                    <span className="px-1.5 py-0.2 rounded text-[10px] font-black bg-purple-100 text-purple-800 border border-purple-300">
+                      {totalTracksCount - completedTracksCount} Pending
+                    </span>
+                  </div>
+                  <div className="text-[11px] text-slate-600 font-medium mt-0.5">
+                    Save time by auto-filling all {sectionDepts.length} selected department tracks simultaneously with curriculum-aligned questions.
+                  </div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={handleBulkImportAllDepartments}
+                disabled={isBulkImporting}
+                className="px-4 py-2 text-xs font-black text-white bg-purple-700 hover:bg-purple-800 rounded-xl shadow-xs transition-all cursor-pointer whitespace-nowrap disabled:opacity-50 flex items-center space-x-2 flex-shrink-0"
+              >
+                {isBulkImporting ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <span>Importing Tracks...</span>
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+                    <span>Import All {sectionDepts.length} Dept Tracks</span>
+                  </>
+                )}
+              </button>
+            </div>
+          )}
         </div>
       ) : (
         <div className="space-y-3.5">

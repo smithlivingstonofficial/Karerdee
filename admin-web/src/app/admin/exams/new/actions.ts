@@ -1,5 +1,7 @@
 "use server";
 
+import fs from "fs";
+import path from "path";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { revalidatePath } from "next/cache";
@@ -793,5 +795,277 @@ export async function getExamForEditingAction(examId: string): Promise<{
   } catch (err: any) {
     console.error("Failed to load exam for editing:", err);
     return { error: err.message || "Failed to load examination." };
+  }
+}
+
+export interface BulkImportDeptQuestionsPayload {
+  sectionId: string;
+  departmentCodes: string[];
+  targetQuota?: number;
+  defaultNegativePoints?: number;
+  existingQuestions?: Array<{
+    prompt: string;
+    targetDepartment?: string | null;
+    sourceQuestionId?: string;
+  }>;
+}
+
+export interface BulkImportDeptQuestionsResult {
+  success: boolean;
+  error?: string;
+  newQuestions: QuestionState[];
+  stats: {
+    totalImported: number;
+    departmentsFulfilled: string[];
+    departmentCounts: Record<string, number>;
+    departmentsCount: number;
+  };
+}
+
+function parseCsvLineHelper(line: string): string[] {
+  const values: string[] = [];
+  let current = "";
+  let inQuotes = false;
+  for (let i = 0; i < line.length; i++) {
+    const char = line[i];
+    if (char === '"') {
+      if (inQuotes && line[i + 1] === '"') {
+        current += '"';
+        i++;
+      } else {
+        inQuotes = !inQuotes;
+      }
+    } else if (char === "," && !inQuotes) {
+      values.push(current.trim());
+      current = "";
+    } else {
+      current += char;
+    }
+  }
+  values.push(current.trim());
+  return values;
+}
+
+function findDepartmentCsvDir(): string | null {
+  const primary = path.join(process.cwd(), ".data", "questions", "csv");
+  if (fs.existsSync(primary)) return primary;
+  const parent = path.join(process.cwd(), "..", ".data", "questions", "csv");
+  if (fs.existsSync(parent)) return parent;
+  return null;
+}
+
+export async function bulkImportAllDepartmentQuestionsAction(
+  payload: BulkImportDeptQuestionsPayload
+): Promise<BulkImportDeptQuestionsResult> {
+  try {
+    const {
+      sectionId,
+      departmentCodes = [],
+      targetQuota = 25,
+      defaultNegativePoints = 0.25,
+      existingQuestions = [],
+    } = payload;
+
+    if (!sectionId) {
+      return {
+        success: false,
+        error: "Missing sectionId for bulk import.",
+        newQuestions: [],
+        stats: { totalImported: 0, departmentsFulfilled: [], departmentCounts: {}, departmentsCount: 0 },
+      };
+    }
+
+    if (departmentCodes.length === 0) {
+      return {
+        success: false,
+        error: "No target departments specified.",
+        newQuestions: [],
+        stats: { totalImported: 0, departmentsFulfilled: [], departmentCounts: {}, departmentsCount: 0 },
+      };
+    }
+
+    // Set of existing prompts for deduplication
+    const existingPromptsSet = new Set<string>();
+    const existingDeptCounts: Record<string, number> = {};
+
+    existingQuestions.forEach((q) => {
+      const code = (q.targetDepartment || "").trim().toUpperCase();
+      if (code) {
+        existingDeptCounts[code] = (existingDeptCounts[code] || 0) + 1;
+        existingPromptsSet.add(`${code}_${q.prompt.trim().toLowerCase()}`);
+      }
+    });
+
+    const newQuestions: QuestionState[] = [];
+    const departmentCounts: Record<string, number> = {};
+    const departmentsFulfilled: string[] = [];
+    const csvDir = findDepartmentCsvDir();
+
+    // Fetch department questions from Supabase for all departments in bulk
+    const { data: dbBankQuestions } = await supabaseAdmin
+      .from("department_questions")
+      .select(`
+        id,
+        department_id,
+        topic,
+        difficulty,
+        question_type,
+        prompt,
+        code_snippet,
+        default_points,
+        default_negative_points,
+        department:departments (
+          code
+        ),
+        options:department_question_options (
+          id,
+          option_text,
+          is_correct,
+          order_index
+        )
+      `);
+
+    // Group db bank questions by department code
+    const dbBankByDept = new Map<string, any[]>();
+    (dbBankQuestions || []).forEach((q: any) => {
+      const deptObj = q.department ? (Array.isArray(q.department) ? q.department[0] : q.department) : null;
+      const dCode = (deptObj?.code || "").trim().toUpperCase();
+      if (dCode) {
+        if (!dbBankByDept.has(dCode)) dbBankByDept.set(dCode, []);
+        dbBankByDept.get(dCode)!.push(q);
+      }
+    });
+
+    for (const rawCode of departmentCodes) {
+      const deptCode = rawCode.trim().toUpperCase();
+      const currentCount = existingDeptCounts[deptCode] || 0;
+      const needed = Math.max(0, targetQuota - currentCount);
+
+      if (needed <= 0) {
+        departmentsFulfilled.push(deptCode);
+        departmentCounts[deptCode] = 0;
+        continue;
+      }
+
+      let addedForThisDept = 0;
+
+      // 1. Try DB question bank first
+      const bankItems = dbBankByDept.get(deptCode) || [];
+      for (const bq of bankItems) {
+        if (addedForThisDept >= needed) break;
+        const promptKey = `${deptCode}_${String(bq.prompt || "").trim().toLowerCase()}`;
+        if (existingPromptsSet.has(promptKey)) continue;
+
+        const qId = `q-bulk-${deptCode.toLowerCase()}-${Date.now()}-${addedForThisDept}-${Math.random().toString(36).slice(2, 6)}`;
+        newQuestions.push({
+          id: qId,
+          sectionId,
+          targetDepartment: deptCode,
+          questionType: bq.question_type || "MCQ_SINGLE",
+          prompt: bq.prompt,
+          codeSnippet: bq.code_snippet || undefined,
+          points: 1.0,
+          negativePoints: defaultNegativePoints,
+          orderIndex: currentCount + addedForThisDept + 1,
+          sourceQuestionId: bq.id,
+          sourceDepartment: deptCode,
+          options: (bq.options || []).map((opt: any, oIdx: number) => ({
+            id: `opt-b-${Date.now()}-${addedForThisDept}-${oIdx}`,
+            text: opt.option_text,
+            isCorrect: opt.is_correct,
+            orderIndex: opt.order_index ?? (oIdx + 1),
+          })),
+        });
+
+        existingPromptsSet.add(promptKey);
+        addedForThisDept++;
+      }
+
+      // 2. If still needed, load from local CSV files (.data/questions/csv/${deptCode}.csv)
+      if (addedForThisDept < needed && csvDir) {
+        const csvPath = path.join(csvDir, `${deptCode}.csv`);
+        if (fs.existsSync(csvPath)) {
+          try {
+            const content = fs.readFileSync(csvPath, "utf-8").replace(/^\uFEFF/, "");
+            const lines = content.split(/\r?\n/).filter((l) => l.trim().length > 0);
+
+            for (let rowIdx = 1; rowIdx < lines.length && addedForThisDept < needed; rowIdx++) {
+              const line = lines[rowIdx].trim();
+              if (!line) continue;
+              const cols = parseCsvLineHelper(line);
+              if (cols.length < 7) continue;
+
+              const prompt = (cols[1] || "").trim();
+              if (!prompt) continue;
+
+              const promptKey = `${deptCode}_${prompt.toLowerCase()}`;
+              if (existingPromptsSet.has(promptKey)) continue;
+
+              const optA = (cols[2] || "").trim();
+              const optB = (cols[3] || "").trim();
+              const optC = (cols[4] || "").trim();
+              const optD = (cols[5] || "").trim();
+              const correctRaw = (cols[6] || "").trim().toUpperCase();
+              const correctLetters = correctRaw.split(/[,;\s]+/).map((s) => s.trim().toUpperCase()).filter(Boolean);
+              const isMulti = correctLetters.length > 1;
+
+              const options = [
+                { id: `opt-c-${deptCode}-${rowIdx}-1`, text: optA, isCorrect: correctLetters.includes("A") || correctLetters.includes("1"), orderIndex: 1 },
+                { id: `opt-c-${deptCode}-${rowIdx}-2`, text: optB, isCorrect: correctLetters.includes("B") || correctLetters.includes("2"), orderIndex: 2 },
+                { id: `opt-c-${deptCode}-${rowIdx}-3`, text: optC, isCorrect: correctLetters.includes("C") || correctLetters.includes("3"), orderIndex: 3 },
+                { id: `opt-c-${deptCode}-${rowIdx}-4`, text: optD, isCorrect: correctLetters.includes("D") || correctLetters.includes("4"), orderIndex: 4 },
+              ];
+
+              if (!options.some((o) => o.isCorrect)) {
+                options[0].isCorrect = true;
+              }
+
+              const qId = `q-csv-${deptCode.toLowerCase()}-${Date.now()}-${rowIdx}-${Math.random().toString(36).slice(2, 6)}`;
+              newQuestions.push({
+                id: qId,
+                sectionId,
+                targetDepartment: deptCode,
+                questionType: isMulti ? "MCQ_MULTIPLE" : "MCQ_SINGLE",
+                prompt,
+                points: 1.0,
+                negativePoints: defaultNegativePoints,
+                orderIndex: currentCount + addedForThisDept + 1,
+                sourceDepartment: deptCode,
+                options,
+              });
+
+              existingPromptsSet.add(promptKey);
+              addedForThisDept++;
+            }
+          } catch (fileErr) {
+            console.error(`Error reading CSV for dept ${deptCode}:`, fileErr);
+          }
+        }
+      }
+
+      departmentCounts[deptCode] = addedForThisDept;
+      if (currentCount + addedForThisDept >= targetQuota) {
+        departmentsFulfilled.push(deptCode);
+      }
+    }
+
+    return {
+      success: true,
+      newQuestions,
+      stats: {
+        totalImported: newQuestions.length,
+        departmentsFulfilled,
+        departmentCounts,
+        departmentsCount: departmentCodes.length,
+      },
+    };
+  } catch (err: any) {
+    console.error("bulkImportAllDepartmentQuestionsAction exception:", err);
+    return {
+      success: false,
+      error: err.message || "Failed to bulk import department questions.",
+      newQuestions: [],
+      stats: { totalImported: 0, departmentsFulfilled: [], departmentCounts: {}, departmentsCount: 0 },
+    };
   }
 }
