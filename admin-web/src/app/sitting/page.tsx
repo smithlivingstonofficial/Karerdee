@@ -49,6 +49,8 @@ import {
   MessageCircle,
   Radio,
   Unlock,
+  UserCheck,
+  User,
 } from "lucide-react";
 import { MathText } from "@/components/MathText";
 
@@ -133,8 +135,8 @@ export default function CandidateExamSittingPage() {
 function CandidateSittingContent() {
   const searchParams = useSearchParams();
 
-  // Lifecycle States
-  const [stage, setStage] = useState<"AUTH_GATE" | "WAITING_ROOM" | "INSTRUCTIONS" | "ACTIVE_EXAM" | "SUBMITTED">("AUTH_GATE");
+  // Lifecycle States: Candidate Pre-Waiting Area is the default entry lobby
+  const [stage, setStage] = useState<"WAITING_ROOM" | "INSTRUCTIONS" | "ACTIVE_EXAM" | "SUBMITTED">("WAITING_ROOM");
   const [token, setToken] = useState<string>("");
   const [sessionId, setSessionId] = useState<string>("");
   const [candidate, setCandidate] = useState<CandidateData | null>(null);
@@ -1369,6 +1371,79 @@ function CandidateSittingContent() {
     if (queryEmail) setLoginEmail(queryEmail);
     if (queryApp) setLoginPassword(queryApp);
     if (queryCode) setLoginPasscode(queryCode);
+
+    // Auto-authenticate in the background if candidate credentials arrived via redirect
+    if (!queryTicket && !queryToken && queryEmail && queryApp) {
+      setIsAuthenticating(true);
+      setAuthError(null);
+
+      fetch("/api/exam/auth", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: queryEmail.trim(),
+          password: queryApp.trim(),
+          applicationNumber: queryApp.trim(),
+          examPasscode: (queryCode || "").trim(),
+          hardwareFingerprint: "BROWSER-SITTING-WEB-CLIENT",
+          clientVersion: "1.0.0-web",
+        }),
+      })
+        .then(async (res) => {
+          const data = await res.json();
+          if (typeof data.serverEpochMs === "number") {
+            setClockSkewMs(data.serverEpochMs - Date.now());
+          }
+          if (!res.ok) {
+            if (data.code === "EXAM_NOT_STARTED" && data.exam) {
+              const cand = data.candidate || {
+                id: "candidate",
+                fullName: queryEmail.trim(),
+                email: queryEmail.trim(),
+                applicationNumber: queryApp.trim(),
+                rollNumber: queryApp.trim(),
+                department: { name: "Department Curricula", code: "GEN" },
+              };
+              setWaitingRoomData({
+                candidate: cand,
+                exam: data.exam,
+                startTimeEpochMs: new Date(data.startTime || data.exam.startTime).getTime(),
+              });
+              setStoredAuthCredentials({
+                email: queryEmail.trim(),
+                password: queryApp.trim(),
+                passcode: (queryCode || "").trim(),
+              });
+              setStage("WAITING_ROOM");
+              return;
+            }
+            if (data.code === "LATE_ENTRY_DENIED") {
+              setLateEntryNotice({
+                delayMinutes: data.delayMinutes ?? 15,
+                graceCutoff: data.graceCutoff,
+                pendingProctorApproval: true,
+              });
+            }
+            setAuthError(data.error || "Authentication failed. Please verify candidate registration on Home Portal.");
+            return;
+          }
+
+          setLateEntryNotice(null);
+          initializeSession(data.token, data.sessionId, data.candidate, {
+            ...data.exam,
+            serverEpochMs: data.serverEpochMs,
+            endTime: data.endTime,
+            remainingSeconds: data.remainingSeconds,
+          });
+        })
+        .catch((err: any) => {
+          console.warn("Auto-auth background verification error:", err);
+          setAuthError(err.message || "Failed to verify credentials.");
+        })
+        .finally(() => {
+          setIsAuthenticating(false);
+        });
+    }
   }, [searchParams]);
 
   // Fetch upcoming scheduled exam info for candidate waiting area notice
@@ -1378,6 +1453,31 @@ function CandidateSittingContent() {
       .then((data) => {
         if (data.success && data.upcomingExam) {
           setUpcomingExamInfo(data.upcomingExam);
+          if (typeof data.serverEpochMs === "number") {
+            setClockSkewMs(data.serverEpochMs - Date.now());
+          }
+          // If waitingRoomData hasn't been set by ticket or direct auth, populate with upcoming exam info
+          setWaitingRoomData((prev) => {
+            if (prev) return prev;
+            return {
+              candidate: {
+                fullName: "Candidate (Awaiting Verification)",
+                email: "",
+                applicationNumber: "",
+                department: { name: "General Research Track", code: "GEN" },
+              },
+              exam: {
+                id: data.upcomingExam.id,
+                title: data.upcomingExam.title,
+                durationMinutes: data.upcomingExam.durationMinutes,
+                startTime: data.upcomingExam.startTime,
+                startTimeIST: data.upcomingExam.startTimeIST,
+                endTime: data.upcomingExam.endTime,
+                endTimeIST: data.upcomingExam.endTimeIST,
+              },
+              startTimeEpochMs: new Date(data.upcomingExam.startTime).getTime(),
+            };
+          });
         }
       })
       .catch((err) => console.warn("Upcoming exam fetch notice:", err));
@@ -2014,260 +2114,52 @@ function CandidateSittingContent() {
   const totalUnansweredCount = totalQuestionsCount - totalAnsweredCount;
 
   // =========================================================================
-  // STAGE 1: AUTHENTICATION GATE (CANDIDATE ENTRANCE)
+  // STAGE: CANDIDATE PRE-WAITING AREA & SCHEDULED AUTOMATIC COMMENCEMENT
   // =========================================================================
-  if (stage === "AUTH_GATE") {
-    if (isAuthenticating && (searchParams.get("token") || searchParams.get("ticket"))) {
+  if (stage === "WAITING_ROOM") {
+    if (!waitingRoomData) {
       return (
-        <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+        <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4 font-sans">
           <div className="w-full max-w-md bg-white border border-slate-200/90 rounded-2xl p-8 shadow-sm text-center space-y-4">
             <div className="w-12 h-12 rounded-2xl bg-blue-700 text-white flex items-center justify-center mx-auto shadow-xs font-bold text-lg">
               K
             </div>
-            <h1 className="text-base font-bold text-slate-900 tracking-tight">
-              Loading Secure Examination Environment...
-            </h1>
-            <p className="text-xs text-slate-500">
-              Verifying candidate credentials and loading curriculum papers...
-            </p>
+            <div className="space-y-1">
+              <span className="text-[10px] font-extrabold uppercase tracking-wider text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
+                Department of Research and Development
+              </span>
+              <h1 className="text-base font-bold text-slate-900 tracking-tight pt-1">
+                KARE PhD Entrance Exam • Candidate Waiting Area
+              </h1>
+              <p className="text-xs text-slate-500">
+                Connecting to Kalasalingam Academic Examination Gateway...
+              </p>
+            </div>
             <div className="flex justify-center pt-2">
               <Loader2 className="w-6 h-6 animate-spin text-blue-700" />
+            </div>
+            <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
+              <span className="flex items-center gap-1.5 text-emerald-700 font-medium">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                Secure Waiting Lobby Active
+              </span>
+              <span>Authoritative IST Clock</span>
             </div>
           </div>
         </div>
       );
     }
 
-    return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
-        <div className="w-full max-w-lg bg-white border border-slate-200/90 rounded-2xl p-6 sm:p-8 shadow-sm space-y-6">
-          {/* Institution Crest */}
-          <div className="text-center space-y-1.5">
-            <div className="w-12 h-12 rounded-2xl bg-blue-700 text-white flex items-center justify-center mx-auto shadow-xs font-bold text-lg">
-              K
-            </div>
-            <h1 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight pt-1">
-              KARE-SES Candidate Exam Portal
-            </h1>
-            <p className="text-xs text-slate-500">
-              Kalasalingam Academy of Research and Education • Online Examination Engine
-            </p>
-          </div>
-
-          {/* Upcoming Examination Banner (Pre-Exam Awareness) */}
-          {upcomingExamInfo && !upcomingExamInfo.isStarted && (
-            <div className="bg-gradient-to-r from-blue-50/90 to-slate-50 border border-blue-200/90 rounded-xl p-3.5 text-xs text-blue-950 flex items-start space-x-2.5 shadow-2xs">
-              <Clock className="w-4 h-4 text-blue-700 shrink-0 mt-0.5" />
-              <div className="text-[11px] leading-relaxed space-y-0.5">
-                <div className="font-bold text-blue-900 flex items-center gap-1.5">
-                  <span>Upcoming Examination:</span>
-                  <span className="text-slate-800">{upcomingExamInfo.title}</span>
-                </div>
-                <div className="text-slate-600">
-                  Scheduled to start at <strong className="text-blue-900 font-bold">{upcomingExamInfo.startTimeIST}</strong>. Login below to enter your Candidate Waiting Area.
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Guidance Banner */}
-          <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-3 text-xs text-slate-600 flex items-start space-x-2.5">
-            <ShieldCheck className="w-4 h-4 text-blue-700 shrink-0 mt-0.5" />
-            <div className="text-[11px] leading-relaxed">
-              <span className="font-bold text-slate-800">Secure Candidate Entrance:</span> Enter your registered email ID, your official Application ID (as password), and the exam security passcode.
-            </div>
-          </div>
-
-          {/* Institutional Indian Server Time (IST) Clock */}
-          <div className="bg-slate-50 border border-slate-200/90 rounded-xl px-3.5 py-2.5 flex items-center justify-between text-xs">
-            <div className="flex items-center space-x-2 text-slate-700">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              <span className="font-bold text-slate-800 text-xs">Server Time (IST):</span>
-            </div>
-            <div className="font-mono font-bold text-blue-700 text-xs">
-              {liveEntranceIST || "Synchronizing IST..."}
-            </div>
-          </div>
-
-          {lateEntryNotice && (
-            <div className="p-4 rounded-xl bg-amber-50 border border-amber-300 text-xs text-amber-900 space-y-2.5 shadow-2xs">
-              <div className="flex items-start space-x-2.5">
-                <Clock className="w-4 h-4 flex-shrink-0 text-amber-700 mt-0.5" />
-                <div className="space-y-1">
-                  <div className="font-bold text-amber-950 text-xs">
-                    Late Arrival Gatekeeping Active (+{lateEntryNotice.delayMinutes} mins late)
-                  </div>
-                  <div className="text-[11px] text-amber-800 leading-relaxed">
-                    The scheduled entry grace period expired at {formatTime(lateEntryNotice.graceCutoff, false, true)}. Your arrival has been submitted to the Chief Proctor. Once an invigilator grants an exception, click below to enter.
-                  </div>
-                </div>
-              </div>
-              <button
-                type="button"
-                disabled={isAuthenticating}
-                onClick={handleAuthenticate}
-                className="w-full py-2 px-3 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-lg text-xs transition-colors flex items-center justify-center space-x-1.5 shadow-2xs cursor-pointer disabled:opacity-50"
-              >
-                <RotateCcw className="w-3.5 h-3.5 mr-1" />
-                <span>Check Proctor Approval &amp; Retry</span>
-              </button>
-            </div>
-          )}
-
-          {authError && !lateEntryNotice && (
-            <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-xs text-red-800 font-semibold flex items-center space-x-2">
-              <AlertCircle className="w-4 h-4 flex-shrink-0 text-red-600" />
-              <span>{authError}</span>
-            </div>
-          )}
-
-          <form onSubmit={handleAuthenticate} className="space-y-4">
-            {/* Field 1: Candidate Email ID */}
-            <div>
-              <label className="text-xs font-bold text-slate-700 flex items-center justify-between mb-1.5">
-                <span className="flex items-center gap-1.5">
-                  <Mail className="w-3.5 h-3.5 text-blue-700" />
-                  Institutional / Registered Email ID
-                </span>
-                <span className="text-[10px] text-slate-400 font-normal">Candidate Account</span>
-              </label>
-              <input
-                type="email"
-                value={loginEmail}
-                onChange={(e) => setLoginEmail(e.target.value)}
-                placeholder="e.g. scholar@klu.ac.in or candidate@gmail.com"
-                className="w-full px-3.5 py-2.5 text-xs bg-slate-50/70 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 text-slate-900 font-medium transition-all"
-                required
-              />
-            </div>
-
-            {/* Field 2: Application ID as Password */}
-            <div>
-              <label className="text-xs font-bold text-slate-700 flex items-center justify-between mb-1.5">
-                <span className="flex items-center gap-1.5">
-                  <Lock className="w-3.5 h-3.5 text-blue-700" />
-                  Application ID (Password)
-                </span>
-                <span className="text-[10px] bg-blue-50 text-blue-700 font-semibold px-2 py-0.5 rounded border border-blue-200">
-                  Acts as Password
-                </span>
-              </label>
-              <div className="relative">
-                <input
-                  type={showPassword ? "text" : "password"}
-                  value={loginPassword}
-                  onChange={(e) => setLoginPassword(e.target.value)}
-                  placeholder="e.g. 2026PHD001 or KARE2026MCA"
-                  className="w-full pl-3.5 pr-10 py-2.5 text-xs bg-slate-50/70 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 font-mono font-bold text-slate-900 uppercase transition-all tracking-wider"
-                  required
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1"
-                  tabIndex={-1}
-                  aria-label={showPassword ? "Hide password" : "Show password"}
-                >
-                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
-              </div>
-              <p className="text-[11px] text-slate-400 mt-1">
-                Your official Application Number acts as your secret password for this sitting.
-              </p>
-            </div>
-
-            {/* Field 3: Examination Security Passcode */}
-            <div>
-              <label className="text-xs font-bold text-slate-700 flex items-center justify-between mb-1.5">
-                <span className="flex items-center gap-1.5">
-                  <KeyRound className="w-3.5 h-3.5 text-blue-700" />
-                  Examination Security Passcode
-                </span>
-                <span className="text-[10px] text-slate-400 font-normal">From Hall Ticket</span>
-              </label>
-              <input
-                type="text"
-                value={loginPasscode}
-                onChange={(e) => setLoginPasscode(e.target.value)}
-                placeholder="Enter 6-8 digit passcode printed on slip"
-                className="w-full px-3.5 py-2.5 text-xs bg-slate-50/70 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 font-mono text-slate-900 font-bold tracking-widest transition-all"
-                required
-              />
-              <p className="text-[11px] text-slate-400 mt-1">
-                Security code issued on your exam slip or invigilator announcement.
-              </p>
-            </div>
-
-            <button
-              type="submit"
-              disabled={isAuthenticating}
-              className="w-full py-2.5 text-xs font-bold text-white bg-blue-700 hover:bg-blue-800 rounded-xl shadow-xs transition-colors flex items-center justify-center space-x-2 cursor-pointer disabled:opacity-50 mt-1"
-            >
-              {isAuthenticating ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin mr-1" />
-                  <span>Verifying Credentials...</span>
-                </>
-              ) : (
-                <>
-                  <ShieldCheck className="w-4 h-4 mr-1" />
-                  <span>Authenticate &amp; Enter Examination</span>
-                </>
-              )}
-            </button>
-          </form>
-
-          <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400">
-            <span className="flex items-center gap-1.5 text-emerald-700 font-medium">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-              Secure Web Lockdown Active
-            </span>
-            <span>Continuous Telemetry &amp; Anti-Tamper Protected</span>
-          </div>
-        </div>
-
-        {/* Off-Screen Video and Canvas for Pre-Wired Snapshot Synthesis */}
-        <video
-          ref={videoRef}
-          playsInline
-          autoPlay
-          muted
-          style={{
-            position: "fixed",
-            top: -9999,
-            left: -9999,
-            width: 640,
-            height: 480,
-            pointerEvents: "none",
-            opacity: 0,
-          }}
-        />
-        <canvas
-          ref={canvasRef}
-          width={640}
-          height={480}
-          style={{
-            position: "fixed",
-            top: -9999,
-            left: -9999,
-            width: 640,
-            height: 480,
-            pointerEvents: "none",
-            opacity: 0,
-          }}
-        />
-      </div>
-    );
-  }
-
-  // =========================================================================
-  // STAGE: WAITING ROOM (PRE-EXAM LOBBY & SCHEDULED AUTOMATIC COMMENCEMENT)
-  // =========================================================================
-  if (stage === "WAITING_ROOM" && waitingRoomData) {
     const hours = Math.floor(waitingCountdown / 3600);
     const minutes = Math.floor((waitingCountdown % 3600) / 60);
     const seconds = waitingCountdown % 60;
     const isZero = waitingCountdown <= 0;
+    const isCandidateVerified = Boolean(
+      storedAuthCredentials?.ticket ||
+      (storedAuthCredentials?.email && storedAuthCredentials?.password) ||
+      token ||
+      (waitingRoomData.candidate.email && waitingRoomData.candidate.email.trim() !== "" && !waitingRoomData.candidate.email.includes("Home Portal"))
+    );
 
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center p-3 sm:p-6 font-sans">
@@ -2295,6 +2187,48 @@ function CandidateSittingContent() {
               <span>{isZero ? "Examination Active • Commencing" : "Gateway Armed • Waiting for Start Time"}</span>
             </div>
           </div>
+
+          {/* Late Entry Notice */}
+          {lateEntryNotice && (
+            <div className="p-4 rounded-xl bg-amber-50 border border-amber-300 text-xs text-amber-900 space-y-2.5 shadow-2xs">
+              <div className="flex items-start space-x-2.5">
+                <Clock className="w-4 h-4 flex-shrink-0 text-amber-700 mt-0.5" />
+                <div className="space-y-1">
+                  <div className="font-bold text-amber-950 text-xs">
+                    Late Arrival Gatekeeping Active (+{lateEntryNotice.delayMinutes} mins late)
+                  </div>
+                  <div className="text-[11px] text-amber-800 leading-relaxed">
+                    The scheduled entry grace period expired at {formatTime(lateEntryNotice.graceCutoff, false, true)}. Your arrival has been submitted to the Chief Proctor. Once an invigilator grants an exception, click below to enter.
+                  </div>
+                </div>
+              </div>
+              <button
+                type="button"
+                disabled={isAuthenticating}
+                onClick={() => triggerAdmission(true)}
+                className="w-full py-2 px-3 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-lg text-xs transition-colors flex items-center justify-center space-x-1.5 shadow-2xs cursor-pointer disabled:opacity-50"
+              >
+                <RotateCcw className="w-3.5 h-3.5 mr-1" />
+                <span>Check Proctor Approval &amp; Retry</span>
+              </button>
+            </div>
+          )}
+
+          {/* Authentication / Verification Alert Notice */}
+          {authError && !lateEntryNotice && (
+            <div className="p-3.5 rounded-xl bg-red-50 border border-red-200 text-xs text-red-800 font-semibold flex items-center justify-between shadow-2xs">
+              <div className="flex items-center space-x-2">
+                <AlertCircle className="w-4 h-4 flex-shrink-0 text-red-600" />
+                <span>{authError}</span>
+              </div>
+              <Link
+                href="/"
+                className="inline-flex items-center text-[11px] font-bold text-red-700 hover:text-red-900 underline ml-3 shrink-0"
+              >
+                Verify on Home Portal →
+              </Link>
+            </div>
+          )}
 
           {/* Main Grid: Countdown & Enter Button + Candidate Profile & Rules */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
@@ -2364,7 +2298,13 @@ function CandidateSittingContent() {
                   <button
                     type="button"
                     disabled={!isZero || isAdmittingAuto}
-                    onClick={() => triggerAdmission(true)}
+                    onClick={() => {
+                      if (!isCandidateVerified) {
+                        window.location.href = "/";
+                        return;
+                      }
+                      triggerAdmission(true);
+                    }}
                     className={`w-full py-3.5 px-4 rounded-xl text-xs font-bold transition-all shadow-sm flex items-center justify-center space-x-2 select-none ${
                       isZero
                         ? "bg-blue-700 hover:bg-blue-800 text-white ring-2 ring-blue-500/30 cursor-pointer animate-pulse"
@@ -2468,46 +2408,78 @@ function CandidateSittingContent() {
 
             {/* Right Column (5 cols): Candidate Verification & Examination Summary */}
             <div className="lg:col-span-5 space-y-4">
-              {/* Candidate Profile Box */}
-              <div className="bg-slate-50 border border-slate-200/90 rounded-2xl p-4 shadow-2xs space-y-3">
-                <div className="flex items-center justify-between border-b border-slate-200/70 pb-2">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-600 flex items-center">
-                    <ShieldCheck className="w-3.5 h-3.5 mr-1.5 text-blue-700" />
-                    Verified Candidate Pass
-                  </span>
-                  <span className="text-[10px] font-mono font-extrabold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-                    Authenticated
-                  </span>
-                </div>
-                <div className="space-y-2 text-xs">
-                  <div>
-                    <span className="text-slate-400 text-[10px] block">Full Candidate Name</span>
-                    <strong className="text-slate-900 font-bold text-sm block">
-                      {waitingRoomData.candidate.fullName}
-                    </strong>
-                  </div>
-                  <div className="grid grid-cols-2 gap-2 pt-1">
-                    <div>
-                      <span className="text-slate-400 text-[10px] block">Application ID</span>
-                      <span className="font-mono font-bold text-slate-800 text-xs">
-                        {waitingRoomData.candidate.applicationNumber || waitingRoomData.candidate.rollNumber || "N/A"}
-                      </span>
-                    </div>
-                    <div>
-                      <span className="text-slate-400 text-[10px] block">Department Specialization</span>
-                      <span className="font-bold text-blue-700 text-xs truncate block" title={waitingRoomData.candidate.department?.name}>
-                        {waitingRoomData.candidate.department?.code || "GEN"} • {waitingRoomData.candidate.department?.name || "Specialization"}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="pt-1">
-                    <span className="text-slate-400 text-[10px] block">Institutional / Registered Email</span>
-                    <span className="text-slate-600 font-mono text-[11px] truncate block">
-                      {waitingRoomData.candidate.email}
+              {/* Candidate Profile / Verification Card */}
+              {isCandidateVerified ? (
+                <div className="bg-slate-50 border border-slate-200/90 rounded-2xl p-4 shadow-2xs space-y-3">
+                  <div className="flex items-center justify-between border-b border-slate-200/70 pb-2">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-600 flex items-center">
+                      <ShieldCheck className="w-3.5 h-3.5 mr-1.5 text-blue-700" />
+                      Verified Candidate Pass
+                    </span>
+                    <span className="text-[10px] font-mono font-extrabold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                      Authenticated
                     </span>
                   </div>
+                  <div className="space-y-2 text-xs">
+                    <div>
+                      <span className="text-slate-400 text-[10px] block">Full Candidate Name</span>
+                      <strong className="text-slate-900 font-bold text-sm block">
+                        {waitingRoomData.candidate.fullName}
+                      </strong>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 pt-1">
+                      <div>
+                        <span className="text-slate-400 text-[10px] block">Application ID</span>
+                        <span className="font-mono font-bold text-slate-800 text-xs">
+                          {waitingRoomData.candidate.applicationNumber || waitingRoomData.candidate.rollNumber || "N/A"}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-slate-400 text-[10px] block">Department Specialization</span>
+                        <span className="font-bold text-blue-700 text-xs truncate block" title={waitingRoomData.candidate.department?.name}>
+                          {waitingRoomData.candidate.department?.code || "GEN"} • {waitingRoomData.candidate.department?.name || "Specialization"}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="pt-1">
+                      <span className="text-slate-400 text-[10px] block">Institutional / Registered Email</span>
+                      <span className="text-slate-600 font-mono text-[11px] truncate block">
+                        {waitingRoomData.candidate.email}
+                      </span>
+                    </div>
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <div className="bg-gradient-to-br from-blue-50/70 via-white to-slate-50 border-2 border-blue-600/30 rounded-2xl p-5 shadow-xs space-y-3.5">
+                  <div className="flex items-center justify-between border-b border-slate-200/80 pb-2.5">
+                    <span className="text-[10px] font-extrabold uppercase tracking-wider text-blue-700 bg-blue-100/70 px-2 py-0.5 rounded-full border border-blue-200">
+                      Candidate Pass Required
+                    </span>
+                    <span className="text-[10px] font-semibold text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                      Awaiting Verification
+                    </span>
+                  </div>
+                  <div className="space-y-1.5">
+                    <h3 className="text-sm font-bold text-slate-900">
+                      Verify on Home Examination Portal
+                    </h3>
+                    <p className="text-[11px] text-slate-600 leading-relaxed">
+                      Candidate verification and official admit card issuance is performed on the institutional home page. Please verify your registered credentials there to bind your candidate pass.
+                    </p>
+                  </div>
+                  <Link
+                    href="/"
+                    className="inline-flex items-center justify-center w-full py-2.5 px-4 bg-blue-700 hover:bg-blue-800 active:scale-[0.99] text-white font-bold rounded-xl text-xs transition-all shadow-xs cursor-pointer"
+                  >
+                    <UserCheck className="w-4 h-4 mr-2" />
+                    <span>Verify Candidate Pass on Home Portal</span>
+                    <ArrowRight className="w-3.5 h-3.5 ml-1.5" />
+                  </Link>
+                  <p className="text-[10px] text-slate-400 text-center">
+                    Already verified? Launch through the link provided on your verified admit card.
+                  </p>
+                </div>
+              )}
 
               {/* Exam Format Summary */}
               <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-2xs space-y-3 text-xs">
