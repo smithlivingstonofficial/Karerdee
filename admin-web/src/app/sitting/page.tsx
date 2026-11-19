@@ -17,6 +17,7 @@ import {
   ArrowLeft,
   ArrowRight,
   ShieldAlert,
+  Bell,
   Send,
   Loader2,
   RotateCcw,
@@ -218,7 +219,7 @@ function CandidateSittingContent() {
     createdAt: string;
   }[]>([]);
   const [helpdeskCategory, setHelpdeskCategory] = useState<
-    "QUESTION_DOUBT" | "TECH_ISSUE" | "SUBMISSION_ISSUE" | "GENERAL_DOUBT"
+    "QUESTION_DOUBT" | "TECH_ISSUE" | "SUBMISSION_ISSUE" | "GENERAL_DOUBT" | "LOCKOUT_APPEAL"
   >("QUESTION_DOUBT");
   const [helpdeskQuestionNumber, setHelpdeskQuestionNumber] = useState<number | null>(null);
   const [helpdeskMessage, setHelpdeskMessage] = useState("");
@@ -226,6 +227,8 @@ function CandidateSittingContent() {
   const [inquiryNotice, setInquiryNotice] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [unreadProctorReplies, setUnreadProctorReplies] = useState(0);
   const [proctorReplyToast, setProctorReplyToast] = useState<{ message: string; timestamp: string } | null>(null);
+  const [isSendingLockoutAppeal, setIsSendingLockoutAppeal] = useState<boolean>(false);
+  const [lockoutAppealSent, setLockoutAppealSent] = useState<boolean>(false);
 
   // Submission Flow & Watchdog States
   const [isSubmitModalOpen, setIsSubmitModalOpen] = useState(false);
@@ -254,6 +257,11 @@ function CandidateSittingContent() {
   useEffect(() => {
     answersRef.current = answers;
   }, [answers]);
+  useEffect(() => {
+    if (!isWorkstationLocked) {
+      setLockoutAppealSent(false);
+    }
+  }, [isWorkstationLocked]);
 
   // Instructions Agreement & Pre-Flight Diagnostics
   const [hasAgreedRules, setHasAgreedRules] = useState(false);
@@ -3664,26 +3672,142 @@ function CandidateSittingContent() {
           MODAL 4: WORKSTATION LOCKOUT OVERLAY (REMOTE PROCTOR OR STRIKES)
          ===================================================================== */}
       {isWorkstationLocked && (
-        <div className="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="w-full max-w-md bg-white border border-red-300 rounded-3xl p-6 shadow-2xl text-center space-y-4">
-            <div className="w-14 h-14 rounded-full bg-red-100 text-red-700 flex items-center justify-center mx-auto border-2 border-red-200 animate-pulse">
+        <div className="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-md flex items-center justify-center p-4 select-none">
+          <div className="w-full max-w-md bg-white border border-red-300 rounded-3xl p-6 sm:p-7 shadow-2xl text-center space-y-4 animate-in fade-in zoom-in-95 duration-200">
+            {/* Pulsing Lock Icon */}
+            <div className="w-14 h-14 rounded-2xl bg-red-100 text-red-700 flex items-center justify-center mx-auto border-2 border-red-200 shadow-2xs animate-pulse">
               <ShieldAlert className="w-7 h-7" />
             </div>
+
+            {/* Lockout Details */}
             <div className="space-y-1.5">
-              <h2 className="text-base font-black text-slate-900 uppercase tracking-tight">
+              <span className="text-[10px] font-extrabold uppercase tracking-widest text-red-700 bg-red-50 border border-red-200 px-2.5 py-0.5 rounded-full">
+                Security Interlock Active
+              </span>
+              <h2 className="text-base font-black text-slate-900 uppercase tracking-tight pt-1">
                 Workstation Locked
               </h2>
               <p className="text-xs text-red-600 font-semibold leading-relaxed">
                 {lockoutReason || "Examination sitting suspended due to security threshold or proctor command."}
               </p>
-              <p className="text-[11px] text-slate-500 pt-2">
-                Your answers are safely preserved in the database. Please raise your hand and wait for the hall invigilator to verify your workstation.
+              <p className="text-[11px] text-slate-500 pt-1 leading-relaxed">
+                Your answers are safely preserved in the database. You can chat directly with the examination invigilator below for assistance or an unlock review.
               </p>
             </div>
+
+            {/* Realtime Unread Message Alert Banner */}
+            {unreadProctorReplies > 0 && (
+              <div className="p-2.5 bg-blue-50 border border-blue-200 rounded-xl flex items-center justify-between text-xs text-blue-900 font-bold animate-pulse text-left">
+                <div className="flex items-center space-x-2 min-w-0 flex-1">
+                  <MessageCircle className="w-4 h-4 text-blue-600 shrink-0" />
+                  <span className="truncate">New reply from invigilator!</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsHelpdeskOpen(true);
+                    setUnreadProctorReplies(0);
+                  }}
+                  className="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-[11px] font-bold shadow-2xs transition-all cursor-pointer shrink-0 ml-2"
+                >
+                  View Message
+                </button>
+              </div>
+            )}
+
+            {/* Action Buttons: Chat with Proctor & Quick Appeal */}
+            <div className="pt-1 space-y-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsHelpdeskOpen(true);
+                  setUnreadProctorReplies(0);
+                  setHelpdeskCategory("LOCKOUT_APPEAL");
+                  if (!helpdeskMessage.trim()) {
+                    setHelpdeskMessage(
+                      "My workstation has been locked. I request invigilator review and assistance to unlock my exam."
+                    );
+                  }
+                }}
+                className="w-full py-2.5 px-4 bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs rounded-xl shadow-xs hover:shadow-md transition-all flex items-center justify-center space-x-2 cursor-pointer active:scale-98"
+              >
+                <MessageSquare className="w-4 h-4 text-white" />
+                <span>Chat with Invigilator / Appeal Unlock</span>
+                {unreadProctorReplies > 0 && (
+                  <span className="bg-red-500 text-white text-[10px] font-black px-1.5 py-0.2 rounded-full ml-1 animate-bounce">
+                    {unreadProctorReplies}
+                  </span>
+                )}
+              </button>
+
+              <button
+                type="button"
+                disabled={isSendingLockoutAppeal || lockoutAppealSent}
+                onClick={async () => {
+                  if (isSendingLockoutAppeal || lockoutAppealSent || !token || !sessionId) return;
+                  setIsSendingLockoutAppeal(true);
+                  try {
+                    const appealMsg = `⚠️ [URGENT LOCKOUT APPEAL] Candidate ${candidate?.fullName || "Candidate"} (${candidate?.applicationNumber || "ID"}) workstation is locked. Requesting immediate verification and screen unlock.`;
+                    const res = await fetch("/api/exam/chat", {
+                      method: "POST",
+                      headers: {
+                        "Content-Type": "application/json",
+                        Authorization: `Bearer ${token}`,
+                      },
+                      body: JSON.stringify({
+                        token,
+                        sessionId,
+                        message: appealMsg,
+                        category: "LOCKOUT_APPEAL",
+                      }),
+                    });
+                    if (res.ok) {
+                      setLockoutAppealSent(true);
+                      setHelpdeskMessages((prev) => [
+                        ...prev,
+                        {
+                          id: `appeal_${Date.now()}`,
+                          sender: "CANDIDATE",
+                          message: appealMsg,
+                          category: "LOCKOUT_APPEAL",
+                          createdAt: new Date().toISOString(),
+                        },
+                      ]);
+                    }
+                  } catch (err) {
+                    console.warn("Lockout appeal dispatch notice:", err);
+                  } finally {
+                    setIsSendingLockoutAppeal(false);
+                  }
+                }}
+                className="w-full py-2 px-3 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs rounded-xl border border-slate-200 transition-all flex items-center justify-center space-x-1.5 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                {lockoutAppealSent ? (
+                  <>
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 mr-1" />
+                    <span className="text-emerald-700">Digital Hand Raised • Invigilator Alerted</span>
+                  </>
+                ) : isSendingLockoutAppeal ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin text-slate-600 mr-1" />
+                    <span>Alerting Invigilation Desk...</span>
+                  </>
+                ) : (
+                  <>
+                    <Bell className="w-3.5 h-3.5 text-amber-600 mr-1" />
+                    <span>Raise Digital Hand (Instant Alert)</span>
+                  </>
+                )}
+              </button>
+            </div>
+
+            {/* Session & Strike Audit Footer */}
             <div className="pt-2 border-t border-slate-100 flex items-center justify-center space-x-2 text-[10px] text-slate-400 font-mono">
               <span>Session: {sessionId.slice(0, 8)}</span>
               <span>•</span>
-              <span>Strikes: {strikes} / {exam?.maxStrikes || 3}</span>
+              <span className="font-semibold text-red-500">
+                Strikes: {strikes} / {exam?.maxStrikes || 3}
+              </span>
             </div>
           </div>
         </div>
@@ -3831,7 +3955,7 @@ function CandidateSittingContent() {
           MODAL 6: CANDIDATE HELPDESK & DOUBT ASSISTANCE MODAL
          ===================================================================== */}
       {isHelpdeskOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4">
+        <div className="fixed inset-0 z-[70] bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-150">
           <div className="w-full max-w-2xl bg-white border border-slate-200 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
             {/* Modal Header */}
             <div className="px-5 py-4 border-b border-slate-200 flex items-center justify-between bg-gradient-to-r from-white via-slate-50 to-blue-50/30 flex-shrink-0">
@@ -3841,10 +3965,10 @@ function CandidateSittingContent() {
                 </div>
                 <div>
                   <h3 className="text-sm font-bold text-slate-900">
-                    Contact Examination Invigilator / Ask Doubt
+                    Contact Examination Invigilator / Live Chat
                   </h3>
                   <p className="text-[11px] text-slate-500">
-                    Send a real-time inquiry regarding an exam question, screen anomaly, or technical doubt.
+                    Send a real-time message regarding workstation lock, question doubt, or technical assistance.
                   </p>
                 </div>
               </div>
@@ -3882,8 +4006,9 @@ function CandidateSittingContent() {
                 <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider block">
                   Select Category:
                 </label>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
                   {[
+                    { id: "LOCKOUT_APPEAL", label: "🔓 Workstation Locked" },
                     { id: "QUESTION_DOUBT", label: "❓ Question Doubt" },
                     { id: "TECH_ISSUE", label: "⚙️ Technical Issue" },
                     { id: "SUBMISSION_ISSUE", label: "⏱️ Time / Timer" },
@@ -3933,6 +4058,7 @@ function CandidateSittingContent() {
                 </span>
                 <div className="flex items-center space-x-1.5 overflow-x-auto pb-1 text-xs">
                   {[
+                    "My workstation is locked. Please verify and unlock my screen.",
                     "Option choices seem ambiguous or unclear.",
                     "Mathematical formula / symbol not displaying properly.",
                     "Brief lag noticed when selecting an option.",

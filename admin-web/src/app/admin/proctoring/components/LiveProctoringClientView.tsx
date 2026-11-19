@@ -136,7 +136,7 @@ export interface CandidateInquiryItem {
   sessionId: string;
   messageId?: string;
   sender: "CANDIDATE" | "PROCTOR";
-  category: "QUESTION_DOUBT" | "TECH_ISSUE" | "SUBMISSION_ISSUE" | "GENERAL_DOUBT";
+  category: "QUESTION_DOUBT" | "TECH_ISSUE" | "SUBMISSION_ISSUE" | "GENERAL_DOUBT" | "LOCKOUT_APPEAL";
   questionNumber?: number | null;
   message: string;
   candidateName: string;
