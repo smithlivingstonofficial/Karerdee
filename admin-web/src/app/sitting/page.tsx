@@ -182,6 +182,14 @@ function CandidateSittingContent() {
   const [waitingCountdown, setWaitingCountdown] = useState<number>(0);
   const [isAdmittingAuto, setIsAdmittingAuto] = useState<boolean>(false);
   const isAdmittingAutoRef = useRef<boolean>(false);
+  const [admissionStatus, setAdmissionStatus] = useState<
+    "IDLE" | "ADMITTING" | "FAILED" | "CONCLUDED" | "ACCESS_DENIED"
+  >("IDLE");
+  const admissionStatusRef = useRef<
+    "IDLE" | "ADMITTING" | "FAILED" | "CONCLUDED" | "ACCESS_DENIED"
+  >("IDLE");
+  const hasTriggeredAdmissionAtZeroRef = useRef<boolean>(false);
+  const admissionRetryCountRef = useRef<number>(0);
 
   // Active Exam State
   const [activeSectionId, setActiveSectionId] = useState<string>("");
@@ -1308,6 +1316,27 @@ function CandidateSittingContent() {
               setStage("WAITING_ROOM");
               return;
             }
+            if (data.code === "EXAM_CONCLUDED") {
+              if (data.candidate && data.exam) {
+                setWaitingRoomData({
+                  candidate: data.candidate,
+                  exam: data.exam,
+                  startTimeEpochMs: new Date(data.startTime || data.exam.startTime).getTime(),
+                });
+              }
+              setAdmissionStatus("CONCLUDED");
+              admissionStatusRef.current = "CONCLUDED";
+              setAuthError(data.error || "This examination has concluded. Access is strictly closed.");
+              setStage("WAITING_ROOM");
+              return;
+            }
+            if (data.code === "STUDENT_NOT_ASSIGNED_TO_EXAM") {
+              setAdmissionStatus("ACCESS_DENIED");
+              admissionStatusRef.current = "ACCESS_DENIED";
+              setAuthError(data.error || "Access Denied: You are not authorized on the examination roster.");
+              setStage("WAITING_ROOM");
+              return;
+            }
             throw new Error(data.error || "Failed to verify examination launch ticket.");
           }
           if (data.candidate && data.exam) {
@@ -1418,6 +1447,27 @@ function CandidateSittingContent() {
               setStage("WAITING_ROOM");
               return;
             }
+            if (data.code === "EXAM_CONCLUDED") {
+              if (data.candidate && data.exam) {
+                setWaitingRoomData({
+                  candidate: data.candidate,
+                  exam: data.exam,
+                  startTimeEpochMs: new Date(data.startTime || data.exam.startTime).getTime(),
+                });
+              }
+              setAdmissionStatus("CONCLUDED");
+              admissionStatusRef.current = "CONCLUDED";
+              setAuthError(data.error || "This examination has concluded. Access is strictly closed.");
+              setStage("WAITING_ROOM");
+              return;
+            }
+            if (data.code === "STUDENT_NOT_ASSIGNED_TO_EXAM") {
+              setAdmissionStatus("ACCESS_DENIED");
+              admissionStatusRef.current = "ACCESS_DENIED";
+              setAuthError(data.error || "Access Denied: You are not authorized on the examination roster.");
+              setStage("WAITING_ROOM");
+              return;
+            }
             if (data.code === "LATE_ENTRY_DENIED") {
               setLateEntryNotice({
                 delayMinutes: data.delayMinutes ?? 15,
@@ -1457,7 +1507,14 @@ function CandidateSittingContent() {
           if (typeof data.serverEpochMs === "number") {
             setClockSkewMs(data.serverEpochMs - Date.now());
           }
-          // If waitingRoomData hasn't been set by ticket or direct auth, populate with upcoming exam info
+          // Do not overwrite waitingRoomData if a direct ticket or auth parameter is present
+          const hasDirectParams =
+            Boolean(searchParams.get("ticket")) ||
+            Boolean(searchParams.get("token")) ||
+            (Boolean(searchParams.get("email")) && Boolean(searchParams.get("app")));
+
+          if (hasDirectParams) return;
+
           setWaitingRoomData((prev) => {
             if (prev) return prev;
             return {
@@ -1482,7 +1539,7 @@ function CandidateSittingContent() {
         }
       })
       .catch((err) => console.warn("Upcoming exam fetch notice:", err));
-  }, []);
+  }, [searchParams]);
 
   // Check online status
   useEffect(() => {
@@ -1667,17 +1724,28 @@ function CandidateSittingContent() {
 
   // Trigger Automatic or Manual Admission from Waiting Room once start time arrives
   async function triggerAdmission(directToExam: boolean = true) {
-    if (isAdmittingAutoRef.current) return;
+    if (
+      isAdmittingAutoRef.current ||
+      admissionStatusRef.current === "CONCLUDED" ||
+      admissionStatusRef.current === "ACCESS_DENIED"
+    ) {
+      return;
+    }
+
     isAdmittingAutoRef.current = true;
     setIsAdmittingAuto(true);
+    setAdmissionStatus("ADMITTING");
+    admissionStatusRef.current = "ADMITTING";
 
     try {
-      if (storedAuthCredentials?.ticket) {
+      const ticketToUse = storedAuthCredentials?.ticket || searchParams.get("ticket");
+
+      if (ticketToUse) {
         const res = await fetch("/api/exam/launch-ticket/verify", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            ticket: storedAuthCredentials.ticket,
+            ticket: ticketToUse,
             clientVersion: "1.0.0-web",
             hardwareFingerprint:
               "WEB-CLIENT-" +
@@ -1686,18 +1754,62 @@ function CandidateSittingContent() {
                 : "GENERIC"),
           }),
         });
+
         const data = await res.json();
+
         if (res.ok && data.candidate && data.exam) {
+          admissionStatusRef.current = "IDLE";
+          setAdmissionStatus("IDLE");
+          setIsAdmittingAuto(false);
+          isAdmittingAutoRef.current = false;
           initializeSession(data.token, data.sessionId, data.candidate, data.exam, directToExam);
           return;
-        } else if (data.code === "EXAM_NOT_STARTED") {
-          // Retry automatically in 1 second in case of slight sub-second clock skew
-          setTimeout(() => {
-            isAdmittingAutoRef.current = false;
-            triggerAdmission(directToExam);
-          }, 1000);
+        }
+
+        if (data.code === "EXAM_CONCLUDED") {
+          admissionStatusRef.current = "CONCLUDED";
+          setAdmissionStatus("CONCLUDED");
+          setIsAdmittingAuto(false);
+          isAdmittingAutoRef.current = false;
+          setAuthError(data.error || "This examination has concluded. Access is strictly closed.");
+          if (data.candidate && data.exam) {
+            setWaitingRoomData((prev) => (prev ? { ...prev, candidate: data.candidate, exam: data.exam } : null));
+          }
           return;
         }
+
+        if (data.code === "STUDENT_NOT_ASSIGNED_TO_EXAM") {
+          admissionStatusRef.current = "ACCESS_DENIED";
+          setAdmissionStatus("ACCESS_DENIED");
+          setIsAdmittingAuto(false);
+          isAdmittingAutoRef.current = false;
+          setAuthError(data.error);
+          return;
+        }
+
+        if (data.code === "EXAM_NOT_STARTED") {
+          if (admissionRetryCountRef.current < 2) {
+            admissionRetryCountRef.current += 1;
+            setTimeout(() => {
+              isAdmittingAutoRef.current = false;
+              admissionStatusRef.current = "IDLE";
+              setAdmissionStatus("IDLE");
+              triggerAdmission(directToExam);
+            }, 3000);
+            return;
+          }
+          admissionStatusRef.current = "IDLE";
+          setAdmissionStatus("IDLE");
+          setIsAdmittingAuto(false);
+          isAdmittingAutoRef.current = false;
+          return;
+        }
+
+        admissionStatusRef.current = "FAILED";
+        setAdmissionStatus("FAILED");
+        setIsAdmittingAuto(false);
+        isAdmittingAutoRef.current = false;
+        setAuthError(data.error || "Admission failed. Please try again.");
       } else if (storedAuthCredentials?.email && storedAuthCredentials?.passcode) {
         const res = await fetch("/api/exam/auth", {
           method: "POST",
@@ -1711,8 +1823,14 @@ function CandidateSittingContent() {
             clientVersion: "1.0.0-web",
           }),
         });
+
         const data = await res.json();
+
         if (res.ok && data.candidate && data.exam) {
+          admissionStatusRef.current = "IDLE";
+          setAdmissionStatus("IDLE");
+          setIsAdmittingAuto(false);
+          isAdmittingAutoRef.current = false;
           initializeSession(
             data.token,
             data.sessionId,
@@ -1726,21 +1844,65 @@ function CandidateSittingContent() {
             directToExam
           );
           return;
-        } else if (data.code === "EXAM_NOT_STARTED") {
-          setTimeout(() => {
-            isAdmittingAutoRef.current = false;
-            triggerAdmission(directToExam);
-          }, 1000);
+        }
+
+        if (data.code === "EXAM_CONCLUDED") {
+          admissionStatusRef.current = "CONCLUDED";
+          setAdmissionStatus("CONCLUDED");
+          setIsAdmittingAuto(false);
+          isAdmittingAutoRef.current = false;
+          setAuthError(data.error || "This examination has concluded. Access is strictly closed.");
+          if (data.candidate && data.exam) {
+            setWaitingRoomData((prev) => (prev ? { ...prev, candidate: data.candidate, exam: data.exam } : null));
+          }
           return;
         }
+
+        if (data.code === "STUDENT_NOT_ASSIGNED_TO_EXAM") {
+          admissionStatusRef.current = "ACCESS_DENIED";
+          setAdmissionStatus("ACCESS_DENIED");
+          setIsAdmittingAuto(false);
+          isAdmittingAutoRef.current = false;
+          setAuthError(data.error);
+          return;
+        }
+
+        if (data.code === "EXAM_NOT_STARTED") {
+          if (admissionRetryCountRef.current < 2) {
+            admissionRetryCountRef.current += 1;
+            setTimeout(() => {
+              isAdmittingAutoRef.current = false;
+              admissionStatusRef.current = "IDLE";
+              setAdmissionStatus("IDLE");
+              triggerAdmission(directToExam);
+            }, 3000);
+            return;
+          }
+          admissionStatusRef.current = "IDLE";
+          setAdmissionStatus("IDLE");
+          setIsAdmittingAuto(false);
+          isAdmittingAutoRef.current = false;
+          return;
+        }
+
+        admissionStatusRef.current = "FAILED";
+        setAdmissionStatus("FAILED");
+        setIsAdmittingAuto(false);
+        isAdmittingAutoRef.current = false;
+        setAuthError(data.error || "Admission failed. Please try again.");
+      } else {
+        setIsAdmittingAuto(false);
+        isAdmittingAutoRef.current = false;
+        setAdmissionStatus("IDLE");
+        admissionStatusRef.current = "IDLE";
       }
     } catch (err: any) {
       console.warn("Waiting room admission notice:", err);
-    } finally {
-      setTimeout(() => {
-        isAdmittingAutoRef.current = false;
-        setIsAdmittingAuto(false);
-      }, 2000);
+      setIsAdmittingAuto(false);
+      isAdmittingAutoRef.current = false;
+      setAdmissionStatus("FAILED");
+      admissionStatusRef.current = "FAILED";
+      setAuthError(err.message || "Failed to contact examination gateway.");
     }
   }
 
@@ -1755,7 +1917,14 @@ function CandidateSittingContent() {
       const secs = Math.max(0, Math.ceil(diffMs / 1000));
       setWaitingCountdown(secs);
 
-      if (secs <= 0) {
+      // Trigger automatic admittance ONLY ONCE when countdown reaches 0
+      if (
+        secs <= 0 &&
+        !hasTriggeredAdmissionAtZeroRef.current &&
+        admissionStatusRef.current !== "CONCLUDED" &&
+        admissionStatusRef.current !== "ACCESS_DENIED"
+      ) {
+        hasTriggeredAdmissionAtZeroRef.current = true;
         triggerAdmission(true);
       }
     }
@@ -2120,28 +2289,28 @@ function CandidateSittingContent() {
   if (stage === "WAITING_ROOM") {
     if (!waitingRoomData) {
       return (
-        <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4 font-sans">
-          <div className="w-full max-w-md bg-white border border-slate-200/90 rounded-2xl p-8 shadow-sm text-center space-y-4">
-            <div className="w-12 h-12 rounded-2xl bg-blue-700 text-white flex items-center justify-center mx-auto shadow-xs font-bold text-lg">
+        <div className="min-h-screen bg-slate-100/70 flex items-center justify-center p-4 font-sans">
+          <div className="w-full max-w-md bg-white border border-slate-200/90 rounded-2xl p-6 shadow-sm text-center space-y-4">
+            <div className="w-11 h-11 rounded-xl bg-blue-700 text-white flex items-center justify-center mx-auto shadow-xs font-bold text-base">
               K
             </div>
             <div className="space-y-1">
-              <span className="text-[10px] font-extrabold uppercase tracking-wider text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
-                Department of Research and Development
+              <span className="text-[10px] font-bold uppercase tracking-wider text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
+                Department of Research &amp; Development
               </span>
               <h1 className="text-base font-bold text-slate-900 tracking-tight pt-1">
-                KARE PhD Entrance Exam • Candidate Waiting Area
+                KARE-SES Candidate Waiting Lobby
               </h1>
               <p className="text-xs text-slate-500">
-                Connecting to Kalasalingam Academic Examination Gateway...
+                Connecting to Institutional Examination Gateway...
               </p>
             </div>
             <div className="flex justify-center pt-2">
-              <Loader2 className="w-6 h-6 animate-spin text-blue-700" />
+              <Loader2 className="w-5 h-5 animate-spin text-blue-700" />
             </div>
             <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
               <span className="flex items-center gap-1.5 text-emerald-700 font-medium">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
                 Secure Waiting Lobby Active
               </span>
               <span>Authoritative IST Clock</span>
@@ -2155,370 +2324,351 @@ function CandidateSittingContent() {
     const minutes = Math.floor((waitingCountdown % 3600) / 60);
     const seconds = waitingCountdown % 60;
     const isZero = waitingCountdown <= 0;
-    const isCandidateVerified = Boolean(
-      storedAuthCredentials?.ticket ||
-      (storedAuthCredentials?.email && storedAuthCredentials?.password) ||
-      token ||
-      (waitingRoomData.candidate.email && waitingRoomData.candidate.email.trim() !== "" && !waitingRoomData.candidate.email.includes("Home Portal"))
-    );
+    const isConcluded = admissionStatus === "CONCLUDED";
 
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-3 sm:p-6 font-sans">
-        <div className="w-full max-w-5xl bg-white border border-slate-200/90 rounded-2xl p-6 sm:p-8 shadow-sm space-y-6">
+      <div className="min-h-screen lg:h-screen lg:max-h-screen flex flex-col justify-center items-center p-3 sm:p-4 lg:p-5 bg-slate-100/70 overflow-hidden font-sans">
+        <div className="w-full max-w-4xl lg:max-w-5xl bg-white border border-slate-200/90 rounded-2xl p-4 sm:p-5 lg:p-6 shadow-sm flex flex-col justify-between max-h-[96vh] overflow-y-auto lg:overflow-hidden space-y-3.5">
           {/* Institutional Top Header */}
-          <div className="border-b border-slate-100 pb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div className="flex items-center space-x-3.5">
-              <div className="w-12 h-12 rounded-2xl bg-blue-700 text-white flex items-center justify-center shadow-xs font-bold text-lg flex-shrink-0">
+          <div className="border-b border-slate-100 pb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+            <div className="flex items-center space-x-3">
+              <div className="w-10 h-10 rounded-xl bg-blue-700 text-white flex items-center justify-center shadow-xs font-bold text-base shrink-0">
                 K
               </div>
-              <div className="space-y-0.5">
-                <span className="text-[10px] font-extrabold uppercase tracking-wider text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
-                  Department of Research and Development
-                </span>
-                <h1 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight">
-                  KARE PhD Entrance Exam • Candidate Waiting Area
-                </h1>
-                <p className="text-xs text-slate-500">
+              <div>
+                <div className="flex items-center space-x-2">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
+                    KARE-SES Ph.D Examination Engine
+                  </span>
+                  <span className="text-[10px] font-semibold text-slate-400 hidden sm:inline">•</span>
+                  <span className="text-[11px] font-semibold text-slate-500 hidden sm:inline">Candidate Waiting Lobby</span>
+                </div>
+                <h1 className="text-sm sm:text-base font-bold text-slate-900 tracking-tight truncate max-w-xl">
                   {waitingRoomData.exam.title || "Ph.D Research Eligibility & Entrance Examination"}
-                </p>
+                </h1>
               </div>
             </div>
-            <div className="inline-flex items-center space-x-2 px-3 py-1.5 rounded-full text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 shadow-2xs self-start sm:self-auto">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              <span>{isZero ? "Examination Active • Commencing" : "Gateway Armed • Waiting for Start Time"}</span>
+
+            <div className="flex items-center space-x-2 self-start sm:self-auto">
+              <div
+                className={`inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold border shadow-2xs ${
+                  isConcluded
+                    ? "bg-rose-50 text-rose-800 border-rose-200"
+                    : isZero
+                    ? "bg-emerald-50 text-emerald-800 border-emerald-200"
+                    : "bg-blue-50 text-blue-800 border-blue-200"
+                }`}
+              >
+                <span
+                  className={`w-1.5 h-1.5 rounded-full ${
+                    isConcluded ? "bg-rose-500" : isZero ? "bg-emerald-500 animate-pulse" : "bg-blue-600"
+                  }`}
+                />
+                <span>
+                  {isConcluded
+                    ? "Examination Concluded"
+                    : isZero
+                    ? "Exam Window Open"
+                    : "Scheduled Start Pending"}
+                </span>
+              </div>
+
+              <div className="hidden md:inline-flex items-center text-[10px] font-mono text-slate-500 bg-slate-100 px-2 py-1 rounded-lg border border-slate-200">
+                IST: {liveEntranceIST || "Synchronized"}
+              </div>
             </div>
           </div>
 
-          {/* Late Entry Notice */}
-          {lateEntryNotice && (
-            <div className="p-4 rounded-xl bg-amber-50 border border-amber-300 text-xs text-amber-900 space-y-2.5 shadow-2xs">
-              <div className="flex items-start space-x-2.5">
-                <Clock className="w-4 h-4 flex-shrink-0 text-amber-700 mt-0.5" />
-                <div className="space-y-1">
-                  <div className="font-bold text-amber-950 text-xs">
-                    Late Arrival Gatekeeping Active (+{lateEntryNotice.delayMinutes} mins late)
-                  </div>
-                  <div className="text-[11px] text-amber-800 leading-relaxed">
-                    The scheduled entry grace period expired at {formatTime(lateEntryNotice.graceCutoff, false, true)}. Your arrival has been submitted to the Chief Proctor. Once an invigilator grants an exception, click below to enter.
-                  </div>
-                </div>
+          {/* Special State: Examination Concluded */}
+          {isConcluded ? (
+            <div className="bg-slate-50 border border-slate-200 rounded-xl p-6 sm:p-8 text-center space-y-4 my-auto">
+              <div className="w-12 h-12 rounded-full bg-rose-50 border border-rose-200 text-rose-600 flex items-center justify-center mx-auto shadow-2xs">
+                <AlertCircle className="w-6 h-6" />
               </div>
-              <button
-                type="button"
-                disabled={isAuthenticating}
-                onClick={() => triggerAdmission(true)}
-                className="w-full py-2 px-3 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-lg text-xs transition-colors flex items-center justify-center space-x-1.5 shadow-2xs cursor-pointer disabled:opacity-50"
-              >
-                <RotateCcw className="w-3.5 h-3.5 mr-1" />
-                <span>Check Proctor Approval &amp; Retry</span>
-              </button>
-            </div>
-          )}
 
-          {/* Authentication / Verification Alert Notice */}
-          {authError && !lateEntryNotice && (
-            <div className="p-3.5 rounded-xl bg-red-50 border border-red-200 text-xs text-red-800 font-semibold flex items-center justify-between shadow-2xs">
-              <div className="flex items-center space-x-2">
-                <AlertCircle className="w-4 h-4 flex-shrink-0 text-red-600" />
-                <span>{authError}</span>
+              <div className="space-y-1.5 max-w-lg mx-auto">
+                <h2 className="text-base font-bold text-slate-900">This Examination Has Concluded</h2>
+                <p className="text-xs text-slate-600 leading-relaxed">
+                  The scheduled examination window for <strong>{waitingRoomData.exam.title}</strong> has
+                  officially ended. Access to question submission and the live sitting room is strictly closed.
+                </p>
+                {authError && (
+                  <p className="text-[11px] text-rose-700 font-mono bg-rose-50/70 border border-rose-200 px-3 py-1.5 rounded-lg inline-block mt-2">
+                    {authError}
+                  </p>
+                )}
               </div>
-              <Link
-                href="/"
-                className="inline-flex items-center text-[11px] font-bold text-red-700 hover:text-red-900 underline ml-3 shrink-0"
-              >
-                Verify on Home Portal →
-              </Link>
+
+              {/* Candidate Info Ribbon */}
+              <div className="inline-flex flex-wrap items-center justify-center gap-2 p-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-600 shadow-2xs">
+                <span>
+                  Candidate: <strong className="text-slate-900">{waitingRoomData.candidate.fullName}</strong>
+                </span>
+                <span className="text-slate-300">•</span>
+                <span className="font-mono">
+                  App ID: <strong className="text-blue-700">{waitingRoomData.candidate.applicationNumber || waitingRoomData.candidate.rollNumber || "N/A"}</strong>
+                </span>
+                <span className="text-slate-300">•</span>
+                <span>
+                  Dept: <strong className="text-slate-800">{waitingRoomData.candidate.department?.code || "GEN"}</strong>
+                </span>
+              </div>
+
+              <div className="pt-2">
+                <Link
+                  href="/"
+                  className="inline-flex items-center px-4 py-2 bg-blue-700 hover:bg-blue-800 text-white font-bold text-xs rounded-xl shadow-xs transition-all cursor-pointer"
+                >
+                  <ArrowLeft className="w-3.5 h-3.5 mr-1.5" />
+                  <span>Return to Institutional Examination Portal Home</span>
+                </Link>
+              </div>
             </div>
-          )}
-
-          {/* Main Grid: Countdown & Enter Button + Candidate Profile & Rules */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-            {/* Left Column (7 cols): Big Digital Countdown Clock & Enter Button */}
-            <div className="lg:col-span-7 space-y-4">
-              <div className="bg-gradient-to-br from-slate-50 via-blue-50/40 to-slate-50 border border-blue-200/80 rounded-2xl p-6 text-center space-y-5 shadow-2xs">
-                <div className="flex items-center justify-center space-x-2 text-xs font-bold text-blue-900 uppercase tracking-wider">
-                  <Clock className="w-4 h-4 text-blue-700" />
-                  <span>Time Until Examination Commences</span>
-                </div>
-
-                {/* Digital Countdown Timer Tiles */}
-                <div className="grid grid-cols-3 gap-3 max-w-sm mx-auto">
-                  <div className="bg-white border border-slate-200 rounded-xl p-3 shadow-xs">
-                    <span className="block text-3xl sm:text-4xl font-extrabold font-mono text-slate-900">
-                      {String(hours).padStart(2, "0")}
-                    </span>
-                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mt-1 block">
-                      Hours
-                    </span>
+          ) : (
+            /* Standard Pre-Exam Waiting Room: 2-Column Grid */
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 lg:gap-5 items-stretch flex-1">
+              {/* Left Column (7 cols): Digital Countdown, Enter Button, and Compact Camera */}
+              <div className="lg:col-span-7 flex flex-col justify-between space-y-3">
+                {/* Countdown Box */}
+                <div className="bg-gradient-to-br from-slate-50 via-blue-50/30 to-slate-50 border border-blue-200/80 rounded-xl p-4 text-center space-y-3 shadow-2xs">
+                  <div className="flex items-center justify-center space-x-1.5 text-[11px] font-bold text-blue-900 uppercase tracking-wider">
+                    <Clock className="w-3.5 h-3.5 text-blue-700" />
+                    <span>Time Until Examination Commences</span>
                   </div>
-                  <div className="bg-white border border-slate-200 rounded-xl p-3 shadow-xs">
-                    <span className="block text-3xl sm:text-4xl font-extrabold font-mono text-blue-700">
-                      {String(minutes).padStart(2, "0")}
-                    </span>
-                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mt-1 block">
-                      Minutes
-                    </span>
-                  </div>
-                  <div className="bg-white border border-slate-200 rounded-xl p-3 shadow-xs">
-                    <span className="block text-3xl sm:text-4xl font-extrabold font-mono text-blue-700">
-                      {String(seconds).padStart(2, "0")}
-                    </span>
-                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mt-1 block">
-                      Seconds
-                    </span>
-                  </div>
-                </div>
 
-                {/* Scheduled Start & Synchronized Clock */}
-                <div className="space-y-1.5 text-xs text-slate-600 pt-1 border-t border-blue-100">
-                  <div className="flex items-center justify-center gap-1.5">
-                    <span className="text-slate-500">Scheduled Start Time:</span>
-                    <strong className="text-slate-900 font-bold">
+                  {/* 3 Compact Tiles */}
+                  <div className="grid grid-cols-3 gap-2.5 max-w-xs mx-auto">
+                    <div className="bg-white border border-slate-200 rounded-lg p-2 shadow-2xs">
+                      <span className="block text-2xl sm:text-3xl font-extrabold font-mono text-slate-900">
+                        {String(hours).padStart(2, "0")}
+                      </span>
+                      <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">
+                        Hours
+                      </span>
+                    </div>
+                    <div className="bg-white border border-slate-200 rounded-lg p-2 shadow-2xs">
+                      <span className="block text-2xl sm:text-3xl font-extrabold font-mono text-blue-700">
+                        {String(minutes).padStart(2, "0")}
+                      </span>
+                      <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">
+                        Minutes
+                      </span>
+                    </div>
+                    <div className="bg-white border border-slate-200 rounded-lg p-2 shadow-2xs">
+                      <span className="block text-2xl sm:text-3xl font-extrabold font-mono text-blue-700">
+                        {String(seconds).padStart(2, "0")}
+                      </span>
+                      <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">
+                        Seconds
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Scheduled Start Ribbon */}
+                  <div className="flex items-center justify-center gap-1.5 text-xs text-slate-600 border-t border-blue-100 pt-2">
+                    <span className="text-slate-400 text-[11px]">Scheduled Start:</span>
+                    <strong className="text-slate-800 text-[11px] font-bold">
                       {waitingRoomData.exam.startTimeIST || formatDateTime(waitingRoomData.exam.startTime, false, true)}
                     </strong>
                   </div>
-                  <div className="text-[11px] text-slate-500 font-mono flex items-center justify-center space-x-1.5">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                    <span>Authoritative Server Clock (IST): {liveEntranceIST || "Synchronized"}</span>
+
+                  {/* Enter Button */}
+                  <div className="space-y-1 pt-0.5">
+                    <button
+                      type="button"
+                      disabled={!isZero || isAdmittingAuto}
+                      onClick={() => triggerAdmission(true)}
+                      className={`w-full py-2.5 px-4 rounded-xl text-xs font-bold transition-all shadow-xs flex items-center justify-center space-x-2 select-none ${
+                        isZero
+                          ? "bg-blue-700 hover:bg-blue-800 text-white ring-2 ring-blue-500/20 cursor-pointer shadow-sm animate-pulse"
+                          : "bg-slate-100 text-slate-400 border border-slate-300 cursor-not-allowed opacity-90"
+                      }`}
+                    >
+                      {isAdmittingAuto ? (
+                        <>
+                          <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" />
+                          <span>Admitting to Examination Page...</span>
+                        </>
+                      ) : isZero ? (
+                        <>
+                          <Unlock className="w-3.5 h-3.5 mr-1" />
+                          <span>Enter Examination Now</span>
+                          <ArrowRight className="w-3.5 h-3.5 ml-1" />
+                        </>
+                      ) : (
+                        <>
+                          <Lock className="w-3.5 h-3.5 mr-1 text-slate-400" />
+                          <span>Enter (Locked until Scheduled Start Time)</span>
+                        </>
+                      )}
+                    </button>
+
+                    <p className="text-[10px] text-slate-500 text-center">
+                      {isZero
+                        ? "Scheduled start time reached! Admitting you automatically, or click above to enter."
+                        : `Button unlocks automatically at scheduled start time (${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")} remaining).`}
+                    </p>
                   </div>
                 </div>
 
-                {/* Live Admittance Notification */}
-                <div className="p-3.5 bg-white border border-blue-200/90 rounded-xl text-xs text-blue-950 font-medium shadow-2xs space-y-1 text-center">
-                  <div className="font-bold text-blue-900 flex items-center justify-center space-x-1.5">
-                    <Radio className="w-3.5 h-3.5 text-blue-700 animate-pulse" />
-                    <span>Automatic Commencement Watchdog Active</span>
+                {/* Compact Live Webcam Pre-Calibration Box */}
+                <div className="bg-slate-50 border border-slate-200/90 rounded-xl p-2.5 sm:p-3 space-y-2">
+                  <div className="flex items-center justify-between pb-1">
+                    <span className="text-[11px] font-bold text-slate-800 flex items-center">
+                      <Camera className="w-3.5 h-3.5 mr-1.5 text-blue-700" />
+                      Live Pre-Exam Camera Diagnostics
+                    </span>
+                    <span
+                      className={`text-[9px] font-bold px-2 py-0.5 rounded-full border flex items-center space-x-1 ${
+                        isCameraActive
+                          ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                          : "bg-amber-50 text-amber-800 border-amber-200"
+                      }`}
+                    >
+                      <span
+                        className={`w-1.5 h-1.5 rounded-full ${
+                          isCameraActive ? "bg-emerald-500 animate-pulse" : "bg-amber-500"
+                        }`}
+                      />
+                      <span>{isCameraActive ? "Camera Calibrated" : "Initializing Camera..."}</span>
+                    </span>
                   </div>
-                  <p className="text-[11px] text-slate-600 leading-relaxed">
-                    Please remain on this screen. When the scheduled start time arrives, the portal will <strong>automatically take you into the examination page</strong>.
+
+                  <div className="relative rounded-lg overflow-hidden bg-slate-950 h-28 sm:h-32 border border-slate-200 shadow-inner flex items-center justify-center w-full">
+                    <video
+                      ref={waitingRoomVideoRef}
+                      autoPlay
+                      playsInline
+                      muted
+                      className={`w-full h-full object-cover ${isCameraActive ? "block" : "hidden"}`}
+                    />
+                    {!isCameraActive && (
+                      <div className="p-3 text-center text-slate-400 text-xs space-y-1.5">
+                        <CameraOff className="w-5 h-5 mx-auto text-slate-500" />
+                        <p className="text-[10px] text-slate-400">
+                          {cameraError || "Initializing video stream for proctoring verification..."}
+                        </p>
+                        <button
+                          type="button"
+                          onClick={initializeSecureCamera}
+                          className="px-2.5 py-1 bg-blue-700 text-white rounded-lg text-[10px] font-bold hover:bg-blue-800 transition-colors cursor-pointer inline-flex items-center space-x-1"
+                        >
+                          <RefreshCw className="w-3 h-3 mr-1" />
+                          <span>Enable Camera</span>
+                        </button>
+                      </div>
+                    )}
+                    {isCameraActive && (
+                      <div className="absolute top-1.5 left-1.5 px-2 py-0.5 rounded-full bg-slate-900/80 text-emerald-300 border border-emerald-500/40 text-[9px] font-bold flex items-center space-x-1 backdrop-blur-xs">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                        <span>LIVE PREVIEW • 640x480</span>
+                      </div>
+                    )}
+                  </div>
+                  <p className="text-[10px] text-slate-500 text-center">
+                    Webcam pre-warmed for seamless biometric surveillance with zero transition delay.
                   </p>
                 </div>
-
-                {/* Enter Examination Button (Locked until scheduled start time) */}
-                <div className="space-y-2 pt-1">
-                  <button
-                    type="button"
-                    disabled={!isZero || isAdmittingAuto}
-                    onClick={() => {
-                      if (!isCandidateVerified) {
-                        window.location.href = "/";
-                        return;
-                      }
-                      triggerAdmission(true);
-                    }}
-                    className={`w-full py-3.5 px-4 rounded-xl text-xs font-bold transition-all shadow-sm flex items-center justify-center space-x-2 select-none ${
-                      isZero
-                        ? "bg-blue-700 hover:bg-blue-800 text-white ring-2 ring-blue-500/30 cursor-pointer animate-pulse"
-                        : "bg-slate-100 text-slate-400 border border-slate-300 cursor-not-allowed opacity-90"
-                    }`}
-                  >
-                    {isAdmittingAuto ? (
-                      <>
-                        <Loader2 className="w-4 h-4 animate-spin mr-1.5" />
-                        <span>Admitting to Examination Page...</span>
-                      </>
-                    ) : isZero ? (
-                      <>
-                        <Unlock className="w-4 h-4 mr-1.5" />
-                        <span>Enter Examination Now</span>
-                        <ArrowRight className="w-4 h-4 ml-1.5" />
-                      </>
-                    ) : (
-                      <>
-                        <Lock className="w-4 h-4 mr-1.5 text-slate-400" />
-                        <span>Enter (Locked until Scheduled Start Time)</span>
-                      </>
-                    )}
-                  </button>
-
-                  {/* Lock Status Helper Notice */}
-                  {!isZero ? (
-                    <p className="text-[11px] text-slate-500 flex items-center justify-center gap-1.5 text-center">
-                      <Lock className="w-3 h-3 text-slate-400 shrink-0" />
-                      <span>
-                        The <strong>Enter</strong> button is locked until scheduled start time ({String(hours).padStart(2, "0")}:{String(minutes).padStart(2, "0")}:{String(seconds).padStart(2, "0")}). It will unlock and automatically take you into the exam page at zero.
-                      </span>
-                    </p>
-                  ) : (
-                    <p className="text-[11px] text-emerald-700 font-semibold flex items-center justify-center gap-1.5 text-center">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                      <span>Scheduled time reached! Admitting you automatically, or click above to enter immediately.</span>
-                    </p>
-                  )}
-                </div>
               </div>
 
-              {/* Live Webcam Pre-Calibration Box */}
-              <div className="bg-slate-50 border border-slate-200/90 rounded-xl p-4 space-y-3">
-                <div className="flex items-center justify-between border-b border-slate-200 pb-2">
-                  <span className="text-xs font-bold text-slate-900 flex items-center">
-                    <Camera className="w-4 h-4 mr-1.5 text-blue-700" />
-                    Live Pre-Exam Camera Diagnostics
-                  </span>
-                  <span
-                    className={`text-[10px] font-bold px-2 py-0.5 rounded-full border flex items-center space-x-1 ${
-                      isCameraActive
-                        ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                        : "bg-amber-50 text-amber-800 border-amber-200"
-                    }`}
-                  >
-                    <span
-                      className={`w-1.5 h-1.5 rounded-full ${
-                        isCameraActive ? "bg-emerald-500 animate-pulse" : "bg-amber-500"
-                      }`}
-                    />
-                    <span>{isCameraActive ? "Camera Calibrated & Monitoring Ready" : "Pre-Calibrating Camera..."}</span>
-                  </span>
-                </div>
-                <div className="relative rounded-xl overflow-hidden bg-slate-950 aspect-video border border-slate-200 shadow-inner flex items-center justify-center max-w-sm mx-auto">
-                  <video
-                    ref={waitingRoomVideoRef}
-                    autoPlay
-                    playsInline
-                    muted
-                    className={`w-full h-full object-cover ${isCameraActive ? "block" : "hidden"}`}
-                  />
-                  {!isCameraActive && (
-                    <div className="p-4 text-center text-slate-400 text-xs space-y-2">
-                      <CameraOff className="w-6 h-6 mx-auto text-slate-500" />
-                      <p className="text-[11px] text-slate-400">
-                        {cameraError || "Initializing video stream for proctoring verification..."}
-                      </p>
-                      <button
-                        type="button"
-                        onClick={initializeSecureCamera}
-                        className="px-3 py-1.5 bg-blue-700 text-white rounded-lg text-xs font-bold hover:bg-blue-800 transition-colors cursor-pointer inline-flex items-center space-x-1"
-                      >
-                        <RefreshCw className="w-3 h-3 mr-1" />
-                        <span>Enable Camera Stream</span>
-                      </button>
-                    </div>
-                  )}
-                  {isCameraActive && (
-                    <div className="absolute top-2 left-2 px-2 py-0.5 rounded-full bg-slate-900/80 text-emerald-300 border border-emerald-500/40 text-[9px] font-bold flex items-center space-x-1 backdrop-blur-xs">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                      <span>LIVE PREVIEW • 640x480</span>
-                    </div>
-                  )}
-                </div>
-                <p className="text-[11px] text-slate-500 text-center">
-                  Your camera is pre-warmed so that you transition into the exam seamlessly with zero setup delays.
-                </p>
-              </div>
-            </div>
-
-            {/* Right Column (5 cols): Candidate Verification & Examination Summary */}
-            <div className="lg:col-span-5 space-y-4">
-              {/* Candidate Profile / Verification Card */}
-              {isCandidateVerified ? (
-                <div className="bg-slate-50 border border-slate-200/90 rounded-2xl p-4 shadow-2xs space-y-3">
-                  <div className="flex items-center justify-between border-b border-slate-200/70 pb-2">
+              {/* Right Column (5 cols): Verified Candidate Pass & Examination Details */}
+              <div className="lg:col-span-5 flex flex-col justify-between space-y-3">
+                {/* Candidate Pass Card */}
+                <div className="bg-slate-50 border border-slate-200/90 rounded-xl p-3.5 space-y-2.5 shadow-2xs">
+                  <div className="flex items-center justify-between border-b border-slate-200/70 pb-1.5">
                     <span className="text-[10px] font-bold uppercase tracking-wider text-slate-600 flex items-center">
-                      <ShieldCheck className="w-3.5 h-3.5 mr-1.5 text-blue-700" />
+                      <ShieldCheck className="w-3.5 h-3.5 mr-1 text-blue-700" />
                       Verified Candidate Pass
                     </span>
-                    <span className="text-[10px] font-mono font-extrabold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-                      Authenticated
+                    <span className="text-[9px] font-mono font-extrabold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                      Roster Verified
                     </span>
                   </div>
-                  <div className="space-y-2 text-xs">
+
+                  <div className="space-y-1.5 text-xs">
                     <div>
-                      <span className="text-slate-400 text-[10px] block">Full Candidate Name</span>
-                      <strong className="text-slate-900 font-bold text-sm block">
-                        {waitingRoomData.candidate.fullName}
+                      <span className="text-slate-400 text-[10px] block">Candidate Name</span>
+                      <strong className="text-slate-900 font-bold text-xs sm:text-sm block truncate">
+                        {waitingRoomData.candidate.fullName || "Candidate"}
                       </strong>
                     </div>
-                    <div className="grid grid-cols-2 gap-2 pt-1">
+
+                    <div className="grid grid-cols-2 gap-2 pt-0.5">
                       <div>
                         <span className="text-slate-400 text-[10px] block">Application ID</span>
-                        <span className="font-mono font-bold text-slate-800 text-xs">
+                        <span className="font-mono font-bold text-blue-700 text-xs bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200 inline-block">
                           {waitingRoomData.candidate.applicationNumber || waitingRoomData.candidate.rollNumber || "N/A"}
                         </span>
                       </div>
                       <div>
-                        <span className="text-slate-400 text-[10px] block">Department Specialization</span>
-                        <span className="font-bold text-blue-700 text-xs truncate block" title={waitingRoomData.candidate.department?.name}>
+                        <span className="text-slate-400 text-[10px] block">Department Track</span>
+                        <span className="font-bold text-slate-800 text-xs truncate block" title={waitingRoomData.candidate.department?.name}>
                           {waitingRoomData.candidate.department?.code || "GEN"} • {waitingRoomData.candidate.department?.name || "Specialization"}
                         </span>
                       </div>
                     </div>
-                    <div className="pt-1">
-                      <span className="text-slate-400 text-[10px] block">Institutional / Registered Email</span>
-                      <span className="text-slate-600 font-mono text-[11px] truncate block">
-                        {waitingRoomData.candidate.email}
+
+                    {waitingRoomData.candidate.email && (
+                      <div className="pt-0.5">
+                        <span className="text-slate-400 text-[10px] block">Institutional Email</span>
+                        <span className="text-slate-600 font-mono text-[11px] truncate block">
+                          {waitingRoomData.candidate.email}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Exam Parameters Summary */}
+                <div className="bg-white border border-slate-200 rounded-xl p-3.5 space-y-2.5 shadow-2xs text-xs flex-1">
+                  <h4 className="font-bold text-slate-900 flex items-center text-xs">
+                    <BookOpen className="w-3.5 h-3.5 mr-1.5 text-blue-700" />
+                    Examination Format &amp; Security
+                  </h4>
+
+                  <ul className="space-y-1.5 text-[11px] text-slate-600">
+                    <li className="flex items-start space-x-2">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5" />
+                      <span>
+                        <strong>50 Questions Total:</strong> 25 Common Core + 25 Specialization Track.
                       </span>
-                    </div>
-                  </div>
+                    </li>
+                    <li className="flex items-start space-x-2">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5" />
+                      <span>
+                        <strong>Timed Window:</strong> {waitingRoomData.exam.durationMinutes || 90} Minutes synchronized with authoritative IST time.
+                      </span>
+                    </li>
+                    <li className="flex items-start space-x-2">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5" />
+                      <span>
+                        <strong>Zero-Trust Watchdog:</strong> Fullscreen mode, face detection, and anti-tamper monitoring active.
+                      </span>
+                    </li>
+                  </ul>
                 </div>
-              ) : (
-                <div className="bg-gradient-to-br from-blue-50/70 via-white to-slate-50 border-2 border-blue-600/30 rounded-2xl p-5 shadow-xs space-y-3.5">
-                  <div className="flex items-center justify-between border-b border-slate-200/80 pb-2.5">
-                    <span className="text-[10px] font-extrabold uppercase tracking-wider text-blue-700 bg-blue-100/70 px-2 py-0.5 rounded-full border border-blue-200">
-                      Candidate Pass Required
-                    </span>
-                    <span className="text-[10px] font-semibold text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
-                      Awaiting Verification
-                    </span>
-                  </div>
-                  <div className="space-y-1.5">
-                    <h3 className="text-sm font-bold text-slate-900">
-                      Verify on Home Examination Portal
-                    </h3>
-                    <p className="text-[11px] text-slate-600 leading-relaxed">
-                      Candidate verification and official admit card issuance is performed on the institutional home page. Please verify your registered credentials there to bind your candidate pass.
-                    </p>
-                  </div>
-                  <Link
-                    href="/"
-                    className="inline-flex items-center justify-center w-full py-2.5 px-4 bg-blue-700 hover:bg-blue-800 active:scale-[0.99] text-white font-bold rounded-xl text-xs transition-all shadow-xs cursor-pointer"
-                  >
-                    <UserCheck className="w-4 h-4 mr-2" />
-                    <span>Verify Candidate Pass on Home Portal</span>
-                    <ArrowRight className="w-3.5 h-3.5 ml-1.5" />
-                  </Link>
-                  <p className="text-[10px] text-slate-400 text-center">
-                    Already verified? Launch through the link provided on your verified admit card.
-                  </p>
+
+                {/* System Readiness Strip */}
+                <div className="p-2.5 bg-emerald-50/70 border border-emerald-200 rounded-xl flex items-center justify-between text-xs">
+                  <span className="text-[11px] font-semibold text-emerald-900 flex items-center space-x-1.5">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>System Status: Pre-Flight Armed</span>
+                  </span>
+                  <span className="text-[10px] font-bold text-emerald-800 bg-white px-2 py-0.5 rounded border border-emerald-200 shadow-2xs">
+                    Ready to Sit
+                  </span>
                 </div>
-              )}
-
-              {/* Exam Format Summary */}
-              <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-2xs space-y-3 text-xs">
-                <h4 className="font-bold text-slate-900 flex items-center">
-                  <BookOpen className="w-3.5 h-3.5 mr-1.5 text-blue-700" />
-                  Examination Structure &amp; Format
-                </h4>
-                <ul className="space-y-2 text-[11px] text-slate-600">
-                  <li className="flex items-start space-x-2">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5" />
-                    <span><strong>50 Questions Total:</strong> 25 in Part A (Common Research Aptitude) + 25 in Part B (Department Specialization).</span>
-                  </li>
-                  <li className="flex items-start space-x-2">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5" />
-                    <span><strong>Timed Window:</strong> {waitingRoomData.exam.durationMinutes || 90} Minutes synchronized with authoritative server IST time.</span>
-                  </li>
-                  <li className="flex items-start space-x-2">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5" />
-                    <span><strong>Academic Blue Theme:</strong> Anti-glare light theme layout conforming to WCAG 2.1 academic ergonomics.</span>
-                  </li>
-                  <li className="flex items-start space-x-2">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5" />
-                    <span><strong>Mandatory Fullscreen:</strong> Tab switching, dev tools, and window exits immediately record infraction strikes.</span>
-                  </li>
-                </ul>
-              </div>
-
-              {/* Pre-Flight Connectivity & Status */}
-              <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between text-xs">
-                <span className="text-[11px] font-semibold text-slate-600 flex items-center space-x-1.5">
-                  <Wifi className="w-3.5 h-3.5 text-emerald-600" />
-                  <span>Network Server Link</span>
-                </span>
-                <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-                  Active &amp; Ready
-                </span>
               </div>
             </div>
+          )}
+
+          {/* Clean Institutional Bottom Footer */}
+          <div className="border-t border-slate-100 pt-2 flex flex-col sm:flex-row items-center justify-between text-[10px] text-slate-400 gap-1 text-center sm:text-left">
+            <span>Kalasalingam Academy of Research and Education • Online Examination Engine</span>
+            <span className="flex items-center gap-1 font-medium text-slate-500">
+              <ShieldCheck className="w-3 h-3 text-emerald-600" />
+              Secure Anti-Tamper Lockdown Active
+            </span>
           </div>
         </div>
 

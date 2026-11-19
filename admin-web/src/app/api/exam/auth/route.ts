@@ -218,6 +218,23 @@ export async function POST(req: NextRequest) {
           serverEpochMs,
           endTime: endTime.toISOString(),
           endTimeIST: formatDateTime(endTime, false, true),
+          candidate: {
+            id: student.id,
+            fullName: student.full_name,
+            email: student.email,
+            rollNumber: student.roll_number,
+            applicationNumber: student.application_number,
+            department: (student as any).department || (student as any).batch?.department || { name: "Department Curricula", code: "GEN" },
+          },
+          exam: {
+            id: exam.id,
+            title: exam.title,
+            durationMinutes: exam.duration_minutes,
+            startTime: exam.start_time,
+            startTimeIST: formatDateTime(startTime, false, true),
+            endTime: exam.end_time,
+            endTimeIST: formatDateTime(endTime, false, true),
+          },
         },
         { status: 403 }
       );
