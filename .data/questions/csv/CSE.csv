@@ -1,20 +1,13 @@
 ﻿Department Code,Question Prompt,Option A,Option B,Option C,Option D,Correct Option
 CSE,Which of the following problems is undecidable?,Determining if a DFA accepts a given string,Determining if a CFG is empty,Determining if two DFAs accept the same language,Determining if a Turing Machine halts on all inputs,D
 CSE,What is the time complexity to find the shortest path from a single source to all other vertices in a directed graph with negative edge weights but no negative cycles?,O(V + E),O(E log V),O(V * E),O(V³),C
-CSE,"A language L
-is recursively enumerable but not recursive if and only if:",Both L and its complement are recursive,L is accepted by a TM that halts on all inputs,"L is accepted by a TM, but its complement is not recursively enumerable",Both L and its complement are context-free,C
-CSE,"Consider a relation 𝑅(𝐴,𝐵,𝐶,𝐷)
-with functional dependencies 𝐴→𝐵
-and 𝐵→𝐶. What is the highest normal form satisfied by R?",1NF,2NF,3NF,BCNF,A
+CSE,"A language L is recursively enumerable but not recursive if and only if:",Both L and its complement are recursive,L is accepted by a TM that halts on all inputs,"L is accepted by a TM, but its complement is not recursively enumerable",Both L and its complement are context-free,C
+CSE,"Consider a relation 𝑅(𝐴,𝐵,𝐶,𝐷) with functional dependencies 𝐴→𝐵 and 𝐵→𝐶. What is the highest normal form satisfied by R?",1NF,2NF,3NF,BCNF,A
 CSE,"In an IP packet with a fragmentation offset value of 100, what is the byte index of the first byte of payload data in this fragment?",100,400,800,1600,C
 CSE,Which of the following scheduling algorithms can lead to starvation?,Round Robin,Shortest Job First,First Come First Served,FIFO,B
 CSE,"Let G be a connected undirected graph with V vertices and E edges. If the weights of all edges are distinct, which of the following statements is TRUE?","Gcap G
-𝐺
-has a unique minimum spanning tree","Gcap G
-𝐺
-can have multiple minimum spanning trees",The shortest path between any two vertices is unique,The maximum spanning tree is the same as the minimum spanning tree,A
-CSE,"What is the maximum number of reduce moves a bottom-up parser can make while parsing a string of length n using a grammar with no ϵepsilon
-𝜖-productions or unit productions?",n,2n,2𝑛−1,n*n,C
+𝐺 has a unique minimum spanning tree","Gcap G 𝐺 can have multiple minimum spanning trees",The shortest path between any two vertices is unique,The maximum spanning tree is the same as the minimum spanning tree,A
+CSE,"What is the maximum number of reduce moves a bottom-up parser can make while parsing a string of length n using a grammar with no ϵepsilon 𝜖-productions or unit productions?",n,2n,2𝑛−1,n*n,C
 CSE,Which of the following concurrency control protocols ensures both conflict serializability and freedom from deadlock?,Two-Phase Locking (2PL),Strict 2PL,Time-Stamp Ordering Protocol,Conservative 2PL,C
 CSE,"A system uses 32-bit virtual addresses and a page size of 4 KB. If each page table entry takes 4 bytes, how many levels of page tables are required if the page table must fit within a single page?",1,2,3,4,B
 CSE,Let 𝐿1 be a regular language and 𝐿2 be a context-free language. Which of the following languages is NOT necessarily context-free?,𝐿1 ∩ 𝐿2,𝐿1 ∪ 𝐿2,𝐿1 ⋅ 𝐿2,𝐿2 ∪ 𝐿1,A

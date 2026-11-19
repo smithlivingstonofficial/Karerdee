@@ -105,26 +105,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 1b. Strict Scheduled Start Window Check (No early entry before scheduled start)
-    if (serverEpochMs < startTime.getTime()) {
-      const minutesUntilStart = Math.ceil((startTime.getTime() - serverEpochMs) / 60000);
-      return NextResponse.json(
-        {
-          error: `Examination has not commenced yet. Entry opens strictly at ${formatDateTime(startTime, false, true)}. Current server time: ${formatDateTime(serverNow, true, true)}.`,
-          code: "EXAM_NOT_STARTED",
-          serverTime: serverNow.toISOString(),
-          serverTimeIST: formatDateTime(serverNow, true, true),
-          serverEpochMs,
-          startTime: startTime.toISOString(),
-          startTimeIST: formatDateTime(startTime, false, true),
-          endTime: endTime.toISOString(),
-          endTimeIST: formatDateTime(endTime, false, true),
-          minutesUntilStart,
-        },
-        { status: 403 }
-      );
-    }
-
     // 2. Look up Student by Email ID (with fallback to roll number or application number for backwards compatibility)
     let studentQuery = supabaseAdmin
       .from("students")
@@ -179,6 +159,46 @@ export async function POST(req: NextRequest) {
     if (!student.is_active) {
       return NextResponse.json(
         { error: "Candidate registration is currently inactive. Contact the examination administration." },
+        { status: 403 }
+      );
+    }
+
+    // 1b. Scheduled Start Window Check (Waiting Room / Pre-Exam Lobby Mode)
+    if (serverEpochMs < startTime.getTime()) {
+      const minutesUntilStart = Math.ceil((startTime.getTime() - serverEpochMs) / 60000);
+      const secondsUntilStart = Math.max(0, Math.ceil((startTime.getTime() - serverEpochMs) / 1000));
+      return NextResponse.json(
+        {
+          code: "EXAM_NOT_STARTED",
+          error: `Examination has not commenced yet. Entry opens strictly at ${formatDateTime(startTime, false, true)}.`,
+          serverTime: serverNow.toISOString(),
+          serverTimeIST: formatDateTime(serverNow, true, true),
+          serverEpochMs,
+          startTime: startTime.toISOString(),
+          startTimeIST: formatDateTime(startTime, false, true),
+          endTime: endTime.toISOString(),
+          endTimeIST: formatDateTime(endTime, false, true),
+          minutesUntilStart,
+          secondsUntilStart,
+          candidate: {
+            id: student.id,
+            fullName: student.full_name,
+            email: student.email,
+            rollNumber: student.roll_number,
+            applicationNumber: student.application_number,
+            department: (student as any).department || (student as any).batch?.department || { name: "Department Curricula", code: "GEN" },
+          },
+          exam: {
+            id: exam.id,
+            title: exam.title,
+            durationMinutes: exam.duration_minutes,
+            startTime: exam.start_time,
+            startTimeIST: formatDateTime(startTime, false, true),
+            endTime: exam.end_time,
+            endTimeIST: formatDateTime(endTime, false, true),
+            totalQuestions: 50,
+          },
+        },
         { status: 403 }
       );
     }
