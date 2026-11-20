@@ -331,6 +331,95 @@ export async function sendProctorWarningAction(sessionId: string, message: strin
   }
 }
 
+export async function issueStrikeAction(
+  sessionId: string,
+  reason: string = "Invigilator issued an infraction strike following activity review."
+) {
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { error: "Unauthorized access" };
+
+    const { data: session, error: sessErr } = await supabaseAdmin
+      .from("exam_sessions")
+      .select("id, strikes_count, exam_id, exams (max_strikes)")
+      .eq("id", sessionId)
+      .single();
+
+    if (sessErr || !session) return { error: "Session not found." };
+
+    const maxStrikes = (session as any).exams?.max_strikes || 3;
+    const newStrikes = (session.strikes_count || 0) + 1;
+    const isLocked = newStrikes >= maxStrikes;
+
+    const { error: updateErr } = await supabaseAdmin
+      .from("exam_sessions")
+      .update({
+        strikes_count: newStrikes,
+        status: isLocked ? "LOCKED" : "IN_PROGRESS",
+      })
+      .eq("id", sessionId);
+
+    if (updateErr) throw updateErr;
+
+    // Log the formal strike in violation_logs
+    await supabaseAdmin.from("violation_logs").insert({
+      session_id: sessionId,
+      violation_type: "WINDOW_UNFOCUSED",
+      strike_number: newStrikes,
+      metadata: {
+        action: "PROCTOR_ISSUED_STRIKE",
+        reason,
+        issuedBy: user.email,
+        timestamp: new Date().toISOString(),
+      },
+    });
+
+    // Broadcast strike command to candidate sitting page
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (supabaseUrl && serviceKey) {
+      await fetch(`${supabaseUrl}/realtime/v1/api/broadcast`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${serviceKey}`,
+          apikey: serviceKey,
+        },
+        body: JSON.stringify({
+          messages: [
+            {
+              topic: `exam-session-${sessionId}`,
+              event: "proctor_command",
+              payload: {
+                command: isLocked ? "CMD_TERMINATE" : "CMD_STRIKE",
+                message: reason,
+                strikesCount: newStrikes,
+                maxStrikes,
+                remainingStrikes: Math.max(0, maxStrikes - newStrikes),
+                isLocked,
+                proctorEmail: user.email,
+                timestamp: new Date().toISOString(),
+              },
+            },
+          ],
+        }),
+      }).catch((err) => console.warn("Broadcast strike fetch error:", err));
+    }
+
+    revalidatePath("/proctoring");
+    revalidatePath("/violations");
+    return {
+      success: true,
+      newStrikes,
+      isLocked,
+      remainingStrikes: Math.max(0, maxStrikes - newStrikes),
+    };
+  } catch (err: any) {
+    return { error: err.message || "Failed to issue strike." };
+  }
+}
+
 export async function sendProctorAnnouncementAction(sessionId: string, message: string) {
   try {
     const supabase = await createClient();

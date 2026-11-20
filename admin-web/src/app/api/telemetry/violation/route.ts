@@ -106,6 +106,63 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    function getSimpleEnglishWarning(type: string, reason?: string): string {
+      switch (type) {
+        case "HEAD_TURNED_AWAY":
+        case "LOOKING_AWAY":
+        case "SUSPICIOUS_HEAD_MOVEMENT":
+          return "Candidate turned head / looking away from screen";
+        case "MULTIPLE_FACES_DETECTED":
+        case "MULTIPLE_FACES":
+          return "Multiple people visible in camera";
+        case "FACE_ABSENCE_EXCEEDED":
+        case "NO_FACE_DETECTED":
+        case "NO_FACE":
+          return "No face visible in camera";
+        case "CAMERA_STREAM_MUTED":
+        case "CAMERA_OBSCURED":
+          return "Camera view is covered or obscured";
+        case "CLICKED_OUTSIDE_EXAM":
+        case "WINDOW_FOCUS_LOST":
+        case "WINDOW_UNFOCUSED":
+          return "Clicked outside the examination page or switched windows";
+        case "TAB_SWITCH_OR_MINIMIZE":
+          return "Switched browser tab or minimized the exam window";
+        case "FULLSCREEN_EXITED":
+          return "Exited full-screen examination mode";
+        case "CLIPBOARD_ACCESS_ATTEMPT":
+          return "Attempted copy or paste shortcut";
+        case "PROHIBITED_KEY_INPUT":
+          return "Pressed restricted keyboard shortcut";
+        case "NAVIGATION_INTERCEPTED":
+          return "Attempted browser back/forward navigation";
+        case "DEVTOOLS_ATTEMPT":
+          return "Attempted to open browser inspection tools";
+        case "PROCTOR_REQUESTED_SNAPSHOT":
+          return "Invigilator requested camera photo";
+        case "ROUTINE_SURVEILLANCE":
+          return "Routine background camera verification";
+        case "EXAM_COMMENCED_BASELINE":
+        case "CANDIDATE_ENTRANCE_VERIFICATION":
+          return "Candidate entrance identity photo";
+        default:
+          return reason || type.replace(/_/g, " ").toLowerCase();
+      }
+    }
+
+    const isWebcamActivity =
+      violationType === "HEAD_TURNED_AWAY" ||
+      violationType === "LOOKING_AWAY" ||
+      violationType === "SUSPICIOUS_HEAD_MOVEMENT" ||
+      violationType === "MULTIPLE_FACES_DETECTED" ||
+      violationType === "MULTIPLE_FACES" ||
+      violationType === "NO_FACE_DETECTED" ||
+      violationType === "FACE_ABSENCE_EXCEEDED" ||
+      violationType === "NO_FACE" ||
+      violationType === "CAMERA_STREAM_MUTED" ||
+      violationType === "CAMERA_OBSCURED" ||
+      metadata?.isWebcamActivity === true;
+
     const isAuditSnapshot =
       violationType === "PROCTOR_REQUESTED_SNAPSHOT" ||
       violationType === "ROUTINE_SURVEILLANCE" ||
@@ -117,11 +174,23 @@ export async function POST(req: NextRequest) {
       metadata?.isAudit === true ||
       metadata?.isSurveillance === true;
 
-    // 3. Atomically increment strike count on session (unless neutral on-demand proctor audit snap or routine surveillance)
-    if (!isAuditSnapshot) {
+    // Automatic strike events: candidate clicked anywhere other than the exam page, tab switched, or exited fullscreen
+    const isClickOutsideOrTabSwitch =
+      violationType === "CLICKED_OUTSIDE_EXAM" ||
+      violationType === "WINDOW_FOCUS_LOST" ||
+      violationType === "WINDOW_UNFOCUSED" ||
+      violationType === "TAB_SWITCH_OR_MINIMIZE" ||
+      violationType === "FULLSCREEN_EXITED";
+
+    let strikeIssued = false;
+    const maxStrikes = (session as any).exams?.max_strikes || 3;
+
+    // 3. Increment strike ONLY when clicking outside the exam page / tab switching.
+    // Webcam activities (looking away, multiple people, no face) only capture photo for proctor review.
+    if (isClickOutsideOrTabSwitch) {
       currentStrikes = (session.strikes_count || 0) + 1;
-      const maxStrikes = (session as any).exams?.max_strikes || 3;
       isLocked = currentStrikes >= maxStrikes;
+      strikeIssued = true;
 
       await supabaseAdmin
         .from("exam_sessions")
@@ -133,6 +202,7 @@ export async function POST(req: NextRequest) {
     } else {
       currentStrikes = session.strikes_count || 0;
       isLocked = session.status === "LOCKED";
+      strikeIssued = false;
     }
 
     // 4. Map violation_type to allowed PostgreSQL CHECK constraint values in violation_logs
@@ -149,34 +219,50 @@ export async function POST(req: NextRequest) {
 
     let dbViolationType = violationType;
     if (!ALLOWED_DB_TYPES.has(dbViolationType)) {
-      if (violationType === "WINDOW_FOCUS_LOST" || violationType === "FULLSCREEN_EXITED") {
+      if (
+        violationType === "WINDOW_FOCUS_LOST" ||
+        violationType === "CLICKED_OUTSIDE_EXAM" ||
+        violationType === "TAB_SWITCH_OR_MINIMIZE" ||
+        violationType === "FULLSCREEN_EXITED"
+      ) {
         dbViolationType = "WINDOW_UNFOCUSED";
       } else if (
+        violationType === "MULTIPLE_FACES_DETECTED" ||
+        violationType === "MULTIPLE_FACES"
+      ) {
+        dbViolationType = "MULTIPLE_FACES";
+      } else if (
         violationType.includes("FACE") ||
-        violationType.includes("CAMERA")
+        violationType.includes("CAMERA") ||
+        violationType.includes("HEAD")
       ) {
         dbViolationType = "NO_FACE";
       } else {
-        // Routine surveillance, baseline photos, or other telemetries map to WINDOW_UNFOCUSED in DB with 0 strikes
         dbViolationType = "WINDOW_UNFOCUSED";
       }
     }
 
+    const simpleWarning = getSimpleEnglishWarning(violationType, metadata?.reason);
+
     const combinedMetadata = {
       ...(metadata || {}),
       actualViolationType: violationType,
+      simpleWarning,
+      isWebcamActivity,
+      requiresProctorReview: isWebcamActivity,
+      strikeIssued,
       isAudit: isAuditSnapshot,
       isSurveillance: isAuditSnapshot,
       recordedAt: new Date().toISOString(),
     };
 
-    // 5. Record violation log with snapshot URL
+    // 5. Record violation log with snapshot URL and strike number (0 for webcam activity)
     const { data: insertedViol, error: violInsertErr } = await supabaseAdmin
       .from("violation_logs")
       .insert({
         session_id: sessionId,
         violation_type: dbViolationType,
-        strike_number: isAuditSnapshot ? 0 : currentStrikes,
+        strike_number: strikeIssued ? currentStrikes : 0,
         snapshot_url: snapshotUrl || null,
         metadata: combinedMetadata,
       })
@@ -187,7 +273,7 @@ export async function POST(req: NextRequest) {
       console.warn("Violation log insert error:", violInsertErr.message);
     }
 
-    // 5. Broadcast to Live Proctoring Console via Supabase Realtime REST API
+    // 6. Broadcast to Live Proctoring Console via Supabase Realtime REST API
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
     if (supabaseUrl && serviceKey) {
@@ -208,7 +294,14 @@ export async function POST(req: NextRequest) {
                   sessionId,
                   violationId: insertedViol?.id,
                   violationType,
-                  strikeNumber: isAuditSnapshot ? 0 : currentStrikes,
+                  simpleWarning,
+                  isWebcamActivity,
+                  requiresProctorReview: isWebcamActivity,
+                  strikeIssued,
+                  strikeNumber: strikeIssued ? currentStrikes : 0,
+                  currentStrikes,
+                  maxStrikes,
+                  remainingStrikes: Math.max(0, maxStrikes - currentStrikes),
                   snapshotUrl: snapshotUrl || null,
                   isLocked,
                   isAuditSnapshot,
@@ -228,7 +321,14 @@ export async function POST(req: NextRequest) {
                   sessionId,
                   violationId: insertedViol?.id,
                   violationType,
-                  strikeNumber: isAuditSnapshot ? 0 : currentStrikes,
+                  simpleWarning,
+                  isWebcamActivity,
+                  requiresProctorReview: isWebcamActivity,
+                  strikeIssued,
+                  strikeNumber: strikeIssued ? currentStrikes : 0,
+                  currentStrikes,
+                  maxStrikes,
+                  remainingStrikes: Math.max(0, maxStrikes - currentStrikes),
                   snapshotUrl: snapshotUrl || null,
                   isLocked,
                   isAuditSnapshot,
@@ -251,7 +351,11 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       success: true,
+      strikeIssued,
       currentStrikes,
+      maxStrikes,
+      remainingStrikes: Math.max(0, maxStrikes - currentStrikes),
+      reason: simpleWarning,
       isLocked,
       snapshotUrl,
       recordedAt: new Date().toISOString(),

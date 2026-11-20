@@ -16,6 +16,7 @@ import {
   sendProctorReplyAction,
   markInquiryResolvedAction,
   requestProctorSnapshotAction,
+  issueStrikeAction,
 } from "../actions";
 import { formatTime, formatDate, formatDateTime } from "@/lib/date";
 import {
@@ -276,8 +277,8 @@ export function LiveProctoringClientView({
           examTitle: currentExamObj?.title || "Examination",
         };
 
-        // Prepend to violations feed only if it is an actual infraction (not neutral background surveillance)
-        if (!payload.isAuditSnapshot && (payload.strikeNumber ?? 1) > 0) {
+        // Prepend to violations feed if it is an actual infraction OR a flagged camera review
+        if (payload.isWebcamActivity || payload.requiresProctorReview || (!payload.isAuditSnapshot && (payload.strikeNumber ?? 1) > 0)) {
           setViolations((prev) => [newViol, ...prev.filter((v) => v.id !== newViol.id)]);
         }
 
@@ -287,16 +288,14 @@ export function LiveProctoringClientView({
             s.id === payload.sessionId
               ? {
                   ...s,
-                  strikesCount: payload.isAuditSnapshot ? s.strikesCount : (payload.strikeNumber ?? s.strikesCount),
+                  strikesCount: payload.isWebcamActivity || payload.isAuditSnapshot ? s.strikesCount : (payload.currentStrikes ?? payload.strikeNumber ?? s.strikesCount),
                   status: payload.isLocked ? "LOCKED" : s.status,
                   latestSnapshotUrl: payload.snapshotUrl || s.latestSnapshotUrl,
                   latestSnapshotTime: payload.snapshotUrl ? (payload.recordedAt || new Date().toISOString()) : s.latestSnapshotTime,
                   snapshotsCount: payload.snapshotUrl ? (s.snapshotsCount || 0) + 1 : s.snapshotsCount,
-                  latestActionText: payload.isAuditSnapshot
-                    ? (payload.snapshotUrl ? "Webcam Snapshot Verified" : s.latestActionText)
-                    : (payload.violationType?.replace(/_/g, " ") || s.latestActionText),
+                  latestActionText: payload.simpleWarning || formatViolationType(payload.violationType) || s.latestActionText,
                   latestActionTime: payload.recordedAt || new Date().toISOString(),
-                  latestActionType: payload.isAuditSnapshot ? s.latestActionType : ("VIOLATION" as const),
+                  latestActionType: (payload.isWebcamActivity || payload.isAuditSnapshot) ? s.latestActionType : ("VIOLATION" as const),
                 }
               : s
           )
@@ -309,10 +308,15 @@ export function LiveProctoringClientView({
             type: "success",
             text: `📸 Live webcam snapshot received for ${newViol.candidateName}!`,
           });
+        } else if (payload.isWebcamActivity) {
+          setNotice({
+            type: "error",
+            text: `📷 Camera Activity: ${newViol.candidateName} — ${payload.simpleWarning || formatViolationType(newViol.violationType)} (Review pending)`,
+          });
         } else if (!payload.isAuditSnapshot) {
           setNotice({
             type: "error",
-            text: `⚠️ Infraction detected: ${newViol.candidateName} (${newViol.departmentCode}) — ${newViol.violationType}`,
+            text: `⚠️ Infraction Strike #${payload.strikeNumber ?? 1}: ${newViol.candidateName} — ${payload.simpleWarning || formatViolationType(newViol.violationType)}`,
           });
         }
       })
@@ -515,6 +519,43 @@ export function LiveProctoringClientView({
     }
   }
 
+  async function handleIssueStrike(sessionId: string, candidateName: string, violationReason?: string) {
+    if (!confirm(`Issue 1 official infraction strike to ${candidateName}?`)) return;
+    setActionLoadingId(sessionId);
+    setNotice(null);
+    try {
+      const strikeText = violationReason
+        ? `Invigilator issued strike: ${formatViolationType(violationReason)}`
+        : "Invigilator issued an infraction strike following activity review.";
+      const res = await issueStrikeAction(sessionId, strikeText);
+      if (res.error) {
+        setNotice({ type: "error", text: res.error });
+      } else {
+        setNotice({
+          type: "success",
+          text: `Infraction strike #${res.newStrikes} issued to ${candidateName}.${res.isLocked ? " Candidate workstation is now locked." : ""}`,
+        });
+        setSessions((prev) =>
+          prev.map((s) =>
+            s.id === sessionId
+              ? {
+                  ...s,
+                  strikesCount: res.newStrikes ?? (s.strikesCount + 1),
+                  status: res.isLocked ? "LOCKED" : s.status,
+                }
+              : s
+          )
+        );
+        setSelectedEvidence(null);
+        router.refresh();
+      }
+    } catch (err: any) {
+      setNotice({ type: "error", text: err.message || "Failed to issue strike." });
+    } finally {
+      setActionLoadingId(null);
+    }
+  }
+
   async function handleRebindPC(studentId: string, candidateName: string) {
     if (
       !confirm(
@@ -703,20 +744,52 @@ export function LiveProctoringClientView({
 
   const formatViolationType = (type: string) => {
     switch (type) {
-      case "WINDOW_UNFOCUSED":
-        return "Window Lost Focus";
-      case "FULLSCREEN_EXIT":
-        return "Full-Screen Exited";
-      case "MULTIPLE_DISPLAYS":
-        return "Multiple Displays";
-      case "KEYBOARD_RESTRICTION":
-        return "Prohibited Keystroke";
-      case "DEVTOOLS_ATTEMPT":
-        return "DevTools Detected";
-      case "CLIPBOARD_ACCESS":
-        return "Clipboard Blocked";
+      case "HEAD_TURNED_AWAY":
+      case "LOOKING_AWAY":
+      case "SUSPICIOUS_HEAD_MOVEMENT":
       case "SUSPICIOUS_WEBCAM_ACTIVITY":
-        return "Suspicious Gaze / Head Pose";
+        return "Looking away from screen";
+      case "MULTIPLE_FACES_DETECTED":
+      case "MULTIPLE_FACES":
+        return "Multiple people seen in camera";
+      case "FACE_ABSENCE_EXCEEDED":
+      case "NO_FACE_DETECTED":
+      case "NO_FACE":
+        return "No face visible in camera";
+      case "CAMERA_STREAM_MUTED":
+      case "CAMERA_OBSCURED":
+        return "Camera blocked or covered";
+      case "CLICKED_OUTSIDE_EXAM":
+      case "WINDOW_FOCUS_LOST":
+      case "WINDOW_UNFOCUSED":
+        return "Clicked outside exam window";
+      case "TAB_SWITCH_OR_MINIMIZE":
+        return "Switched browser tab or minimized";
+      case "FULLSCREEN_EXITED":
+      case "FULLSCREEN_EXIT":
+        return "Exited full-screen mode";
+      case "CLIPBOARD_ACCESS_ATTEMPT":
+      case "CLIPBOARD_ACCESS":
+        return "Attempted copy or paste";
+      case "KEYBOARD_RESTRICTION":
+      case "PROHIBITED_KEY_INPUT":
+      case "SYSTEM_KEY_INTERCEPTED":
+        return "Restricted shortcut key pressed";
+      case "NAVIGATION_INTERCEPTED":
+        return "Back / forward navigation attempt";
+      case "DEVTOOLS_ATTEMPT":
+        return "Developer tools opened";
+      case "MULTIPLE_DISPLAYS":
+      case "MULTI_MONITOR_DETECTED":
+        return "Multiple monitors detected";
+      case "PROCTOR_REQUESTED_SNAPSHOT":
+        return "Camera snapshot verified";
+      case "ROUTINE_SURVEILLANCE":
+        return "Routine camera check photo";
+      case "PROCTOR_ISSUED_STRIKE":
+        return "Strike issued by invigilator";
+      case "PROCTOR_FREEZE":
+        return "Workstation frozen by invigilator";
       default:
         return type.replace(/_/g, " ").toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
     }
@@ -1577,9 +1650,16 @@ export function LiveProctoringClientView({
                           <span className="font-bold text-slate-900 truncate max-w-[170px]">
                             {v.candidateName}
                           </span>
-                          <span className="text-[9px] font-extrabold px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-800 border border-amber-200">
-                            Strike #{v.strikeNumber}
-                          </span>
+                          {v.strikeNumber === 0 ? (
+                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-800 border border-amber-200 flex items-center gap-1">
+                              <Camera className="w-2.5 h-2.5" />
+                              Camera Review
+                            </span>
+                          ) : (
+                            <span className="text-[9px] font-extrabold px-1.5 py-0.5 rounded-md bg-red-50 text-red-700 border border-red-200">
+                              Strike #{v.strikeNumber}
+                            </span>
+                          )}
                         </div>
 
                         <div className="text-[11px] font-semibold text-amber-700 flex items-center space-x-1.5">
@@ -1620,9 +1700,21 @@ export function LiveProctoringClientView({
                               <Camera className="w-3 h-3 mr-1" />
                               View Photo
                             </button>
-                            <span className="text-[9px] text-emerald-700 font-bold bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200">
-                              Photo Captured
-                            </span>
+                            {v.strikeNumber === 0 ? (
+                              <button
+                                type="button"
+                                disabled={actionLoadingId === v.sessionId}
+                                onClick={() => handleIssueStrike(v.sessionId, v.candidateName, v.violationType)}
+                                className="inline-flex items-center px-2 py-0.5 rounded-md bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 text-[10px] font-bold transition-colors cursor-pointer disabled:opacity-40"
+                              >
+                                <AlertTriangle className="w-2.5 h-2.5 mr-1 text-amber-600" />
+                                Give Strike
+                              </button>
+                            ) : (
+                              <span className="text-[9px] text-emerald-700 font-bold bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200">
+                                Photo Captured
+                              </span>
+                            )}
                           </div>
                         )}
                       </div>
@@ -2159,9 +2251,16 @@ export function LiveProctoringClientView({
                           <span className="font-bold text-slate-900 truncate max-w-[170px]">
                             {v.candidateName}
                           </span>
-                          <span className="text-[9px] font-extrabold px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-800 border border-amber-200">
-                            Strike #{v.strikeNumber}
-                          </span>
+                          {v.strikeNumber === 0 ? (
+                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-800 border border-amber-200 flex items-center gap-1">
+                              <Camera className="w-2.5 h-2.5" />
+                              Camera Review
+                            </span>
+                          ) : (
+                            <span className="text-[9px] font-extrabold px-1.5 py-0.5 rounded-md bg-red-50 text-red-700 border border-red-200">
+                              Strike #{v.strikeNumber}
+                            </span>
+                          )}
                         </div>
 
                         <div className="text-[11px] font-semibold text-amber-700 flex items-center space-x-1.5">
@@ -2184,9 +2283,21 @@ export function LiveProctoringClientView({
                               <Camera className="w-3 h-3 mr-1" />
                               View Photo
                             </button>
-                            <span className="text-[9px] text-emerald-700 font-bold bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200">
-                              Photo Captured
-                            </span>
+                            {v.strikeNumber === 0 ? (
+                              <button
+                                type="button"
+                                disabled={actionLoadingId === v.sessionId}
+                                onClick={() => handleIssueStrike(v.sessionId, v.candidateName, v.violationType)}
+                                className="inline-flex items-center px-2 py-0.5 rounded-md bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 text-[10px] font-bold transition-colors cursor-pointer disabled:opacity-40"
+                              >
+                                <AlertTriangle className="w-2.5 h-2.5 mr-1 text-amber-600" />
+                                Give Strike
+                              </button>
+                            ) : (
+                              <span className="text-[9px] text-emerald-700 font-bold bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200">
+                                Photo Captured
+                              </span>
+                            )}
                           </div>
                         )}
                       </div>
@@ -2630,23 +2741,28 @@ export function LiveProctoringClientView({
               <div className="border-t border-slate-200/80 pt-2 flex items-center justify-between">
                 <div className="flex items-center space-x-2">
                   <span className="text-[10px] uppercase font-bold text-slate-400">
-                    {selectedEvidence.violationType === "PROCTOR_REQUESTED_SNAPSHOT" ? "Event Type:" : "Violation:"}
+                    {selectedEvidence.violationType === "PROCTOR_REQUESTED_SNAPSHOT" ? "Event Type:" : "Observed Activity:"}
                   </span>
                   <span
                     className={`font-bold px-2 py-0.5 rounded border text-[11px] ${
                       selectedEvidence.violationType === "PROCTOR_REQUESTED_SNAPSHOT"
                         ? "text-emerald-800 bg-emerald-50 border-emerald-200"
+                        : selectedEvidence.strikeNumber === 0
+                        ? "text-blue-800 bg-blue-50 border-blue-200"
                         : "text-red-700 bg-red-50 border-red-200"
                     }`}
                   >
-                    {selectedEvidence.violationType === "PROCTOR_REQUESTED_SNAPSHOT"
-                      ? "PROCTOR_VERIFICATION_SNAP"
-                      : selectedEvidence.violationType}
+                    {formatViolationType(selectedEvidence.violationType)}
                   </span>
                 </div>
                 {selectedEvidence.violationType === "PROCTOR_REQUESTED_SNAPSHOT" ? (
                   <span className="font-mono text-xs font-black px-2.5 py-0.5 rounded bg-emerald-100 text-emerald-800 border border-emerald-300">
                     Non-Punitive Audit ✓
+                  </span>
+                ) : selectedEvidence.strikeNumber === 0 ? (
+                  <span className="font-mono text-xs font-bold px-2.5 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-300 flex items-center gap-1">
+                    <Camera className="w-3.5 h-3.5" />
+                    Review Only (No Strike Issued)
                   </span>
                 ) : (
                   <span className="font-mono text-xs font-black px-2.5 py-0.5 rounded bg-red-100 text-red-800 border border-red-300">
@@ -2659,6 +2775,15 @@ export function LiveProctoringClientView({
             {/* Proctored Intervention Quick Actions */}
             <div className="pt-2 border-t border-slate-100 flex items-center justify-between flex-wrap gap-2">
               <div className="flex items-center space-x-2">
+                <button
+                  type="button"
+                  disabled={actionLoadingId === selectedEvidence.sessionId}
+                  onClick={() => handleIssueStrike(selectedEvidence.sessionId, selectedEvidence.candidateName, selectedEvidence.violationType)}
+                  className="inline-flex items-center px-3 py-1.5 text-xs font-bold text-white bg-red-600 hover:bg-red-700 border border-red-700 rounded-xl transition-colors cursor-pointer disabled:opacity-40 shadow-xs"
+                >
+                  <AlertTriangle className="w-3.5 h-3.5 mr-1" />
+                  Issue Infraction Strike
+                </button>
                 <button
                   type="button"
                   disabled={actionLoadingId === selectedEvidence.sessionId}
@@ -2805,6 +2930,7 @@ export function LiveProctoringClientView({
           onSendWarning={sendProctorWarningAction}
           onAddExtraTime={addExtraTimeAction}
           onResetStrikes={resetStrikesAction}
+          onIssueStrike={handleIssueStrike}
           onRebindHardware={resetCandidateWorkstationBindingAction}
           onRequestSnapshot={requestProctorSnapshotAction}
           onSendReply={sendProctorReplyAction}

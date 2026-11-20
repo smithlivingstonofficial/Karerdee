@@ -217,6 +217,15 @@ function CandidateSittingContent() {
   const [unlockCheckNotice, setUnlockCheckNotice] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [isManualSyncing, setIsManualSyncing] = useState<boolean>(false);
 
+  // Strike Confirmation Popup States
+  const [isStrikePopupOpen, setIsStrikePopupOpen] = useState(false);
+  const [strikePopupDetails, setStrikePopupDetails] = useState<{
+    reason: string;
+    currentStrikes: number;
+    maxStrikes: number;
+    remainingStrikes: number;
+  } | null>(null);
+
   // In-Exam Digital Aids Modals
   const [isCalculatorOpen, setIsCalculatorOpen] = useState(false);
   const [calcInput, setCalcInput] = useState("");
@@ -260,6 +269,21 @@ function CandidateSittingContent() {
   const tokenRef = useRef<string>(token);
   const sessionIdRef = useRef<string>(sessionId);
   const answersRef = useRef<Record<string, string[]>>(answers);
+  const isWorkstationLockedRef = useRef<boolean>(isWorkstationLocked);
+  const isStrikePopupOpenRef = useRef<boolean>(isStrikePopupOpen);
+  const headTurnedTicksRef = useRef<number>(0);
+  const lastWebcamAuditTimeRef = useRef<{ multiple: number; absence: number; turned: number }>({
+    multiple: 0,
+    absence: 0,
+    turned: 0,
+  });
+
+  useEffect(() => {
+    isWorkstationLockedRef.current = isWorkstationLocked;
+  }, [isWorkstationLocked]);
+  useEffect(() => {
+    isStrikePopupOpenRef.current = isStrikePopupOpen;
+  }, [isStrikePopupOpen]);
 
   useEffect(() => {
     stageRef.current = stage;
@@ -697,14 +721,23 @@ function CandidateSittingContent() {
 
       if (res.ok) {
         const data = await res.json();
-        if (typeof data.currentStrikes === "number" && !isAudit) {
+        if (typeof data.currentStrikes === "number") {
           setStrikes(data.currentStrikes);
         }
-        if (data.isLocked && !isAudit) {
+        if (data.isLocked) {
           setIsWorkstationLocked(true);
           setLockoutReason(
             "Security Infraction Threshold Reached. Workstation locked by Safe Exam Watchdog."
           );
+          setIsStrikePopupOpen(false);
+        } else if (data.strikeIssued) {
+          setStrikePopupDetails({
+            reason: data.reason || reason || "You clicked outside the examination page or switched windows/tabs.",
+            currentStrikes: data.currentStrikes,
+            maxStrikes: data.maxStrikes || exam?.maxStrikes || 3,
+            remainingStrikes: data.remainingStrikes ?? Math.max(0, (exam?.maxStrikes || 3) - data.currentStrikes),
+          });
+          setIsStrikePopupOpen(true);
         }
       }
     } catch (err) {
@@ -719,6 +752,7 @@ function CandidateSittingContent() {
     const faceCheckInterval = setInterval(async () => {
       let faceDetected = true;
       let faceCount = 1;
+      let isHeadTurned = false;
 
       // Tier 1: Hardware-accelerated browser FaceDetector API (Chromium / WebView2)
       if ("FaceDetector" in window && videoRef.current && videoRef.current.readyState >= 2) {
@@ -730,6 +764,15 @@ function CandidateSittingContent() {
           const faces = await detector.detect(videoRef.current);
           faceCount = faces.length;
           faceDetected = faces.length > 0;
+          if (faces.length === 1 && videoRef.current) {
+            const box = faces[0].boundingBox;
+            const vw = videoRef.current.videoWidth || 640;
+            const faceCenterX = box.x + box.width / 2;
+            // Candidate head turned far to side or looking away
+            if (faceCenterX < vw * 0.22 || faceCenterX > vw * 0.78 || box.width < vw * 0.12) {
+              isHeadTurned = true;
+            }
+          }
         } catch {
           faceDetected = true;
         }
@@ -764,26 +807,49 @@ function CandidateSittingContent() {
         }
       }
 
-      // Check for multiple faces
+      const now = Date.now();
+
+      // 1. Check for multiple faces (capture photo for proctor review - NO automated strike)
       if (faceDetected && faceCount > 1) {
-        reportSecurityViolation(
-          "MULTIPLE_FACES_DETECTED",
-          "Multiple candidate faces detected simultaneously in proctor viewport"
-        );
+        if (now - lastWebcamAuditTimeRef.current.multiple > 15000) {
+          lastWebcamAuditTimeRef.current.multiple = now;
+          reportSecurityViolation(
+            "MULTIPLE_FACES_DETECTED",
+            "Multiple people visible in camera"
+          );
+        }
       }
 
-      // Grace Window Countdown Logic
+      // 2. Check if candidate turned head or looking away (capture photo for proctor review - NO automated strike)
+      if (faceDetected && isHeadTurned) {
+        headTurnedTicksRef.current += 1;
+        if (headTurnedTicksRef.current >= 3) {
+          if (now - lastWebcamAuditTimeRef.current.turned > 15000) {
+            lastWebcamAuditTimeRef.current.turned = now;
+            reportSecurityViolation(
+              "HEAD_TURNED_AWAY",
+              "Candidate turned head / looking away from screen"
+            );
+          }
+        }
+      } else {
+        headTurnedTicksRef.current = 0;
+      }
+
+      // 3. Face Absence Detection (capture photo for proctor review - NO automated strike)
       if (!faceDetected) {
         faceMissingTicksRef.current += 1;
-        // Trigger 10-second warning banner after 2 consecutive missing ticks
         if (faceMissingTicksRef.current >= 2) {
-          const remaining = Math.max(0, 12 - faceMissingTicksRef.current);
+          const remaining = Math.max(0, 7 - faceMissingTicksRef.current);
           setFaceWarningCountdown(remaining);
           if (remaining === 0) {
-            reportSecurityViolation(
-              "FACE_ABSENCE_EXCEEDED",
-              "No candidate face visible in camera viewport for 10 seconds"
-            );
+            if (now - lastWebcamAuditTimeRef.current.absence > 20000) {
+              lastWebcamAuditTimeRef.current.absence = now;
+              reportSecurityViolation(
+                "NO_FACE_DETECTED",
+                "No face visible in camera"
+              );
+            }
             faceMissingTicksRef.current = 0;
             setFaceWarningCountdown(null);
           }
@@ -873,22 +939,36 @@ function CandidateSittingContent() {
 
     function handleVisibilityChange() {
       if (document.hidden) {
+        if (hasSubmittedRef.current || isWorkstationLockedRef.current) return;
         reportSecurityViolation(
           "TAB_SWITCH_OR_MINIMIZE",
-          "Candidate minimized window or switched browser tabs"
+          "You switched browser tabs or minimized the examination window."
         );
       }
     }
 
     function handleWindowBlur() {
+      if (hasSubmittedRef.current || isWorkstationLockedRef.current || isStrikePopupOpenRef.current) return;
       reportSecurityViolation(
-        "WINDOW_FOCUS_LOST",
-        "Examination application window lost foreground focus"
+        "CLICKED_OUTSIDE_EXAM",
+        "You clicked outside the examination page or switched windows/tabs."
       );
     }
 
     function handleContextMenu(e: MouseEvent) {
       e.preventDefault();
+    }
+
+    function handleSelectStart(e: Event) {
+      e.preventDefault();
+      return false;
+    }
+
+    function handleSelectionChange() {
+      const sel = window.getSelection();
+      if (sel && sel.toString().length > 0) {
+        sel.removeAllRanges();
+      }
     }
 
     function handleClipboard(e: ClipboardEvent) {
@@ -905,7 +985,7 @@ function CandidateSittingContent() {
       triggerForcefulExitSubmission("WINDOW_BEFOREUNLOAD");
       e.preventDefault();
       const exitPrompt =
-        "Active examination in progress! If you navigate away or close this window, your examination will be finalized and submitted automatically.";
+        "Active examination in progress! If you reload or close this window, your examination will be finalized and submitted automatically.";
       e.returnValue = exitPrompt;
       return exitPrompt;
     }
@@ -921,29 +1001,40 @@ function CandidateSittingContent() {
     }
 
     function handleKeyDown(e: KeyboardEvent) {
+      // 1. Developer Inspection Tools
       const isDevTools =
         e.key === "F12" ||
         ((e.ctrlKey || e.metaKey) &&
           e.shiftKey &&
-          ["I", "i", "J", "j", "C", "c"].includes(e.key));
+          ["I", "i", "J", "j", "C", "c", "K", "k"].includes(e.key));
 
+      // 2. Hard Refresh & Reload: F5, Ctrl+F5, Shift+F5, Ctrl+R, Ctrl+Shift+R, Cmd+R
       const isReload =
         e.key === "F5" ||
         ((e.ctrlKey || e.metaKey) && (e.key === "r" || e.key === "R"));
 
+      // 3. Tab Switching & Browser Window: Ctrl+Tab, Ctrl+Shift+Tab, Ctrl+W, Ctrl+T, Ctrl+N, Ctrl+Q, Ctrl+PageUp, Ctrl+PageDown
+      const isTabSwitch =
+        (e.ctrlKey || e.metaKey) &&
+        ["Tab", "t", "T", "w", "W", "n", "N", "q", "Q", "PageUp", "PageDown"].includes(e.key);
+
+      // 4. Source, Print, Save, Search: Ctrl+U, Ctrl+P, Ctrl+S, Ctrl+F, Ctrl+H, Ctrl+O
       const isSavePrintSource =
         (e.ctrlKey || e.metaKey) &&
-        ["u", "U", "p", "P", "s", "S"].includes(e.key);
+        ["u", "U", "p", "P", "s", "S", "f", "F", "h", "H", "o", "O"].includes(e.key);
 
-      const isClipboardKey =
+      // 5. Text Selection & Clipboard: Ctrl+A, Ctrl+C, Ctrl+V, Ctrl+X
+      const isTextSelectOrClipboard =
         (e.ctrlKey || e.metaKey) &&
-        ["c", "C", "v", "V", "x", "X", "a", "A"].includes(e.key);
+        ["a", "A", "c", "C", "v", "V", "x", "X"].includes(e.key);
 
+      // 6. System Keys: PrintScreen, Meta, Alt+Tab, Alt+F4, Alt+Escape
       const isSystemKey =
         e.key === "PrintScreen" ||
         e.key === "Meta" ||
-        (e.altKey && (e.key === "Tab" || e.key === "Escape"));
+        (e.altKey && (e.key === "Tab" || e.key === "Escape" || e.key === "F4"));
 
+      // 7. Browser Back/Forward navigation
       const isBackNav =
         (e.altKey && (e.key === "ArrowLeft" || e.key === "ArrowRight" || e.key === "Home")) ||
         (e.key === "Backspace" &&
@@ -965,18 +1056,25 @@ function CandidateSittingContent() {
         return;
       }
 
-      if (isDevTools || isReload || isSavePrintSource || isClipboardKey || isSystemKey) {
+      if (isDevTools || isReload || isTabSwitch || isSavePrintSource || isTextSelectOrClipboard || isSystemKey) {
         e.preventDefault();
         e.stopPropagation();
         const reason = isDevTools
           ? "Developer Inspection Tools shortcut intercepted"
           : isReload
-          ? "Page reload command intercepted"
+          ? "Page refresh / hard reload shortcut intercepted"
+          : isTabSwitch
+          ? "Tab switching / browser window shortcut intercepted"
           : isSavePrintSource
-          ? "Source/Print/Save command intercepted"
-          : isClipboardKey
-          ? "Clipboard shortcut intercepted"
+          ? "Source/Print/Save/Search shortcut intercepted"
+          : isTextSelectOrClipboard
+          ? "Text selection / clipboard shortcut intercepted"
           : `System keystroke intercepted: ${e.key}`;
+
+        if (isReload || isTabSwitch) {
+          setNavLockWarning("⚠️ Action restricted: Page refresh and tab switching are strictly blocked.");
+          setTimeout(() => setNavLockWarning(null), 4000);
+        }
         reportSecurityViolation("PROHIBITED_KEY_INPUT", reason);
       }
     }
@@ -985,6 +1083,8 @@ function CandidateSittingContent() {
     window.addEventListener("pagehide", handlePageHide);
     document.addEventListener("visibilitychange", handleVisibilityChange);
     window.addEventListener("blur", handleWindowBlur);
+    document.addEventListener("selectstart", handleSelectStart);
+    document.addEventListener("selectionchange", handleSelectionChange);
     document.addEventListener("contextmenu", handleContextMenu);
     document.addEventListener("copy", handleClipboard);
     document.addEventListener("paste", handleClipboard);
@@ -998,6 +1098,8 @@ function CandidateSittingContent() {
       window.removeEventListener("pagehide", handlePageHide);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       window.removeEventListener("blur", handleWindowBlur);
+      document.removeEventListener("selectstart", handleSelectStart);
+      document.removeEventListener("selectionchange", handleSelectionChange);
       document.removeEventListener("contextmenu", handleContextMenu);
       document.removeEventListener("copy", handleClipboard);
       document.removeEventListener("paste", handleClipboard);
@@ -1089,10 +1191,28 @@ function CandidateSittingContent() {
             setLockoutReason(
               "Examination terminated by invigilator: " + (msg || "Integrity protocol enforcement.")
             );
+          } else if (cmd === "CMD_STRIKE") {
+            const newCount = payload?.strikesCount ?? (strikes + 1);
+            setStrikes(newCount);
+            if (payload?.isLocked) {
+              setIsWorkstationLocked(true);
+              setLockoutReason("Infraction Limit Reached. Workstation locked by Invigilator.");
+              setIsStrikePopupOpen(false);
+            } else {
+              setStrikePopupDetails({
+                reason: payload?.message || "Invigilator issued an infraction strike following activity review.",
+                currentStrikes: newCount,
+                maxStrikes: payload?.maxStrikes || exam?.maxStrikes || 3,
+                remainingStrikes: payload?.remainingStrikes ?? Math.max(0, (exam?.maxStrikes || 3) - newCount),
+              });
+              setIsStrikePopupOpen(true);
+            }
           } else if (cmd === "CMD_RESUME") {
             setIsWorkstationLocked(false);
             setLockoutReason("");
             setProctorWarningMessage(null);
+            setIsStrikePopupOpen(false);
+            setStrikePopupDetails(null);
             setStrikes(0);
             enterFullscreen().catch(() => {});
           }
@@ -3603,11 +3723,87 @@ function CandidateSittingContent() {
           <div className="flex items-center space-x-2.5 text-xs font-bold">
             <AlertOctagon className="w-4 h-4 shrink-0 text-white" />
             <span>
-              ⚠️ Security Warning: Face Not Detected in Camera View! Please look directly at the screen.
+              ⚠️ Security Notice: Face not detected in camera view! Please look directly at the screen.
             </span>
           </div>
           <div className="text-xs font-black font-mono bg-black/25 px-2.5 py-1 rounded border border-white/20">
-            Infraction Strike in {faceWarningCountdown}s
+            Camera Review Flag in {faceWarningCountdown}s
+          </div>
+        </div>
+      )}
+
+      {/* =====================================================================
+          STRIKE CONFIRMATION MODAL: POPUP WITH REASON & REMAINING STRIKES
+         ===================================================================== */}
+      {isStrikePopupOpen && !isWorkstationLocked && (
+        <div className="fixed inset-0 z-50 bg-slate-900/75 backdrop-blur-xs flex items-center justify-center p-4 select-none animate-in fade-in duration-150">
+          <div className="w-full max-w-md bg-white border-2 border-amber-300 rounded-3xl p-6 sm:p-7 shadow-2xl text-center space-y-4 animate-in zoom-in-95 duration-200">
+            {/* Top Warning Icon */}
+            <div className="w-14 h-14 rounded-2xl bg-amber-100 text-amber-700 flex items-center justify-center mx-auto border-2 border-amber-200 shadow-2xs animate-pulse">
+              <AlertTriangle className="w-7 h-7 text-amber-600" />
+            </div>
+
+            {/* Title & Reason */}
+            <div className="space-y-2">
+              <span className="text-[10px] font-extrabold uppercase tracking-widest text-amber-800 bg-amber-50 border border-amber-200 px-3 py-1 rounded-full">
+                Security Infraction Strike Recorded
+              </span>
+              <h2 className="text-base font-black text-slate-900 uppercase tracking-tight pt-1">
+                Strike #{strikePopupDetails?.currentStrikes || strikes} of {strikePopupDetails?.maxStrikes || exam?.maxStrikes || 3}
+              </h2>
+              <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-left">
+                <span className="text-[10px] font-bold text-red-700 uppercase tracking-wider block">
+                  Infraction Reason:
+                </span>
+                <p className="text-xs text-red-900 font-bold mt-0.5 leading-snug">
+                  {strikePopupDetails?.reason || "You clicked outside the examination page or switched windows/tabs."}
+                </p>
+              </div>
+            </div>
+
+            {/* Strikes Remaining Status Strip */}
+            <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-center space-y-2">
+              <div className="flex items-center justify-between text-xs font-bold text-slate-700">
+                <span>Remaining Strikes Allowed:</span>
+                <span className="text-sm font-black font-mono text-red-600">
+                  {strikePopupDetails?.remainingStrikes ?? Math.max(0, (exam?.maxStrikes || 3) - strikes)} Left
+                </span>
+              </div>
+              {/* Visual Strike Progress Pills */}
+              <div className="flex items-center space-x-1.5">
+                {Array.from({ length: strikePopupDetails?.maxStrikes || exam?.maxStrikes || 3 }).map((_, idx) => {
+                  const isUsed = idx < (strikePopupDetails?.currentStrikes || strikes);
+                  return (
+                    <div
+                      key={idx}
+                      className={`flex-1 h-2 rounded-full transition-all ${
+                        isUsed ? "bg-red-500 shadow-2xs" : "bg-emerald-400"
+                      }`}
+                    />
+                  );
+                })}
+              </div>
+              <p className="text-[11px] text-slate-500 font-medium">
+                {(strikePopupDetails?.remainingStrikes ?? Math.max(0, (exam?.maxStrikes || 3) - strikes)) === 0
+                  ? "You have reached your maximum strike limit. Workstation will be locked."
+                  : `You have ${strikePopupDetails?.remainingStrikes ?? Math.max(0, (exam?.maxStrikes || 3) - strikes)} strike(s) left. Clicking outside or switching windows again will result in further strikes.`}
+              </p>
+            </div>
+
+            {/* Acknowledgment Button */}
+            <button
+              type="button"
+              onClick={async () => {
+                setIsStrikePopupOpen(false);
+                setStrikePopupDetails(null);
+                await enterFullscreen().catch(() => {});
+                if (typeof window !== "undefined") window.focus();
+              }}
+              className="w-full py-3 px-4 bg-blue-700 hover:bg-blue-800 text-white font-extrabold text-xs uppercase tracking-wider rounded-xl shadow-md hover:shadow-lg transition-all flex items-center justify-center space-x-2 cursor-pointer active:scale-98"
+            >
+              <CheckCircle2 className="w-4 h-4 text-white mr-1" />
+              <span>I Acknowledge &amp; Return to Examination</span>
+            </button>
           </div>
         </div>
       )}

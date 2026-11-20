@@ -44,9 +44,58 @@ export interface CandidateDetailedModalProps {
   onSendWarning?: (sessionId: string, message: string) => Promise<any>;
   onAddExtraTime?: (sessionId: string, minutes: number) => Promise<any>;
   onResetStrikes?: (sessionId: string) => Promise<any>;
+  onIssueStrike?: (sessionId: string, candidateName: string, reason?: string) => Promise<any>;
   onRebindHardware?: (studentId: string, candidateName: string) => Promise<any>;
   onRequestSnapshot?: (sessionId: string, candidateName: string) => Promise<any>;
   onSendReply?: (sessionId: string, replyText: string, messageId?: string) => Promise<any>;
+}
+
+function formatViolationSimple(type?: string): string {
+  if (!type) return "Integrity Violation";
+  switch (type) {
+    case "HEAD_TURNED_AWAY":
+    case "LOOKING_AWAY":
+    case "SUSPICIOUS_HEAD_MOVEMENT":
+    case "SUSPICIOUS_WEBCAM_ACTIVITY":
+      return "Looking away from screen";
+    case "MULTIPLE_FACES_DETECTED":
+    case "MULTIPLE_FACES":
+      return "Multiple people seen in camera";
+    case "FACE_ABSENCE_EXCEEDED":
+    case "NO_FACE_DETECTED":
+    case "NO_FACE":
+      return "No face visible in camera";
+    case "CAMERA_STREAM_MUTED":
+    case "CAMERA_OBSCURED":
+      return "Camera blocked or covered";
+    case "CLICKED_OUTSIDE_EXAM":
+    case "WINDOW_FOCUS_LOST":
+    case "WINDOW_UNFOCUSED":
+      return "Clicked outside exam window";
+    case "TAB_SWITCH_OR_MINIMIZE":
+      return "Switched browser tab or minimized";
+    case "FULLSCREEN_EXITED":
+    case "FULLSCREEN_EXIT":
+      return "Exited full-screen mode";
+    case "CLIPBOARD_ACCESS_ATTEMPT":
+    case "CLIPBOARD_ACCESS":
+      return "Attempted copy or paste";
+    case "KEYBOARD_RESTRICTION":
+    case "PROHIBITED_KEY_INPUT":
+    case "SYSTEM_KEY_INTERCEPTED":
+      return "Restricted shortcut key pressed";
+    case "NAVIGATION_INTERCEPTED":
+      return "Back / forward navigation attempt";
+    case "DEVTOOLS_ATTEMPT":
+      return "Developer tools opened";
+    case "MULTIPLE_DISPLAYS":
+    case "MULTI_MONITOR_DETECTED":
+      return "Multiple monitors detected";
+    case "PROCTOR_REQUESTED_SNAPSHOT":
+      return "Webcam snapshot verified";
+    default:
+      return type.replace(/_/g, " ").toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
+  }
 }
 
 interface ForensicEvent {
@@ -68,6 +117,7 @@ export function CandidateDetailedModal({
   onSendWarning,
   onAddExtraTime,
   onResetStrikes,
+  onIssueStrike,
   onRebindHardware,
   onRequestSnapshot,
   onSendReply,
@@ -174,11 +224,21 @@ export function CandidateDetailedModal({
     // 3. Violations & Integrity events
     violations.forEach((v) => {
       const isSnapshotOnly = v.metadata?.action === "CMD_REQUEST_SNAP" || v.metadata?.isAuditSnapshot;
+      const isReviewOnly = v.strike_number === 0 || v.metadata?.requiresProctorReview;
+      const simpleTitle = v.metadata?.simpleWarning || formatViolationSimple(v.violation_type);
       events.push({
         id: `viol_${v.id}`,
         type: isSnapshotOnly ? "SNAPSHOT" : "VIOLATION",
-        title: isSnapshotOnly ? "Forensic Webcam Snapshot Verified" : (v.violation_type?.replace(/_/g, " ") || "Integrity Violation"),
-        description: v.metadata?.reason || v.metadata?.message || `Infraction logged. Strike #${v.strike_number || 0}`,
+        title: isSnapshotOnly
+          ? "Forensic Webcam Snapshot Verified"
+          : isReviewOnly
+          ? `Camera Activity: ${simpleTitle}`
+          : simpleTitle,
+        description:
+          v.metadata?.simpleWarning ||
+          v.metadata?.reason ||
+          v.metadata?.message ||
+          (isReviewOnly ? "Webcam image captured for invigilator review." : `Infraction logged. Strike #${v.strike_number || 1}`),
         timestamp: v.created_at,
         strikeNumber: v.strike_number,
         snapshotUrl: v.snapshot_url,
@@ -327,6 +387,36 @@ export function CandidateDetailedModal({
       }
     } catch (e: any) {
       setActionNotice({ type: "error", text: e.message || "Failed to reset strikes." });
+    } finally {
+      setActionLoading(false);
+    }
+  }
+
+  async function handleIssueStrike(reason?: string) {
+    const candidateName = sessionData?.student?.full_name || "Candidate";
+    if (!onIssueStrike) return;
+    if (!confirm(`Issue 1 official infraction strike to ${candidateName}?`)) return;
+    setActionLoading(true);
+    setActionNotice(null);
+    try {
+      const res = await onIssueStrike(sessionId, candidateName, reason);
+      if (res?.error) {
+        setActionNotice({ type: "error", text: res.error });
+      } else {
+        setActionNotice({ type: "success", text: `Strike issued to ${candidateName}.${res?.isLocked ? " Workstation locked." : ""}` });
+        setSessionData((prev: any) =>
+          prev
+            ? {
+                ...prev,
+                strikes_count: res?.newStrikes ?? (prev.strikes_count || 0) + 1,
+                status: res?.isLocked ? "LOCKED" : prev.status,
+              }
+            : prev
+        );
+        loadCandidateData(true);
+      }
+    } catch (e: any) {
+      setActionNotice({ type: "error", text: e.message || "Failed to issue strike." });
     } finally {
       setActionLoading(false);
     }
@@ -896,6 +986,12 @@ export function CandidateDetailedModal({
                                       Strike #{ev.strikeNumber}
                                     </span>
                                   )}
+                                  {ev.strikeNumber === 0 && (
+                                    <span className="font-mono text-[9px] font-bold bg-amber-50 text-amber-800 px-1.5 py-0.2 rounded border border-amber-200 flex items-center gap-1">
+                                      <Camera className="w-2.5 h-2.5 text-amber-600" />
+                                      Camera Review
+                                    </span>
+                                  )}
                                 </div>
 
                                 <span className="text-[10px] font-mono text-slate-400 whitespace-nowrap">
@@ -909,7 +1005,7 @@ export function CandidateDetailedModal({
 
                               {/* Snapshot attachment thumbnail if violation has photo */}
                               {ev.snapshotUrl && (
-                                <div className="pt-1.5 flex items-center space-x-2">
+                                <div className="pt-1.5 flex items-center space-x-2 flex-wrap gap-1">
                                   <button
                                     type="button"
                                     onClick={() => {
@@ -924,6 +1020,17 @@ export function CandidateDetailedModal({
                                     <Camera className="w-3 h-3" />
                                     <span>Inspect Captured Webcam Evidence</span>
                                   </button>
+                                  {ev.strikeNumber === 0 && onIssueStrike && (
+                                    <button
+                                      type="button"
+                                      disabled={actionLoading}
+                                      onClick={() => handleIssueStrike(ev.title)}
+                                      className="inline-flex items-center space-x-1 px-2 py-1 rounded-lg bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 text-[10px] font-bold transition-colors cursor-pointer disabled:opacity-40"
+                                    >
+                                      <AlertTriangle className="w-3 h-3 text-red-600" />
+                                      <span>Issue Infraction Strike</span>
+                                    </button>
+                                  )}
                                 </div>
                               )}
                             </div>
@@ -1084,21 +1191,39 @@ export function CandidateDetailedModal({
 
                     {/* Strikes Counter */}
                     <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-2.5">
-                      <div className="flex items-center space-x-1.5">
-                        <RotateCcw className="w-4 h-4 text-slate-600" />
-                        <h4 className="text-xs font-bold text-slate-800">Clear Strikes</h4>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-1.5">
+                          <RotateCcw className="w-4 h-4 text-slate-600" />
+                          <h4 className="text-xs font-bold text-slate-800">Infraction Strikes</h4>
+                        </div>
+                        <span className="font-mono text-xs font-black px-2 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200">
+                          {sessionData?.strikes_count || 0} / {exam?.max_strikes || 3}
+                        </span>
                       </div>
                       <p className="text-[11px] text-slate-500">
-                        Current strikes: {sessionData?.strikes_count || 0} / {exam?.max_strikes || 3}
+                        Workstation locks when limit is reached.
                       </p>
-                      <button
-                        type="button"
-                        disabled={actionLoading || isSubmitted || (sessionData?.strikes_count || 0) === 0}
-                        onClick={handleResetStrikes}
-                        className="w-full py-1.5 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-800 text-xs font-bold transition-colors cursor-pointer disabled:opacity-40"
-                      >
-                        Reset Strikes to 0
-                      </button>
+                      <div className="flex items-center space-x-2">
+                        {onIssueStrike && (
+                          <button
+                            type="button"
+                            disabled={actionLoading || isSubmitted}
+                            onClick={() => handleIssueStrike("Invigilator issued strike from candidate dossier.")}
+                            className="flex-1 py-1.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-bold transition-colors cursor-pointer disabled:opacity-40 shadow-xs flex items-center justify-center space-x-1"
+                          >
+                            <AlertTriangle className="w-3.5 h-3.5" />
+                            <span>Issue Strike</span>
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          disabled={actionLoading || isSubmitted || (sessionData?.strikes_count || 0) === 0}
+                          onClick={handleResetStrikes}
+                          className="flex-1 py-1.5 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-800 text-xs font-bold transition-colors cursor-pointer disabled:opacity-40"
+                        >
+                          Clear to 0
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>
