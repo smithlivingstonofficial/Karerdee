@@ -148,6 +148,28 @@ export async function POST(req: NextRequest) {
       questionsMap.set(q.id, q);
     });
 
+    const reason = body.submissionReason || "NORMAL";
+
+    // Strict validation: candidate manual submission requires attending all questions
+    if (reason === "NORMAL") {
+      const answeredQIds = new Set(
+        answers
+          .filter((a) => Array.isArray(a.selectedOptionIds) && a.selectedOptionIds.length > 0)
+          .map((a) => a.questionId)
+      );
+      const totalExamQuestionsCount = (dbQuestions || []).length;
+      if (totalExamQuestionsCount > 0 && answeredQIds.size < totalExamQuestionsCount) {
+        const missingCount = totalExamQuestionsCount - answeredQIds.size;
+        return NextResponse.json(
+          {
+            error: `Incomplete examination: You must attend all questions before submitting. ${missingCount} question(s) remaining.`,
+            missingCount,
+          },
+          { status: 400 }
+        );
+      }
+    }
+
     // 3. Process answers and auto-grade MCQs
     let totalScore = 0;
     const submissionUpserts = [];
@@ -225,7 +247,6 @@ export async function POST(req: NextRequest) {
     }
 
     // 6. Record Forensic Audit entry if auto-submitted by watchdog / schedule / exit
-    const reason = body.submissionReason || "NORMAL";
     if (reason === "FORCE_EXIT" || reason === "WINDOW_PAGEHIDE" || reason === "WINDOW_BEFOREUNLOAD") {
       await supabaseAdmin.from("violation_logs").insert({
         session_id: sessionId,

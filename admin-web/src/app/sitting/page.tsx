@@ -2465,6 +2465,24 @@ function CandidateSittingContent() {
     const currentSessionId = sessionIdRef.current || sessionId;
     if (!currentToken || !currentSessionId) return;
 
+    // Normal submissions strictly require all questions to be answered
+    if (reason === "NORMAL") {
+      const allExamQs = exam?.questions || [];
+      const currentAns = answersRef.current || answers;
+      const answeredSet = new Set(
+        Object.entries(currentAns)
+          .filter(([_, opts]) => Array.isArray(opts) && opts.length > 0)
+          .map(([qId]) => qId)
+      );
+      const missingCount = allExamQs.filter((q) => !answeredSet.has(q.id)).length;
+      if (allExamQs.length > 0 && missingCount > 0) {
+        setIsSubmitting(false);
+        hasSubmittedRef.current = false;
+        setIsSubmitModalOpen(true);
+        return;
+      }
+    }
+
     hasSubmittedRef.current = true;
     setIsSubmitting(true);
     setSubmissionReason(reason);
@@ -2575,11 +2593,35 @@ function CandidateSittingContent() {
     : [];
   const isLastQuestionOfExam = isLastQuestionInSection && !hasNextSection;
 
-  // Global question counts
-  const totalQuestionsCount = (exam?.questions || []).length;
-  const totalAnsweredCount = Object.keys(answers).length;
+  // Global question counts & mandatory completion tracking
+  const allExamQuestions = exam?.questions || [];
+  const totalQuestionsCount = allExamQuestions.length;
+  const answeredQuestionIds = new Set(
+    Object.entries(answers)
+      .filter(([_, opts]) => Array.isArray(opts) && opts.length > 0)
+      .map(([qId]) => qId)
+  );
+  const totalAnsweredCount = allExamQuestions.filter((q) => answeredQuestionIds.has(q.id)).length;
+  const unansweredQuestions = allExamQuestions.filter((q) => !answeredQuestionIds.has(q.id));
+  const totalUnansweredCount = unansweredQuestions.length;
   const totalFlaggedCount = flaggedQuestions.size;
-  const totalUnansweredCount = totalQuestionsCount - totalAnsweredCount;
+  const isAllQuestionsAnswered = totalQuestionsCount > 0 && totalUnansweredCount === 0;
+
+  function jumpToUnansweredQuestion(targetQ?: (typeof allExamQuestions)[0]) {
+    const qToJump = targetQ || unansweredQuestions[0];
+    if (!qToJump) return;
+    if (qToJump.sectionId && qToJump.sectionId !== activeSectionId) {
+      setActiveSectionId(qToJump.sectionId);
+      const secQs = allExamQuestions.filter((q) => q.sectionId === qToJump.sectionId);
+      const qIdx = secQs.findIndex((q) => q.id === qToJump.id);
+      setActiveQuestionIndex(qIdx !== -1 ? qIdx : 0);
+    } else {
+      const secQs = allExamQuestions.filter((q) => q.sectionId === activeSectionId);
+      const qIdx = secQs.findIndex((q) => q.id === qToJump.id);
+      if (qIdx !== -1) setActiveQuestionIndex(qIdx);
+    }
+    setIsSubmitModalOpen(false);
+  }
 
   // =========================================================================
   // STAGE: CANDIDATE PRE-WAITING AREA & SCHEDULED AUTOMATIC COMMENCEMENT
@@ -3999,9 +4041,24 @@ function CandidateSittingContent() {
             <button
               type="button"
               onClick={() => setIsSubmitModalOpen(true)}
-              className="px-3.5 py-1.5 text-xs font-bold text-white bg-blue-700 hover:bg-blue-800 rounded-lg shadow-2xs transition-all cursor-pointer"
+              className={`px-3.5 py-1.5 text-xs font-bold rounded-lg shadow-2xs transition-all cursor-pointer flex items-center space-x-1.5 ${
+                isAllQuestionsAnswered
+                  ? "bg-emerald-600 hover:bg-emerald-700 text-white ring-2 ring-emerald-500/20"
+                  : "bg-blue-700 hover:bg-blue-800 text-white"
+              }`}
+              title={
+                isAllQuestionsAnswered
+                  ? "All questions answered. Click to submit examination."
+                  : `You must answer all questions before submitting (${totalUnansweredCount} remaining).`
+              }
             >
-              Finish &amp; Submit
+              <CheckCircle2 className="w-3.5 h-3.5" />
+              <span>Submit Examination</span>
+              {!isAllQuestionsAnswered && totalQuestionsCount > 0 && (
+                <span className="text-[10px] bg-white/20 text-white px-1.5 py-0.2 rounded-full font-mono">
+                  {totalAnsweredCount}/{totalQuestionsCount}
+                </span>
+              )}
             </button>
           </div>
         </div>
@@ -4184,6 +4241,50 @@ function CandidateSittingContent() {
                 </div>
               )}
 
+              {/* Final Question of Examination Alert Banner */}
+              {isLastQuestionOfExam && (
+                <div className="p-4 rounded-xl bg-gradient-to-r from-emerald-50 via-teal-50/60 to-emerald-50 border border-emerald-200 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-in fade-in slide-in-from-bottom-2 duration-200">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-9 h-9 rounded-xl bg-emerald-600 text-white flex items-center justify-center font-bold text-xs flex-shrink-0 shadow-2xs">
+                      <CheckCircle2 className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <div className="text-xs font-bold text-slate-900 flex items-center space-x-1.5">
+                        <span>Final Question of Examination</span>
+                        <span
+                          className={`text-[10px] px-2 py-0.5 rounded-full font-mono font-extrabold ${
+                            isAllQuestionsAnswered
+                              ? "bg-emerald-100 text-emerald-800"
+                              : "bg-amber-100 text-amber-800"
+                          }`}
+                        >
+                          {totalAnsweredCount}/{totalQuestionsCount} Completed
+                        </span>
+                      </div>
+                      <div className="text-[11px] text-slate-600 font-medium mt-0.5">
+                        {!isAllQuestionsAnswered ? (
+                          <span className="text-amber-800 font-semibold">
+                            ⚠️ You have {totalUnansweredCount} unanswered question(s). You must attend all questions before submitting.
+                          </span>
+                        ) : (
+                          <span className="text-emerald-800 font-semibold">
+                            ✓ All {totalQuestionsCount} questions have been attended! Ready for final submission.
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsSubmitModalOpen(true)}
+                    className="inline-flex items-center justify-center px-5 py-2.5 rounded-xl text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 shadow-xs transition-all cursor-pointer whitespace-nowrap self-stretch sm:self-auto"
+                  >
+                    <CheckCircle2 className="w-4 h-4 mr-1.5" />
+                    <span>Submit Examination</span>
+                  </button>
+                </div>
+              )}
+
               {/* Bottom Navigation Toolbar */}
               <div className="pt-4 border-t border-slate-100 flex items-center justify-between gap-3">
                 <button
@@ -4206,31 +4307,29 @@ function CandidateSittingContent() {
                   <span>Clear Response</span>
                 </button>
 
-                {isLastQuestionInSection ? (
-                  hasNextSection && nextSection ? (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setActiveSectionId(nextSection.id);
-                        setActiveQuestionIndex(0);
-                      }}
-                      className="inline-flex items-center px-4 py-2 text-xs font-bold text-white bg-gradient-to-r from-blue-700 to-indigo-700 hover:from-blue-800 hover:to-indigo-800 rounded-xl shadow-xs transition-all cursor-pointer ring-2 ring-blue-500/20"
-                      title={`Proceed to next section: ${nextSection.title}`}
-                    >
-                      <span>Continue to Next Section</span>
-                      <ChevronRight className="w-4 h-4 ml-1" />
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => setIsSubmitModalOpen(true)}
-                      className="inline-flex items-center px-4 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow-xs transition-all cursor-pointer"
-                      title="Review answers and submit examination"
-                    >
-                      <CheckCircle2 className="w-3.5 h-3.5 mr-1.5" />
-                      <span>Review &amp; Submit Paper</span>
-                    </button>
-                  )
+                {isLastQuestionOfExam ? (
+                  <button
+                    type="button"
+                    onClick={() => setIsSubmitModalOpen(true)}
+                    className="inline-flex items-center px-5 py-2.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow-xs transition-all cursor-pointer ring-2 ring-emerald-500/20"
+                    title="Submit Examination"
+                  >
+                    <CheckCircle2 className="w-4 h-4 mr-1.5" />
+                    <span>Submit Examination</span>
+                  </button>
+                ) : isLastQuestionInSection && hasNextSection && nextSection ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveSectionId(nextSection.id);
+                      setActiveQuestionIndex(0);
+                    }}
+                    className="inline-flex items-center px-4 py-2 text-xs font-bold text-white bg-gradient-to-r from-blue-700 to-indigo-700 hover:from-blue-800 hover:to-indigo-800 rounded-xl shadow-xs transition-all cursor-pointer ring-2 ring-blue-500/20"
+                    title={`Proceed to next section: ${nextSection.title}`}
+                  >
+                    <span>Continue to Next Section</span>
+                    <ChevronRight className="w-4 h-4 ml-1" />
+                  </button>
                 ) : (
                   <button
                     type="button"
@@ -4369,22 +4468,60 @@ function CandidateSittingContent() {
                 })}
               </div>
             </div>
+
+            {/* Quick Unanswered Helper */}
+            {!isAllQuestionsAnswered && totalQuestionsCount > 0 && (
+              <div className="p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-xs flex items-center justify-between gap-2 mt-2">
+                <span className="text-[11px] font-semibold text-amber-800">
+                  {totalUnansweredCount} question(s) left to answer
+                </span>
+                <button
+                  type="button"
+                  onClick={() => jumpToUnansweredQuestion()}
+                  className="px-2.5 py-1 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-[10px] font-bold transition-colors cursor-pointer flex items-center gap-1"
+                >
+                  <span>Next Missing</span>
+                  <ArrowRight className="w-3 h-3" />
+                </button>
+              </div>
+            )}
           </div>
         </aside>
       </div>
 
       {/* =====================================================================
-          MODAL 1: SUBMISSION CONFIRMATION
+          MODAL 1: SUBMISSION CONFIRMATION & COMPLETION VALIDATION
          ===================================================================== */}
       {isSubmitModalOpen && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="w-full max-w-md bg-white border border-slate-200 rounded-2xl p-6 shadow-xl space-y-4">
-            <h3 className="text-base font-bold text-slate-900">
-              Submit Examination Paper?
-            </h3>
-            <p className="text-xs text-slate-500 leading-relaxed">
-              Once submitted, your session will be locked and finalized. Please verify your progress before confirming:
-            </p>
+            <div className="flex items-center space-x-3">
+              <div
+                className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold flex-shrink-0 shadow-2xs ${
+                  isAllQuestionsAnswered
+                    ? "bg-emerald-100 text-emerald-700"
+                    : "bg-amber-100 text-amber-700"
+                }`}
+              >
+                {isAllQuestionsAnswered ? (
+                  <CheckCircle2 className="w-6 h-6" />
+                ) : (
+                  <AlertCircle className="w-6 h-6" />
+                )}
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-slate-900">
+                  {isAllQuestionsAnswered
+                    ? "Submit Examination Paper?"
+                    : "Cannot Submit — Incomplete Examination"}
+                </h3>
+                <p className="text-xs text-slate-500">
+                  {isAllQuestionsAnswered
+                    ? "Verify your final answers before permanent sealing."
+                    : "You must attend all questions before submitting."}
+                </p>
+              </div>
+            </div>
 
             <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 text-xs space-y-2">
               <div className="flex justify-between">
@@ -4393,22 +4530,59 @@ function CandidateSittingContent() {
               </div>
               <div className="flex justify-between text-emerald-700 font-semibold">
                 <span>Answered:</span>
-                <span>{totalAnsweredCount}</span>
+                <span>{totalAnsweredCount} / {totalQuestionsCount}</span>
               </div>
               <div className="flex justify-between text-amber-700 font-semibold">
                 <span>Marked for Review:</span>
                 <span>{totalFlaggedCount}</span>
               </div>
-              <div className="flex justify-between text-red-600 font-semibold">
-                <span>Unanswered:</span>
-                <span>{totalUnansweredCount}</span>
+              <div className="flex justify-between font-semibold">
+                <span className={totalUnansweredCount > 0 ? "text-red-600 font-bold" : "text-slate-500"}>
+                  Unanswered Remaining:
+                </span>
+                <span className={totalUnansweredCount > 0 ? "text-red-600 font-bold" : "text-slate-500"}>
+                  {totalUnansweredCount}
+                </span>
               </div>
             </div>
 
-            {totalUnansweredCount > 0 && (
-              <div className="p-2.5 rounded-lg bg-amber-50 border border-amber-200 text-[11px] text-amber-800 font-semibold flex items-center space-x-1.5">
-                <AlertCircle className="w-4 h-4 flex-shrink-0 text-amber-600" />
-                <span>You have {totalUnansweredCount} unanswered questions remaining.</span>
+            {!isAllQuestionsAnswered ? (
+              <div className="p-3.5 rounded-xl bg-red-50 border border-red-200 text-xs text-red-800 space-y-2">
+                <div className="flex items-center space-x-2 font-bold text-red-900">
+                  <AlertCircle className="w-4 h-4 text-red-600 flex-shrink-0" />
+                  <span>Mandatory Completion Rule Active</span>
+                </div>
+                <p className="text-[11px] text-red-700 leading-relaxed">
+                  You have <strong>{totalUnansweredCount} unanswered question(s)</strong> remaining. All questions in this examination must be attended and answered before your final submission can be accepted.
+                </p>
+                <div className="pt-1 flex flex-wrap gap-1.5 max-h-24 overflow-y-auto pr-1">
+                  {unansweredQuestions.slice(0, 15).map((uq, idx) => {
+                    const qNum = allExamQuestions.findIndex((q) => q.id === uq.id) + 1;
+                    return (
+                      <button
+                        key={uq.id}
+                        type="button"
+                        onClick={() => jumpToUnansweredQuestion(uq)}
+                        className="px-2 py-0.5 rounded-md bg-white hover:bg-red-100 text-red-700 border border-red-200 text-[10px] font-bold transition-colors cursor-pointer"
+                        title="Click to jump to this question"
+                      >
+                        Q{qNum > 0 ? qNum : idx + 1}
+                      </button>
+                    );
+                  })}
+                  {unansweredQuestions.length > 15 && (
+                    <span className="text-[10px] text-red-600 font-medium self-center">
+                      +{unansweredQuestions.length - 15} more
+                    </span>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-800 flex items-center space-x-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                <span className="font-semibold">
+                  All {totalQuestionsCount} questions have been answered. You are ready to finalize and seal your paper.
+                </span>
               </div>
             )}
 
@@ -4420,24 +4594,36 @@ function CandidateSittingContent() {
               >
                 Return to Exam
               </button>
-              <button
-                type="button"
-                onClick={() => submitFinalExam("NORMAL")}
-                disabled={isSubmitting}
-                className="inline-flex items-center px-4 py-2 text-xs font-bold text-white bg-blue-700 hover:bg-blue-800 rounded-xl shadow-xs transition-colors cursor-pointer disabled:opacity-50"
-              >
-                {isSubmitting ? (
-                  <>
-                    <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
-                    <span>Finalizing...</span>
-                  </>
-                ) : (
-                  <>
-                    <Send className="w-3.5 h-3.5 mr-1.5" />
-                    <span>Confirm Final Submit</span>
-                  </>
-                )}
-              </button>
+
+              {!isAllQuestionsAnswered ? (
+                <button
+                  type="button"
+                  onClick={() => jumpToUnansweredQuestion()}
+                  className="inline-flex items-center px-4 py-2 text-xs font-bold text-white bg-blue-700 hover:bg-blue-800 rounded-xl shadow-xs transition-colors cursor-pointer"
+                >
+                  <span>Answer Unanswered Qs</span>
+                  <ArrowRight className="w-3.5 h-3.5 ml-1.5" />
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => submitFinalExam("NORMAL")}
+                  disabled={isSubmitting}
+                  className="inline-flex items-center px-4 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow-xs transition-colors cursor-pointer disabled:opacity-50"
+                >
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                      <span>Finalizing...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Send className="w-3.5 h-3.5 mr-1.5" />
+                      <span>Confirm Final Submit</span>
+                    </>
+                  )}
+                </button>
+              )}
             </div>
           </div>
         </div>
