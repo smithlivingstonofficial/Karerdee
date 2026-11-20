@@ -12,16 +12,38 @@ interface AnswerItem {
 interface SyncRequestBody {
   sessionId: string;
   answers: AnswerItem[];
+  token?: string;
 }
 
 export async function POST(req: NextRequest) {
   try {
-    const authHeader = req.headers.get("authorization");
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      return NextResponse.json({ error: "Missing or invalid authorization token" }, { status: 401 });
+    let rawBody: any = null;
+    try {
+      rawBody = await req.json();
+    } catch {
+      try {
+        const text = await req.text();
+        rawBody = JSON.parse(text);
+      } catch {
+        return NextResponse.json({ error: "Invalid sync payload format" }, { status: 400 });
+      }
     }
 
-    const token = authHeader.split(" ")[1];
+    const body: SyncRequestBody = rawBody || {};
+    const { sessionId, answers } = body;
+
+    const authHeader = req.headers.get("authorization");
+    let token = "";
+    if (authHeader && authHeader.startsWith("Bearer ")) {
+      token = authHeader.split(" ")[1];
+    } else if (body && typeof body.token === "string" && body.token) {
+      token = body.token;
+    }
+
+    if (!token) {
+      return NextResponse.json({ error: "Missing or invalid authorization token in header or payload" }, { status: 401 });
+    }
+
     const jwtSecret = process.env.EXAM_JWT_SECRET || "safe_exam_development_jwt_secret_key_minimum_32_characters_long";
 
     let decoded: any;
@@ -30,9 +52,6 @@ export async function POST(req: NextRequest) {
     } catch {
       return NextResponse.json({ error: "Session token expired or tampered" }, { status: 403 });
     }
-
-    const body: SyncRequestBody = await req.json();
-    const { sessionId, answers } = body;
 
     if (!sessionId || !Array.isArray(answers)) {
       return NextResponse.json({ error: "Invalid sync payload format" }, { status: 400 });

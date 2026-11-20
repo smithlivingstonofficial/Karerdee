@@ -61,6 +61,8 @@ export async function POST(req: NextRequest) {
         hardware_fingerprint,
         exam_id,
         exam:exams (
+          id,
+          status,
           start_time,
           end_time,
           duration_minutes
@@ -81,14 +83,18 @@ export async function POST(req: NextRequest) {
     const examData = (session as any)?.exam;
     let remainingSeconds = 0;
     let isExpired = false;
+    const isExamConcluded = examData?.status === "COMPLETED";
 
     if (examData?.end_time) {
       const endTime = new Date(examData.end_time);
       remainingSeconds = Math.max(0, Math.floor((endTime.getTime() - serverEpochMs) / 1000));
       if (serverEpochMs > endTime.getTime() + 60 * 1000) {
         isExpired = true;
-        reconcileExamStatuses(session.exam_id).catch(() => {});
       }
+    }
+
+    if (isExpired || isExamConcluded) {
+      reconcileExamStatuses(session.exam_id).catch(() => {});
     }
 
     // 2. Hardware verification if fingerprint supplied
@@ -112,8 +118,9 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      sessionStatus: isExpired ? "LOCKED" : session.status,
+      sessionStatus: session.status === "SUBMITTED" ? "SUBMITTED" : (isExpired ? "LOCKED" : session.status),
       isExpired,
+      isExamConcluded,
       extraTimeMinutes: session.extra_time_minutes || 0,
       strikesCount: session.strikes_count || 0,
       serverTime: serverNow.toISOString(),

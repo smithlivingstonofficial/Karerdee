@@ -979,20 +979,58 @@ function CandidateSittingContent() {
       );
     }
 
+    function syncBeaconAnswers() {
+      const currentSessId = sessionIdRef.current;
+      const currentTok = tokenRef.current;
+      const currentAnswers = answersRef.current;
+      if (!currentSessId || !currentTok) return;
+
+      const payloadAnswers = Object.entries(currentAnswers).map(([qId, opts]) => ({
+        questionId: qId,
+        selectedOptionIds: opts,
+        clientTimestamp: new Date().toISOString(),
+      }));
+
+      const payloadData = JSON.stringify({
+        sessionId: currentSessId,
+        token: currentTok,
+        answers: payloadAnswers,
+      });
+
+      if (typeof navigator !== "undefined" && typeof navigator.sendBeacon === "function") {
+        try {
+          const blob = new Blob([payloadData], { type: "application/json" });
+          navigator.sendBeacon("/api/exam/sync", blob);
+        } catch {}
+      }
+
+      try {
+        fetch("/api/exam/sync", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${currentTok}`,
+          },
+          body: payloadData,
+          keepalive: true,
+        }).catch(() => {});
+      } catch {}
+    }
+
     function handleBeforeUnload(e: BeforeUnloadEvent) {
       if (stageRef.current !== "ACTIVE_EXAM" || hasSubmittedRef.current) return;
-      // Preemptively submit progress via sendBeacon / keepalive fetch
-      triggerForcefulExitSubmission("WINDOW_BEFOREUNLOAD");
+      // Guarantee all user answers are saved in database even during crash or tab close
+      syncBeaconAnswers();
       e.preventDefault();
       const exitPrompt =
-        "Active examination in progress! If you reload or close this window, your examination will be finalized and submitted automatically.";
+        "Active examination in progress! If you reload or close this window, your answers remain saved.";
       e.returnValue = exitPrompt;
       return exitPrompt;
     }
 
     function handlePageHide(e: PageTransitionEvent) {
       if (stageRef.current === "ACTIVE_EXAM" && !hasSubmittedRef.current) {
-        triggerForcefulExitSubmission("WINDOW_PAGEHIDE");
+        syncBeaconAnswers();
       }
     }
 
@@ -1161,6 +1199,22 @@ function CandidateSittingContent() {
               setLockoutReason(
                 "Infraction Limit Reached. Workstation locked by Safe Exam Watchdog."
               );
+            }
+          }
+
+          // 4. Remote Exam Concluded / Session Submitted by Admin or Scheduled Timing
+          if (newRow.status === "SUBMITTED") {
+            hasSubmittedRef.current = true;
+            setSubmissionReceipt({
+              sessionId,
+              referenceCode: `AUTOSUB-${(sessionId || "").slice(0, 8).toUpperCase()}`,
+              timestamp: newRow.submitted_at || new Date().toISOString(),
+              autoScore: newRow.auto_score,
+            });
+            setSubmissionReason("EXAM_CONCLUDED");
+            setStage("SUBMITTED");
+            if (document.fullscreenElement && document.exitFullscreen) {
+              document.exitFullscreen().catch(() => {});
             }
           }
         }
@@ -2140,6 +2194,8 @@ function CandidateSittingContent() {
           }
           if (
             hbData.isExpired ||
+            hbData.isExamConcluded ||
+            hbData.sessionStatus === "SUBMITTED" ||
             (typeof hbData.serverCalculatedSecondsRemaining === "number" &&
               hbData.serverCalculatedSecondsRemaining <= 0)
           ) {
@@ -2251,28 +2307,33 @@ function CandidateSittingContent() {
     return () => clearInterval(syncInterval);
   }, [stage, token, sessionId, answers]);
 
-  // Sync Answers helper
-  async function syncAnswersToServer() {
-    if (!isOnline || !token || !sessionId) return;
+  // Sync Answers helper (Supports direct payload and debounced real-time transmission)
+  async function syncAnswersToServer(answersToSync?: Record<string, string[]>) {
+    const currentTok = tokenRef.current || token;
+    const currentSessId = sessionIdRef.current || sessionId;
+    if (!isOnline || !currentTok || !currentSessId) return;
+
+    const sourceAnswers = answersToSync || answersRef.current || answers;
+    const payloadAnswers = Object.entries(sourceAnswers).map(([qId, opts]) => ({
+      questionId: qId,
+      selectedOptionIds: opts,
+      clientTimestamp: new Date().toISOString(),
+    }));
 
     setIsSyncing(true);
     try {
-      const payloadAnswers = Object.entries(answers).map(([qId, opts]) => ({
-        questionId: qId,
-        selectedOptionIds: opts,
-        clientTimestamp: new Date().toISOString(),
-      }));
-
       const res = await fetch("/api/exam/sync", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${currentTok}`,
         },
         body: JSON.stringify({
-          sessionId,
+          sessionId: currentSessId,
+          token: currentTok,
           answers: payloadAnswers,
         }),
+        keepalive: true,
       });
 
       if (res.ok) {
@@ -2283,6 +2344,17 @@ function CandidateSittingContent() {
     } finally {
       setIsSyncing(false);
     }
+  }
+
+  const syncDebounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  function triggerDebouncedAnswerSync(currentAnswers: Record<string, string[]>) {
+    if (syncDebounceTimerRef.current) {
+      clearTimeout(syncDebounceTimerRef.current);
+    }
+    syncDebounceTimerRef.current = setTimeout(() => {
+      syncAnswersToServer(currentAnswers);
+    }, 500);
   }
 
   // Manual In-Page Unlock Check & Resume (Accessible from Workstation Lock Modal)
@@ -2399,7 +2471,7 @@ function CandidateSittingContent() {
     }
   }
 
-  // Answer selection handler (Synchronous LocalStorage Preservation)
+  // Answer selection handler (Synchronous LocalStorage Preservation & Instant Debounced Cloud Sync)
   function handleSelectOption(questionId: string, optionId: string, isMultiple: boolean) {
     setAnswers((prev) => {
       let updated: string[];
@@ -2417,6 +2489,8 @@ function CandidateSittingContent() {
       if (sessionId) {
         localStorage.setItem(`exam_answers_${sessionId}`, JSON.stringify(nextState));
       }
+      answersRef.current = nextState;
+      triggerDebouncedAnswerSync(nextState);
       return nextState;
     });
   }
@@ -2429,6 +2503,8 @@ function CandidateSittingContent() {
       if (sessionId) {
         localStorage.setItem(`exam_answers_${sessionId}`, JSON.stringify(nextState));
       }
+      answersRef.current = nextState;
+      triggerDebouncedAnswerSync(nextState);
       return nextState;
     });
   }
@@ -2459,29 +2535,11 @@ function CandidateSittingContent() {
     await submitFinalExam(reason);
   }
 
-  // Final Submit Handler
+  // Final Submit Handler (Candidate can submit at their choice at any time)
   async function submitFinalExam(reason: string = "NORMAL") {
     const currentToken = tokenRef.current || token;
     const currentSessionId = sessionIdRef.current || sessionId;
     if (!currentToken || !currentSessionId) return;
-
-    // Normal submissions strictly require all questions to be answered
-    if (reason === "NORMAL") {
-      const allExamQs = exam?.questions || [];
-      const currentAns = answersRef.current || answers;
-      const answeredSet = new Set(
-        Object.entries(currentAns)
-          .filter(([_, opts]) => Array.isArray(opts) && opts.length > 0)
-          .map(([qId]) => qId)
-      );
-      const missingCount = allExamQs.filter((q) => !answeredSet.has(q.id)).length;
-      if (allExamQs.length > 0 && missingCount > 0) {
-        setIsSubmitting(false);
-        hasSubmittedRef.current = false;
-        setIsSubmitModalOpen(true);
-        return;
-      }
-    }
 
     hasSubmittedRef.current = true;
     setIsSubmitting(true);
@@ -4266,7 +4324,7 @@ function CandidateSittingContent() {
                       <div className="text-[11px] text-slate-600 font-medium mt-0.5">
                         {!isAllQuestionsAnswered ? (
                           <span className="text-amber-800 font-semibold">
-                            ⚠️ You have {totalUnansweredCount} unanswered question(s). You must attend all questions before submitting.
+                            ⚠️ You have {totalUnansweredCount} unanswered question(s). You can review or submit as your choice.
                           </span>
                         ) : (
                           <span className="text-emerald-800 font-semibold">
@@ -4513,14 +4571,12 @@ function CandidateSittingContent() {
               </div>
               <div>
                 <h3 className="text-base font-bold text-slate-900">
-                  {isAllQuestionsAnswered
-                    ? "Submit Examination Paper?"
-                    : "Cannot Submit — Incomplete Examination"}
+                  Submit Examination Paper?
                 </h3>
                 <p className="text-xs text-slate-500">
                   {isAllQuestionsAnswered
-                    ? "Verify your final answers before permanent sealing."
-                    : "You must attend all questions before submitting."}
+                    ? "All questions answered. Verify your final answers before sealing."
+                    : "Review your answered and unanswered questions before submitting."}
                 </p>
               </div>
             </div>
@@ -4539,42 +4595,42 @@ function CandidateSittingContent() {
                 <span>{totalFlaggedCount}</span>
               </div>
               <div className="flex justify-between font-semibold">
-                <span className={totalUnansweredCount > 0 ? "text-red-600 font-bold" : "text-slate-500"}>
+                <span className={totalUnansweredCount > 0 ? "text-amber-700 font-bold" : "text-slate-500"}>
                   Unanswered Remaining:
                 </span>
-                <span className={totalUnansweredCount > 0 ? "text-red-600 font-bold" : "text-slate-500"}>
+                <span className={totalUnansweredCount > 0 ? "text-amber-700 font-bold" : "text-slate-500"}>
                   {totalUnansweredCount}
                 </span>
               </div>
             </div>
 
             {!isAllQuestionsAnswered ? (
-              <div className="p-3.5 rounded-xl bg-red-50 border border-red-200 text-xs text-red-800 space-y-2">
-                <div className="flex items-center space-x-2 font-bold text-red-900">
-                  <AlertCircle className="w-4 h-4 text-red-600 flex-shrink-0" />
-                  <span>Mandatory Completion Rule Active</span>
+              <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-900 space-y-2">
+                <div className="flex items-center space-x-2 font-bold text-amber-900">
+                  <AlertCircle className="w-4 h-4 text-amber-600 flex-shrink-0" />
+                  <span>Unanswered Questions Summary ({totalUnansweredCount} remaining)</span>
                 </div>
-                <p className="text-[11px] text-red-700 leading-relaxed">
-                  You have <strong>{totalUnansweredCount} unanswered question(s)</strong> remaining. All questions in this examination must be attended and answered before your final submission can be accepted.
+                <p className="text-[11px] text-amber-800 leading-relaxed">
+                  You have answered <strong>{totalAnsweredCount}</strong> of <strong>{totalQuestionsCount}</strong> questions. <strong>{totalUnansweredCount} question(s)</strong> remain unanswered. You may jump to any question below to answer it, or confirm and submit your examination now as your choice.
                 </p>
                 <div className="pt-1 flex flex-wrap gap-1.5 max-h-24 overflow-y-auto pr-1">
-                  {unansweredQuestions.slice(0, 15).map((uq, idx) => {
+                  {unansweredQuestions.slice(0, 20).map((uq, idx) => {
                     const qNum = allExamQuestions.findIndex((q) => q.id === uq.id) + 1;
                     return (
                       <button
                         key={uq.id}
                         type="button"
                         onClick={() => jumpToUnansweredQuestion(uq)}
-                        className="px-2 py-0.5 rounded-md bg-white hover:bg-red-100 text-red-700 border border-red-200 text-[10px] font-bold transition-colors cursor-pointer"
+                        className="px-2 py-0.5 rounded-md bg-white hover:bg-amber-100 text-amber-800 border border-amber-300 text-[10px] font-bold transition-colors cursor-pointer"
                         title="Click to jump to this question"
                       >
                         Q{qNum > 0 ? qNum : idx + 1}
                       </button>
                     );
                   })}
-                  {unansweredQuestions.length > 15 && (
-                    <span className="text-[10px] text-red-600 font-medium self-center">
-                      +{unansweredQuestions.length - 15} more
+                  {unansweredQuestions.length > 20 && (
+                    <span className="text-[10px] text-amber-700 font-medium self-center">
+                      +{unansweredQuestions.length - 20} more
                     </span>
                   )}
                 </div>
@@ -4597,35 +4653,24 @@ function CandidateSittingContent() {
                 Return to Exam
               </button>
 
-              {!isAllQuestionsAnswered ? (
-                <button
-                  type="button"
-                  onClick={() => jumpToUnansweredQuestion()}
-                  className="inline-flex items-center px-4 py-2 text-xs font-bold text-white bg-blue-700 hover:bg-blue-800 rounded-xl shadow-xs transition-colors cursor-pointer"
-                >
-                  <span>Answer Unanswered Qs</span>
-                  <ArrowRight className="w-3.5 h-3.5 ml-1.5" />
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => submitFinalExam("NORMAL")}
-                  disabled={isSubmitting}
-                  className="inline-flex items-center px-4 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow-xs transition-colors cursor-pointer disabled:opacity-50"
-                >
-                  {isSubmitting ? (
-                    <>
-                      <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
-                      <span>Finalizing...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Send className="w-3.5 h-3.5 mr-1.5" />
-                      <span>Confirm Final Submit</span>
-                    </>
-                  )}
-                </button>
-              )}
+              <button
+                type="button"
+                onClick={() => submitFinalExam("NORMAL")}
+                disabled={isSubmitting}
+                className="inline-flex items-center px-4 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow-xs transition-colors cursor-pointer disabled:opacity-50"
+              >
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                    <span>Submitting...</span>
+                  </>
+                ) : (
+                  <>
+                    <Send className="w-3.5 h-3.5 mr-1.5" />
+                    <span>Confirm Final Submit</span>
+                  </>
+                )}
+              </button>
             </div>
           </div>
         </div>

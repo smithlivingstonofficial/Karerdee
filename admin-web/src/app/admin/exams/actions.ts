@@ -165,6 +165,10 @@ export async function updateExamStatusAction(
       return { error: error.message };
     }
 
+    if (newStatus === "COMPLETED") {
+      await reconcileExamStatuses(examId);
+    }
+
     revalidatePath("/");
     revalidatePath("/exams");
     revalidatePath(`/exams/${examId}`);

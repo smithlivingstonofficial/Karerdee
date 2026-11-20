@@ -200,11 +200,11 @@ export async function reconcileExamStatuses(targetExamId?: string): Promise<Reco
   let finalizedSessionsCount = 0;
 
   try {
-    // 1. Query exams that are currently ACTIVE, ONGOING, or SCHEDULED
+    // 1. Query exams that are currently ACTIVE, ONGOING, SCHEDULED, or COMPLETED
     let examsQuery = supabaseAdmin
       .from("exams")
       .select("id, title, status, start_time, end_time, duration_minutes, created_at, config, enable_negative_marking")
-      .in("status", ["ACTIVE", "ONGOING", "SCHEDULED"]);
+      .in("status", ["ACTIVE", "ONGOING", "SCHEDULED", "COMPLETED"]);
 
     if (targetExamId && targetExamId !== "ALL") {
       examsQuery = examsQuery.eq("id", targetExamId);
@@ -223,11 +223,11 @@ export async function reconcileExamStatuses(targetExamId?: string): Promise<Reco
       };
     }
 
-    // 2. Fetch max extra time minutes for active sessions to prevent concluding while a student is in approved extra time
+    // 2. Fetch active sessions including start timestamps for individual expiration checks
     const examIds = candidateExams.map((e) => e.id);
     const { data: activeSessions } = await supabaseAdmin
       .from("exam_sessions")
-      .select("id, exam_id, status, extra_time_minutes")
+      .select("id, exam_id, status, extra_time_minutes, started_at, created_at")
       .in("exam_id", examIds)
       .in("status", ["IN_PROGRESS", "LOCKED", "PAUSED"]);
 
@@ -244,38 +244,35 @@ export async function reconcileExamStatuses(targetExamId?: string): Promise<Reco
     for (const exam of candidateExams) {
       const maxExtra = maxExtraTimeByExam.get(exam.id) || 0;
       const timing = computeExamTimingDetails(exam, maxExtra);
+      const isNeg = Boolean(exam.enable_negative_marking);
 
-      // Condition A: Exam has reached or exceeded its scheduled end time + grace period
-      if (timing.isConcluded) {
-        console.log(
-          `[Exam Reconcile] Auto-concluding expired exam "${exam.title}" (${exam.id}). Cutoff was: ${formatDateTime(
-            timing.autoConcludeDeadline,
-            false,
-            true
-          )}`
-        );
+      // Condition A: Exam is marked COMPLETED or has reached its scheduled end time + grace period
+      if (exam.status === "COMPLETED" || timing.isConcluded) {
+        if (exam.status !== "COMPLETED") {
+          console.log(
+            `[Exam Reconcile] Auto-concluding expired exam "${exam.title}" (${exam.id}). Cutoff was: ${formatDateTime(
+              timing.autoConcludeDeadline,
+              false,
+              true
+            )}`
+          );
+          await supabaseAdmin
+            .from("exams")
+            .update({ status: "COMPLETED" })
+            .eq("id", exam.id);
+        }
 
-        // Mark exam as COMPLETED
-        const { error: updateErr } = await supabaseAdmin
-          .from("exams")
-          .update({ status: "COMPLETED" })
-          .eq("id", exam.id);
+        concludedExams.push({
+          id: exam.id,
+          title: exam.title,
+          cutoffIST: formatDateTime(timing.autoConcludeDeadline, false, true),
+        });
 
-        if (!updateErr) {
-          concludedExams.push({
-            id: exam.id,
-            title: exam.title,
-            cutoffIST: formatDateTime(timing.autoConcludeDeadline, false, true),
-          });
-
-          // Finalize lingering active sessions for this exam
-          const lingeringSessions = (activeSessions || []).filter((s) => s.exam_id === exam.id);
-          const isNeg = Boolean(exam.enable_negative_marking);
-
-          for (const s of lingeringSessions) {
-            await autoFinalizeSession(s.id, exam.id, isNeg);
-            finalizedSessionsCount++;
-          }
+        // Finalize all lingering active sessions for this exam
+        const lingeringSessions = (activeSessions || []).filter((s) => s.exam_id === exam.id);
+        for (const s of lingeringSessions) {
+          await autoFinalizeSession(s.id, exam.id, isNeg);
+          finalizedSessionsCount++;
         }
       }
       // Condition B: Exam was SCHEDULED and its scheduled start time has arrived
@@ -299,6 +296,26 @@ export async function reconcileExamStatuses(targetExamId?: string): Promise<Reco
             title: exam.title,
             startTimeIST: formatDateTime(timing.startTime, false, true),
           });
+        }
+      }
+      // Condition C: Exam is ACTIVE - check individual candidate session duration expiry
+      else {
+        const lingeringSessions = (activeSessions || []).filter((s) => s.exam_id === exam.id);
+        for (const s of lingeringSessions) {
+          const startTimeStr = s.started_at || s.created_at;
+          if (startTimeStr) {
+            const startEpoch = new Date(startTimeStr).getTime();
+            const allowedMinutes = (exam.duration_minutes || 90) + Number(s.extra_time_minutes || 0);
+            // 2-minute network / latency buffer
+            const expireEpoch = startEpoch + (allowedMinutes * 60 + 120) * 1000;
+            if (serverNow.getTime() >= expireEpoch) {
+              console.log(
+                `[Exam Reconcile] Auto-finalizing expired candidate session ${s.id} for exam "${exam.title}" (allotted ${allowedMinutes}m ended).`
+              );
+              await autoFinalizeSession(s.id, exam.id, isNeg);
+              finalizedSessionsCount++;
+            }
+          }
         }
       }
     }

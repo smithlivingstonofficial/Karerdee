@@ -150,26 +150,6 @@ export async function POST(req: NextRequest) {
 
     const reason = body.submissionReason || "NORMAL";
 
-    // Strict validation: candidate manual submission requires attending all questions
-    if (reason === "NORMAL") {
-      const answeredQIds = new Set(
-        answers
-          .filter((a) => Array.isArray(a.selectedOptionIds) && a.selectedOptionIds.length > 0)
-          .map((a) => a.questionId)
-      );
-      const totalExamQuestionsCount = (dbQuestions || []).length;
-      if (totalExamQuestionsCount > 0 && answeredQIds.size < totalExamQuestionsCount) {
-        const missingCount = totalExamQuestionsCount - answeredQIds.size;
-        return NextResponse.json(
-          {
-            error: `Incomplete examination: You must attend all questions before submitting. ${missingCount} question(s) remaining.`,
-            missingCount,
-          },
-          { status: 400 }
-        );
-      }
-    }
-
     // 3. Process answers and auto-grade MCQs
     let totalScore = 0;
     const submissionUpserts = [];
