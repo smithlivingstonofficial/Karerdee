@@ -253,25 +253,49 @@ export async function getExamGradebookAction(examId: string): Promise<{
       return deptCode && targetDeptCodes.has(deptCode);
     });
 
-    // 5. Fetch Submissions for All Sessions in this Exam
-    let submissionsBySession = new Map<string, any[]>();
+    // 5. Fetch Submissions for All Sessions in this Exam (Paginated to guarantee all 10,000+ records are loaded)
+    const submissionsBySession = new Map<string, any[]>();
     if (sessionIds.length > 0) {
-      const { data: subsData } = await supabaseAdmin
-        .from("submissions")
-        .select(`
-          session_id,
-          question_id,
-          selected_option_ids,
-          awarded_points,
-          is_auto_graded
-        `)
-        .in("session_id", sessionIds);
+      const pageSize = 1000;
+      let page = 0;
+      let hasMore = true;
 
-      (subsData || []).forEach((sub: any) => {
-        const existing = submissionsBySession.get(sub.session_id) || [];
-        existing.push(sub);
-        submissionsBySession.set(sub.session_id, existing);
-      });
+      while (hasMore) {
+        const from = page * pageSize;
+        const to = from + pageSize - 1;
+        const { data: batchSubs, error: subErr } = await supabaseAdmin
+          .from("submissions")
+          .select(`
+            session_id,
+            question_id,
+            selected_option_ids,
+            awarded_points,
+            is_auto_graded
+          `)
+          .in("session_id", sessionIds)
+          .range(from, to);
+
+        if (subErr) {
+          console.error("Submissions batch fetch error at page", page, subErr);
+          break;
+        }
+
+        if (batchSubs && batchSubs.length > 0) {
+          batchSubs.forEach((sub: any) => {
+            const existing = submissionsBySession.get(sub.session_id) || [];
+            existing.push(sub);
+            submissionsBySession.set(sub.session_id, existing);
+          });
+
+          if (batchSubs.length < pageSize) {
+            hasMore = false;
+          } else {
+            page++;
+          }
+        } else {
+          hasMore = false;
+        }
+      }
     }
 
     // 6. Aggregate Candidate Gradebook Items
@@ -499,10 +523,10 @@ export async function getExamGradebookAction(examId: string): Promise<{
       let calculatedScore = 0;
       if (typeof sess?.final_score === "number") {
         calculatedScore = sess.final_score;
-      } else if (userSubmissions.length > 0) {
-        calculatedScore = earnedScore;
       } else if (typeof sess?.auto_score === "number") {
         calculatedScore = sess.auto_score;
+      } else if (userSubmissions.length > 0) {
+        calculatedScore = earnedScore;
       } else {
         calculatedScore = 0;
       }
